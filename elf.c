@@ -1,5 +1,42 @@
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+static int
+compile_elf_source (const char *filename)
+{
+    int fd = open (filename, O_RDONLY);
+    if (fd < 0) {
+        printf ("Failed to open file \"%s\": %s\n", filename, strerror (errno));
+        return 1;
+    }
+
+    struct stat file_info;
+    if (fstat (fd, &file_info) < 0) {
+        close (fd);
+        printf ("Failed to get information: %s\n", strerror (errno));
+        return 1;
+    }
+    size_t data_length = file_info.st_size;
+
+    char *data = mmap (NULL, data_length, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (data == MAP_FAILED) {
+        close (fd);
+        printf ("Failed to map file: %s\n", strerror (errno));
+        return 1;
+    }
+
+    printf ("%.*s\n", (int) data_length, data);
+
+    munmap (data, data_length);
+    close (fd);
+
+    return 0;
+}
 
 int
 main (int argc, char **argv)
@@ -9,8 +46,13 @@ main (int argc, char **argv)
         command = argv[1];
 
     if (strcmp (command, "compile") == 0) {
-        printf ("NOT IMPLEMENTED\n");
-        return 1;
+        if (argc < 3) {
+            printf ("Need file to compile, run elf help for more information\n");
+            return 1;
+        }
+        const char *filename = argv[2];
+
+        return compile_elf_source (filename);
     }
     else if (strcmp (command, "version") == 0) {
         printf ("0\n");
