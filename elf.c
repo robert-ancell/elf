@@ -1,10 +1,66 @@
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+typedef enum {
+    TOKEN_TYPE_WORD,
+    TOKEN_TYPE_NUMBER,
+} TokenType;
+
+typedef struct {
+    TokenType type;
+    size_t offset;
+    size_t length;
+} Token;
+
+static int
+parse_elf_source (const char *data, size_t data_length)
+{
+    Token **tokens = NULL;
+    size_t tokens_length = 0;
+    Token *current_token = NULL;
+    for (size_t offset = 0; offset < data_length; offset++) {
+        // FIXME: Support UTF-8
+        char c = data[offset];
+
+        if (current_token == NULL) {
+            // Skip whitespace
+            if (isspace (c))
+                continue;
+
+            tokens_length++;
+            tokens = realloc (tokens, sizeof (Token *) * tokens_length); // FIXME: Double size each time
+            tokens[tokens_length - 1] = current_token = malloc (sizeof (Token));
+            memset (current_token, 0, sizeof (Token));
+            current_token->type = TOKEN_TYPE_WORD;
+            current_token->offset = offset;
+            current_token->length = 1;
+        }
+        else {
+            if (isspace (c)) {
+                current_token = NULL;
+                continue;
+            }
+
+            current_token->length++;
+        }
+    }
+
+    for (size_t i = 0; i < tokens_length; i++) {
+        Token *token = tokens[i];
+        printf ("%.*s\n", (int) token->length, data + token->offset);
+        free (token);
+    }
+    free (tokens);
+
+    return 0;
+}
 
 static int
 compile_elf_source (const char *filename)
@@ -30,12 +86,12 @@ compile_elf_source (const char *filename)
         return 1;
     }
 
-    printf ("%.*s\n", (int) data_length, data);
+    int result = parse_elf_source (data, data_length);
 
     munmap (data, data_length);
     close (fd);
 
-    return 0;
+    return result;
 }
 
 int
