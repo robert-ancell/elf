@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,6 +8,12 @@ static bool
 is_number_char (char c)
 {
     return c >= '0' && c <= '9';
+}
+
+static bool
+is_symbol_char (char c)
+{
+    return is_number_char (c) || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
 static char
@@ -42,7 +47,7 @@ token_is_complete (const char *data, Token *token, char next_c)
 {
    switch (token->type) {
    case TOKEN_TYPE_WORD:
-       return isspace (next_c);
+       return !is_symbol_char (next_c);
    case TOKEN_TYPE_NUMBER:
        return !is_number_char (next_c);
    case TOKEN_TYPE_TEXT:
@@ -54,6 +59,7 @@ token_is_complete (const char *data, Token *token, char next_c)
    case TOKEN_TYPE_DIVIDE:
    case TOKEN_TYPE_OPEN_PAREN:
    case TOKEN_TYPE_CLOSE_PAREN:
+   case TOKEN_TYPE_COMMA:
    case TOKEN_TYPE_OPEN_BRACE:
    case TOKEN_TYPE_CLOSE_BRACE:
        return true;
@@ -80,7 +86,7 @@ elf_lex (const char *data, size_t data_length)
 
         if (current_token == NULL) {
             // Skip whitespace
-            if (isspace (c))
+            if (c == ' ' || c == '\r' || c == '\n')
                 continue;
 
             tokens_length++;
@@ -88,7 +94,6 @@ elf_lex (const char *data, size_t data_length)
             tokens[tokens_length] = NULL;
             Token *token = tokens[tokens_length - 1] = malloc (sizeof (Token));
             memset (token, 0, sizeof (Token));
-            token->type = TOKEN_TYPE_WORD;
             token->offset = offset;
             token->length = 1;
 
@@ -96,6 +101,8 @@ elf_lex (const char *data, size_t data_length)
                 token->type = TOKEN_TYPE_OPEN_PAREN;
             else if (c == ')')
                 token->type = TOKEN_TYPE_CLOSE_PAREN;
+            else if (c == ',')
+                token->type = TOKEN_TYPE_COMMA;
             else if (c == '{')
                 token->type = TOKEN_TYPE_OPEN_BRACE;
             else if (c == '}')
@@ -114,7 +121,7 @@ elf_lex (const char *data, size_t data_length)
                 token->type = TOKEN_TYPE_NUMBER;
             else if (c == '"' || c == '\'')
                 token->type = TOKEN_TYPE_TEXT;
-            else
+            else if (is_symbol_char (c))
                 token->type = TOKEN_TYPE_WORD;
 
             current_token = token;
@@ -136,7 +143,7 @@ tokens_free (Token **tokens)
 }
 
 static bool
-token_matches (const char *data, Token *token, const char *value)
+token_has_text (const char *data, Token *token, const char *value)
 {
     for (int i = 0; i < token->length; i++) {
         if (value[i] == '\0' || data[token->offset + i] != value[i])
@@ -160,20 +167,48 @@ is_data_type (const char *data, Token *token)
         return false;
 
     for (int i = 0; builtin_types[i] != NULL; i++)
-        if (token_matches (data, token, builtin_types[i]))
+        if (token_has_text (data, token, builtin_types[i]))
             return true;
 
     return false;
 }
 
 static bool
-is_variable (const char *data, Token *token)
+token_text_matches (const char *data, Token *a, Token *b)
 {
-    return token->type == TOKEN_TYPE_WORD; // FIXME
+    if (a->length != b->length)
+        return false;
+
+    for (size_t i = 0; i < a->length; i++)
+        if (data[a->offset + i] != data[b->offset + i])
+            return false;
+
+    return true;
+}
+
+static bool
+is_variable (OperationFunctionDefinition *function, const char *data, Token *token)
+{
+    for (int i = 0; function->body[i] != NULL; i++) {
+        if (function->body[i]->type != OPERATION_TYPE_VARIABLE_DEFINITION)
+            continue;
+
+        OperationVariableDefinition *op = (OperationVariableDefinition *) function->body[i];
+        if (token_text_matches (data, op->name, token))
+            return true;
+    }
+
+    return false;
+}
+
+static bool
+is_function (OperationFunctionDefinition *function, const char *data, Token *token)
+{
+    return token_has_text (data, token, "print");
 }
 
 static Operation *
-parse_value (const char *data, Token **tokens, size_t *offset)
+parse_value (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
 {
     Token *token = tokens[*offset];
     if (token == NULL)
@@ -195,18 +230,25 @@ parse_value (const char *data, Token **tokens, size_t *offset)
         (*offset)++;
         return (Operation *) op;
     }
+    else if (is_variable (function, data, token)) {
+        OperationVariableValue *op = malloc (sizeof (OperationVariableValue));
+        memset (op, 0, sizeof (OperationVariableValue));
+        op->type = OPERATION_TYPE_VARIABLE_VALUE;
+        op->name = token;
+        (*offset)++;
+        return (Operation *) op;
+    }
 
     return NULL;
 }
 
-static Operation **
-parse_sequence (const char *data, Token **tokens, size_t *offset)
+static bool
+parse_function_body (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
 {
-    Operation **sequence = NULL;
-    size_t sequence_length = 0;
+    size_t body_length = 0;
 
-    sequence = malloc (sizeof (Operation *));
-    sequence[0] = NULL;
+    function->body = malloc (sizeof (Operation *));
+    function->body[0] = NULL;
     while (tokens[*offset] != NULL) {
         Token *token = tokens[*offset];
 
@@ -223,10 +265,10 @@ parse_sequence (const char *data, Token **tokens, size_t *offset)
             if (assignment_token != NULL && assignment_token->type == TOKEN_TYPE_ASSIGN) {
                  (*offset)++;
 
-                 value = parse_value (data, tokens, offset);
+                 value = parse_value (function, data, tokens, offset);
                  if (value == NULL) {
                     printf ("Invalid value for variable\n");
-                    return NULL;
+                    return false;
                 }
             }
 
@@ -238,13 +280,13 @@ parse_sequence (const char *data, Token **tokens, size_t *offset)
             o->value = value;
             op = (Operation *) o;
         }
-        else if (token_matches (data, token, "return")) {
+        else if (token_has_text (data, token, "return")) {
             (*offset)++;
 
-            Operation *value = parse_value (data, tokens, offset);
+            Operation *value = parse_value (function, data, tokens, offset);
             if (value == NULL) {
                 printf ("Not value return value\n");
-                return NULL;
+                return false;
             }
 
             OperationReturn *o = malloc (sizeof (OperationReturn));
@@ -253,21 +295,21 @@ parse_sequence (const char *data, Token **tokens, size_t *offset)
             o->value = value;
             op = (Operation *) o;
         }
-        else if (is_variable (data, token)) {
+        else if (is_variable (function, data, token)) {
             Token *name = token;
             (*offset)++;
 
             Token *assignment_token = tokens[*offset];
             if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
                  printf ("Missing assignment token\n");
-                 return NULL;
+                 return false;
             }
             (*offset)++;
 
-            Operation *value = parse_value (data, tokens, offset);
+            Operation *value = parse_value (function, data, tokens, offset);
             if (value == NULL) {
                  printf ("Invalid value for variable\n");
-                 return NULL;
+                 return false;
             }
 
             OperationVariableAssignment *o = malloc (sizeof (OperationVariableAssignment));
@@ -277,18 +319,56 @@ parse_sequence (const char *data, Token **tokens, size_t *offset)
             o->value = value;
             op = (Operation *) o;
         }
+        else if (is_function (function, data, token)) {
+            Token *name = token;
+            (*offset)++;
+
+            Token *open_paren_token = tokens[*offset];
+            if (open_paren_token != NULL && open_paren_token->type == TOKEN_TYPE_OPEN_PAREN) {
+                (*offset)++;
+
+                bool closed = false;
+                while (tokens[*offset] != NULL) {
+                    Token *param_token = tokens[*offset];
+                    if (param_token->type == TOKEN_TYPE_CLOSE_PAREN) {
+                        (*offset)++;
+                        closed = true;
+                        break;
+                    }
+
+                    // FIXME comma separate
+
+                    Operation *value = parse_value (function, data, tokens, offset);
+                    if (value == NULL) {
+                        printf ("Invalid parameter\n");
+                        return NULL;
+                    }
+                }
+
+                if (!closed) {
+                    printf ("Unclosed paren\n");
+                    return NULL;
+                }
+            }
+
+            OperationFunctionCall *o = malloc (sizeof (OperationFunctionCall));
+            memset (o, 0, sizeof (OperationFunctionCall));
+            o->type = OPERATION_TYPE_FUNCTION_CALL;
+            o->name = name;
+            op = (Operation *) o;
+        }
         else {
             printf ("Unexpected token\n");
-            return NULL;
+            return false;
         }
 
-        sequence_length++;
-        sequence = realloc (sequence, sizeof (Operation *) * (sequence_length + 1));
-        sequence[sequence_length - 1] = op;
-        sequence[sequence_length] = NULL;
+        body_length++;
+        function->body = realloc (function->body, sizeof (Operation *) * (body_length + 1));
+        function->body[body_length - 1] = op;
+        function->body[body_length] = NULL;
     }
 
-    return sequence;
+    return true;
 }
 
 OperationFunctionDefinition *
@@ -296,16 +376,15 @@ elf_parse (const char *data, size_t data_length)
 {
     Token **tokens = elf_lex (data, data_length);
 
+    OperationFunctionDefinition *main_function = malloc (sizeof (OperationFunctionDefinition));
+    memset (main_function, 0, sizeof (OperationFunctionDefinition));
+
     size_t offset = 0;
-    Operation **body = parse_sequence (data, tokens, &offset);
-    if (body == NULL) {
+    if (!parse_function_body (main_function, data, tokens, &offset)) {
+        operation_free ((Operation *) main_function);
         tokens_free (tokens);
         return NULL;
     }
-
-    OperationFunctionDefinition *main_function = malloc (sizeof (OperationFunctionDefinition));
-    memset (main_function, 0, sizeof (OperationFunctionDefinition));
-    main_function->body = body;
 
     tokens_free (tokens);
 
@@ -330,6 +409,8 @@ operation_to_string (Operation *operation)
         return strdup ("NUMBER_CONSTANT");
     case OPERATION_TYPE_TEXT_CONSTANT:
         return strdup ("TEXT_CONSTANT");
+    case OPERATION_TYPE_VARIABLE_VALUE:
+        return strdup ("VARIABLE_VALUE");
     }
 
     return strdup ("UNKNOWN");
@@ -376,6 +457,7 @@ operation_free (Operation *operation)
     }
     case OPERATION_TYPE_NUMBER_CONSTANT:
     case OPERATION_TYPE_TEXT_CONSTANT:
+    case OPERATION_TYPE_VARIABLE_VALUE:
         break;
     }
 

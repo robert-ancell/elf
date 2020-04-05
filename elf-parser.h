@@ -13,6 +13,7 @@ typedef enum {
     TOKEN_TYPE_DIVIDE,
     TOKEN_TYPE_OPEN_PAREN,
     TOKEN_TYPE_CLOSE_PAREN,
+    TOKEN_TYPE_COMMA,
     TOKEN_TYPE_OPEN_BRACE,
     TOKEN_TYPE_CLOSE_BRACE,
 } TokenType;
@@ -31,6 +32,7 @@ typedef enum {
     OPERATION_TYPE_RETURN,
     OPERATION_TYPE_NUMBER_CONSTANT,
     OPERATION_TYPE_TEXT_CONSTANT,
+    OPERATION_TYPE_VARIABLE_VALUE,
 } OperationType;
 
 typedef struct {
@@ -52,13 +54,16 @@ typedef struct {
     Operation *value;
 } OperationVariableAssignment;
 
-typedef struct {
+typedef struct _OperationFunctionDefinition OperationFunctionDefinition;
+
+struct _OperationFunctionDefinition {
     OperationType type; // OPERATION_TYPE_FUNCTION_DEFINITION
 
+    OperationFunctionDefinition *parent;
     Token *name;
     Operation **parameters;
     Operation **body;
-} OperationFunctionDefinition;
+};
 
 typedef struct {
     OperationType type; // OPERATION_TYPE_FUNCTION_CALL
@@ -85,6 +90,12 @@ typedef struct {
 
     Token *value;
 } OperationTextConstant;
+
+typedef struct {
+    OperationType type; // OPERATION_TYPE_VARIABLE_VALUE;
+
+    Token *name;
+} OperationVariableValue;
 
 OperationFunctionDefinition *elf_parse (const char *data, size_t data_length);
 
