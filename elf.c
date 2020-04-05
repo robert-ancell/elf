@@ -14,12 +14,17 @@
 static int
 parse_elf_source (const char *data, size_t data_length)
 {
-    Token **tokens = elf_parse (data, data_length);
-    for (int i = 0; tokens[i] != NULL; i++) {
-        Token *token = tokens[i];
-        printf ("%.*s\n", (int) token->length, data + token->offset);
+    OperationFunctionDefinition *main_function = elf_parse (data, data_length);
+    if (main_function == NULL)
+        return 1;
+
+    for (int i = 0; main_function->body[i] != NULL; i++) {
+        Operation *op = main_function->body[i];
+        char *op_text = operation_to_string (op);
+        printf ("%s\n", op_text);
     }
-    tokens_free (tokens);
+
+    operation_free ((Operation *) main_function);
 
     return 0;
 }

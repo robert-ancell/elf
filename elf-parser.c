@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "elf-parser.h"
@@ -61,8 +62,8 @@ token_is_complete (const char *data, Token *token, char next_c)
    return false;
 }
 
-Token **
-elf_parse (const char *data, size_t data_length)
+static Token **
+elf_lex (const char *data, size_t data_length)
 {
     Token **tokens = NULL;
     size_t tokens_length = 0;
@@ -126,10 +127,257 @@ elf_parse (const char *data, size_t data_length)
     return tokens;
 }
 
-void
+static void
 tokens_free (Token **tokens)
 {
     for (size_t i = 0; tokens[i] != NULL; i++)
         free (tokens[i]);
     free (tokens);
+}
+
+static bool
+token_matches (const char *data, Token *token, const char *value)
+{
+    for (int i = 0; i < token->length; i++) {
+        if (value[i] == '\0' || data[token->offset + i] != value[i])
+            return false;
+    }
+
+    return value[token->length] == '\0';
+}
+
+static bool
+is_data_type (const char *data, Token *token)
+{
+    const char *builtin_types[] = { "uint8", "int8",
+                                    "uint16", "int16",
+                                    "uint32", "int32",
+                                    "uint64", "int64",
+                                    "utf8",
+                                    NULL };
+
+    if (token->type != TOKEN_TYPE_WORD)
+        return false;
+
+    for (int i = 0; builtin_types[i] != NULL; i++)
+        if (token_matches (data, token, builtin_types[i]))
+            return true;
+
+    return false;
+}
+
+static bool
+is_variable (const char *data, Token *token)
+{
+    return token->type == TOKEN_TYPE_WORD; // FIXME
+}
+
+static Operation *
+parse_value (const char *data, Token **tokens, size_t *offset)
+{
+    Token *token = tokens[*offset];
+    if (token == NULL)
+        return NULL;
+
+    if (token->type == TOKEN_TYPE_NUMBER) {
+        OperationNumberConstant *op = malloc (sizeof (OperationNumberConstant));
+        memset (op, 0, sizeof (OperationNumberConstant));
+        op->type = OPERATION_TYPE_NUMBER_CONSTANT;
+        op->value = token;
+        (*offset)++;
+        return (Operation *) op;
+    }
+    else if (token->type == TOKEN_TYPE_TEXT) {
+        OperationTextConstant *op = malloc (sizeof (OperationTextConstant));
+        memset (op, 0, sizeof (OperationTextConstant));
+        op->type = OPERATION_TYPE_TEXT_CONSTANT;
+        op->value = token;
+        (*offset)++;
+        return (Operation *) op;
+    }
+
+    return NULL;
+}
+
+static Operation **
+parse_sequence (const char *data, Token **tokens, size_t *offset)
+{
+    Operation **sequence = NULL;
+    size_t sequence_length = 0;
+
+    sequence = malloc (sizeof (Operation *));
+    sequence[0] = NULL;
+    while (tokens[*offset] != NULL) {
+        Token *token = tokens[*offset];
+
+        Operation *op = NULL;
+        if (is_data_type (data, token)) {
+            Token *data_type = token;
+            (*offset)++;
+
+            Token *name = tokens[*offset]; // FIXME: Check valid name
+            (*offset)++;
+
+            Token *assignment_token = tokens[*offset];
+            Operation *value = NULL;
+            if (assignment_token != NULL && assignment_token->type == TOKEN_TYPE_ASSIGN) {
+                 (*offset)++;
+
+                 value = parse_value (data, tokens, offset);
+                 if (value == NULL) {
+                    printf ("Invalid value for variable\n");
+                    return NULL;
+                }
+            }
+
+            OperationVariableDefinition *o = malloc (sizeof (OperationVariableDefinition));
+            memset (o, 0, sizeof (OperationVariableDefinition));
+            o->type = OPERATION_TYPE_VARIABLE_DEFINITION;
+            o->data_type = data_type;
+            o->name = name;
+            o->value = value;
+            op = (Operation *) o;
+        }
+        else if (token_matches (data, token, "return")) {
+            (*offset)++;
+
+            Operation *value = parse_value (data, tokens, offset);
+            if (value == NULL) {
+                printf ("Not value return value\n");
+                return NULL;
+            }
+
+            OperationReturn *o = malloc (sizeof (OperationReturn));
+            memset (o, 0, sizeof (OperationReturn));
+            o->type = OPERATION_TYPE_RETURN;
+            o->value = value;
+            op = (Operation *) o;
+        }
+        else if (is_variable (data, token)) {
+            Token *name = token;
+            (*offset)++;
+
+            Token *assignment_token = tokens[*offset];
+            if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
+                 printf ("Missing assignment token\n");
+                 return NULL;
+            }
+            (*offset)++;
+
+            Operation *value = parse_value (data, tokens, offset);
+            if (value == NULL) {
+                 printf ("Invalid value for variable\n");
+                 return NULL;
+            }
+
+            OperationVariableAssignment *o = malloc (sizeof (OperationVariableAssignment));
+            memset (o, 0, sizeof (OperationVariableAssignment));
+            o->type = OPERATION_TYPE_VARIABLE_ASSIGNMENT;
+            o->name = name;
+            o->value = value;
+            op = (Operation *) o;
+        }
+        else {
+            printf ("Unexpected token\n");
+            return NULL;
+        }
+
+        sequence_length++;
+        sequence = realloc (sequence, sizeof (Operation *) * (sequence_length + 1));
+        sequence[sequence_length - 1] = op;
+        sequence[sequence_length] = NULL;
+    }
+
+    return sequence;
+}
+
+OperationFunctionDefinition *
+elf_parse (const char *data, size_t data_length)
+{
+    Token **tokens = elf_lex (data, data_length);
+
+    size_t offset = 0;
+    Operation **body = parse_sequence (data, tokens, &offset);
+    if (body == NULL) {
+        tokens_free (tokens);
+        return NULL;
+    }
+
+    OperationFunctionDefinition *main_function = malloc (sizeof (OperationFunctionDefinition));
+    memset (main_function, 0, sizeof (OperationFunctionDefinition));
+    main_function->body = body;
+
+    tokens_free (tokens);
+
+    return main_function;
+}
+
+char *
+operation_to_string (Operation *operation)
+{
+    switch (operation->type) {
+    case OPERATION_TYPE_VARIABLE_DEFINITION:
+        return strdup ("VARIABLE_DEFINITION");
+    case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
+        return strdup ("VARIABLE_ASSIGNMENT");
+    case OPERATION_TYPE_FUNCTION_DEFINE:
+        return strdup ("FUNCTION_DEFINE");
+    case OPERATION_TYPE_FUNCTION_CALL:
+        return strdup ("FUNCTION_CALL");
+    case OPERATION_TYPE_RETURN:
+        return strdup ("RETURN");
+    case OPERATION_TYPE_NUMBER_CONSTANT:
+        return strdup ("NUMBER_CONSTANT");
+    case OPERATION_TYPE_TEXT_CONSTANT:
+        return strdup ("TEXT_CONSTANT");
+    }
+
+    return strdup ("UNKNOWN");
+}
+
+void
+operation_free (Operation *operation)
+{
+    if (operation == NULL)
+        return;
+
+    switch (operation->type) {
+    case OPERATION_TYPE_VARIABLE_DEFINITION: {
+        OperationVariableDefinition *op = (OperationVariableDefinition *) operation;
+        operation_free (op->value);
+        break;
+    }
+    case OPERATION_TYPE_VARIABLE_ASSIGNMENT: {
+        OperationVariableAssignment *op = (OperationVariableAssignment *) operation;
+        operation_free (op->value);
+        break;
+    }
+    case OPERATION_TYPE_FUNCTION_DEFINE: {
+        OperationFunctionDefinition *op = (OperationFunctionDefinition *) operation;
+        for (int i = 0; op->parameters[i] != NULL; i++)
+            operation_free (op->parameters[i]);
+        free (op->parameters);
+        for (int i = 0; op->body[i] != NULL; i++)
+            operation_free (op->body[i]);
+        free (op->body);
+        break;
+    }
+    case OPERATION_TYPE_FUNCTION_CALL: {
+        OperationFunctionCall *op = (OperationFunctionCall *) operation;
+        for (int i = 0; op->parameters[i] != NULL; i++)
+            operation_free (op->parameters[i]);
+        free (op->parameters);
+        break;
+    }
+    case OPERATION_TYPE_RETURN: {
+        OperationReturn *op = (OperationReturn *) operation;
+        operation_free (op->value);
+        break;
+    }
+    case OPERATION_TYPE_NUMBER_CONSTANT:
+    case OPERATION_TYPE_TEXT_CONSTANT:
+        break;
+    }
+
+    free (operation);
 }
