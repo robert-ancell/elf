@@ -296,14 +296,28 @@ token_text_matches (const char *data, Token *a, Token *b)
 }
 
 static bool
+is_variable_definition_with_name (Operation *operation, const char *data, Token *token)
+{
+    if (operation->type != OPERATION_TYPE_VARIABLE_DEFINITION)
+        return false;
+
+    OperationVariableDefinition *op = (OperationVariableDefinition *) operation;
+    if (token_text_matches (data, op->name, token))
+        return true;
+
+    return false;
+}
+
+static bool
 is_variable (OperationFunctionDefinition *function, const char *data, Token *token)
 {
-    for (int i = 0; function->body[i] != NULL; i++) {
-        if (function->body[i]->type != OPERATION_TYPE_VARIABLE_DEFINITION)
-            continue;
+    for (int i = 0; function->parameters[i] != NULL; i++) {
+        if (is_variable_definition_with_name (function->parameters[i], data, token))
+            return true;
+    }
 
-        OperationVariableDefinition *op = (OperationVariableDefinition *) function->body[i];
-        if (token_text_matches (data, op->name, token))
+    for (int i = 0; function->body[i] != NULL; i++) {
+        if (is_variable_definition_with_name (function->body[i], data, token))
             return true;
     }
 
@@ -528,7 +542,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 
             Operation *value = parse_expression (function, data, tokens, offset);
             if (value == NULL) {
-                printf ("Not value return value\n");
+                printf ("Not valid return value\n");
                 return false;
             }
 
