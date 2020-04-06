@@ -1,6 +1,6 @@
-#include <string.h>
-
 #include "elf-token.h"
+
+#include <string.h>
 
 char *
 token_to_string (Token *token)

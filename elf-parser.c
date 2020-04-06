@@ -1,8 +1,8 @@
+#include "elf-parser.h"
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-
-#include "elf-parser.h"
 
 static bool
 is_number_char (char c)
