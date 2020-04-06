@@ -207,6 +207,8 @@ is_function (OperationFunctionDefinition *function, const char *data, Token *tok
     return token_has_text (data, token, "print");
 }
 
+static Operation *parse_expression (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset);
+
 static Operation *
 parse_value (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
 {
@@ -236,6 +238,44 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
         op->type = OPERATION_TYPE_VARIABLE_VALUE;
         op->name = token;
         (*offset)++;
+        return (Operation *) op;
+    }
+    else if (is_function (function, data, token)) {
+        Token *name = token;
+        (*offset)++;
+
+        Token *open_paren_token = tokens[*offset];
+        if (open_paren_token != NULL && open_paren_token->type == TOKEN_TYPE_OPEN_PAREN) {
+            (*offset)++;
+
+            bool closed = false;
+            while (tokens[*offset] != NULL) {
+                Token *param_token = tokens[*offset];
+                if (param_token->type == TOKEN_TYPE_CLOSE_PAREN) {
+                    (*offset)++;
+                    closed = true;
+                    break;
+                }
+
+                // FIXME comma separate
+
+                Operation *value = parse_expression (function, data, tokens, offset);
+                if (value == NULL) {
+                    printf ("Invalid parameter\n");
+                    return NULL;
+                }
+            }
+
+            if (!closed) {
+                printf ("Unclosed paren\n");
+                return NULL;
+            }
+        }
+
+        OperationFunctionCall *op = malloc (sizeof (OperationFunctionCall));
+        memset (op, 0, sizeof (OperationFunctionCall));
+        op->type = OPERATION_TYPE_FUNCTION_CALL;
+        op->name = name;
         return (Operation *) op;
     }
 
@@ -359,43 +399,8 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
             o->value = value;
             op = (Operation *) o;
         }
-        else if (is_function (function, data, token)) {
-            Token *name = token;
-            (*offset)++;
-
-            Token *open_paren_token = tokens[*offset];
-            if (open_paren_token != NULL && open_paren_token->type == TOKEN_TYPE_OPEN_PAREN) {
-                (*offset)++;
-
-                bool closed = false;
-                while (tokens[*offset] != NULL) {
-                    Token *param_token = tokens[*offset];
-                    if (param_token->type == TOKEN_TYPE_CLOSE_PAREN) {
-                        (*offset)++;
-                        closed = true;
-                        break;
-                    }
-
-                    // FIXME comma separate
-
-                    Operation *value = parse_expression (function, data, tokens, offset);
-                    if (value == NULL) {
-                        printf ("Invalid parameter\n");
-                        return NULL;
-                    }
-                }
-
-                if (!closed) {
-                    printf ("Unclosed paren\n");
-                    return NULL;
-                }
-            }
-
-            OperationFunctionCall *o = malloc (sizeof (OperationFunctionCall));
-            memset (o, 0, sizeof (OperationFunctionCall));
-            o->type = OPERATION_TYPE_FUNCTION_CALL;
-            o->name = name;
-            op = (Operation *) o;
+        else if ((op = parse_value (function, data, tokens, offset)) != NULL) {
+            // FIXME: Only allow functions and variable values
         }
         else {
             printf ("Unexpected token\n");
