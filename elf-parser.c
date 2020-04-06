@@ -243,6 +243,46 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
 }
 
 static bool
+token_is_binary_operator (Token *token)
+{
+    return token->type == TOKEN_TYPE_ADD ||
+           token->type == TOKEN_TYPE_SUBTRACT ||
+           token->type == TOKEN_TYPE_MULTIPLY ||
+           token->type == TOKEN_TYPE_DIVIDE;
+}
+
+static Operation *
+parse_expression (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
+{
+    Operation *a = parse_value (function, data, tokens, offset);
+    if (a == NULL)
+        return NULL;
+
+    Token *operator = tokens[*offset];
+    if (operator == NULL)
+        return a;
+
+    if (!token_is_binary_operator (operator))
+        return a;
+    (*offset)++;
+
+    Operation *b = parse_value (function, data, tokens, offset);
+    if (b == NULL) {
+        printf ("Missing second value in binary operation\n");
+        operation_free (a);
+        return NULL;
+    }
+
+    OperationBinary *op = malloc (sizeof (OperationBinary));
+    memset (op, 0, sizeof (OperationBinary));
+    op->type = OPERATION_TYPE_BINARY;
+    op->operator = operator;
+    op->a = a;
+    op->b = b;
+    return (Operation *) op;
+}
+
+static bool
 parse_function_body (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
 {
     size_t body_length = 0;
@@ -265,7 +305,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
             if (assignment_token != NULL && assignment_token->type == TOKEN_TYPE_ASSIGN) {
                  (*offset)++;
 
-                 value = parse_value (function, data, tokens, offset);
+                 value = parse_expression (function, data, tokens, offset);
                  if (value == NULL) {
                     printf ("Invalid value for variable\n");
                     return false;
@@ -283,7 +323,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
         else if (token_has_text (data, token, "return")) {
             (*offset)++;
 
-            Operation *value = parse_value (function, data, tokens, offset);
+            Operation *value = parse_expression (function, data, tokens, offset);
             if (value == NULL) {
                 printf ("Not value return value\n");
                 return false;
@@ -306,7 +346,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
             }
             (*offset)++;
 
-            Operation *value = parse_value (function, data, tokens, offset);
+            Operation *value = parse_expression (function, data, tokens, offset);
             if (value == NULL) {
                  printf ("Invalid value for variable\n");
                  return false;
@@ -338,7 +378,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 
                     // FIXME comma separate
 
-                    Operation *value = parse_value (function, data, tokens, offset);
+                    Operation *value = parse_expression (function, data, tokens, offset);
                     if (value == NULL) {
                         printf ("Invalid parameter\n");
                         return NULL;
@@ -411,6 +451,8 @@ operation_to_string (Operation *operation)
         return strdup ("TEXT_CONSTANT");
     case OPERATION_TYPE_VARIABLE_VALUE:
         return strdup ("VARIABLE_VALUE");
+    case OPERATION_TYPE_BINARY:
+        return strdup ("BINARY");
     }
 
     return strdup ("UNKNOWN");
@@ -453,6 +495,12 @@ operation_free (Operation *operation)
     case OPERATION_TYPE_RETURN: {
         OperationReturn *op = (OperationReturn *) operation;
         operation_free (op->value);
+        break;
+    }
+    case OPERATION_TYPE_BINARY: {
+        OperationBinary *op = (OperationBinary *) operation;
+        operation_free (op->a);
+        operation_free (op->b);
         break;
     }
     case OPERATION_TYPE_NUMBER_CONSTANT:

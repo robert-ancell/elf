@@ -33,6 +33,7 @@ typedef enum {
     OPERATION_TYPE_NUMBER_CONSTANT,
     OPERATION_TYPE_TEXT_CONSTANT,
     OPERATION_TYPE_VARIABLE_VALUE,
+    OPERATION_TYPE_BINARY,
 } OperationType;
 
 typedef struct {
@@ -96,6 +97,14 @@ typedef struct {
 
     Token *name;
 } OperationVariableValue;
+
+typedef struct {
+    OperationType type; // OPERATION_TYPE_BINARY
+
+    Token *operator;
+    Operation *a;
+    Operation *b;
+} OperationBinary;
 
 OperationFunctionDefinition *elf_parse (const char *data, size_t data_length);
 
