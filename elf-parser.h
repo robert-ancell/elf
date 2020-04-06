@@ -27,7 +27,7 @@ typedef struct {
 typedef enum {
     OPERATION_TYPE_VARIABLE_DEFINITION,
     OPERATION_TYPE_VARIABLE_ASSIGNMENT,
-    OPERATION_TYPE_FUNCTION_DEFINE,
+    OPERATION_TYPE_FUNCTION_DEFINITION,
     OPERATION_TYPE_FUNCTION_CALL,
     OPERATION_TYPE_RETURN,
     OPERATION_TYPE_NUMBER_CONSTANT,
@@ -61,6 +61,7 @@ struct _OperationFunctionDefinition {
     OperationType type; // OPERATION_TYPE_FUNCTION_DEFINITION
 
     OperationFunctionDefinition *parent;
+    Token *data_type;
     Token *name;
     Operation **parameters;
     Operation **body;
@@ -107,6 +108,8 @@ typedef struct {
 } OperationBinary;
 
 OperationFunctionDefinition *elf_parse (const char *data, size_t data_length);
+
+char *token_to_string (Token *token);
 
 char *operation_to_string (Operation *operation);
 
