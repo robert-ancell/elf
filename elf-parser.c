@@ -4,6 +4,30 @@
 #include <stdio.h>
 #include <string.h>
 
+static void
+print_token_error (const char *data, Token *token, const char *message)
+{
+    size_t line_offset = 0;
+    size_t line_number = 1;
+    for (size_t i = 0; i < token->offset; i++) {
+        if (data[i] == '\n') {
+            line_offset = i + 1;
+            line_number++;
+        }
+    }
+
+    printf ("Line %zi:\n", line_number);
+    for (size_t i = line_offset; data[i] != '\0' && data[i] != '\n'; i++)
+        printf ("%c", data[i]);
+    printf ("\n");
+    for (size_t i = line_offset; i < token->offset; i++)
+        printf (" ");
+    for (size_t i = 0; i < token->length; i++)
+        printf ("^");
+    printf ("\n");
+    printf ("%s\n", message);
+}
+
 static bool
 is_number_char (char c)
 {
@@ -288,7 +312,7 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
 
                 if (parameters_length > 0) {
                     if (t->type != TOKEN_TYPE_COMMA) {
-                        printf ("Missing comma\n");
+                        print_token_error (data, current_token (tokens, offset), "Missing comma");
                         return false;
                     }
                     next_token (offset);
@@ -297,7 +321,7 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
 
                 Operation *value = parse_expression (function, data, tokens, offset);
                 if (value == NULL) {
-                    printf ("Invalid parameter\n");
+                    print_token_error (data, current_token (tokens, offset), "Invalid parameter");
                     return NULL;
                 }
 
@@ -308,7 +332,7 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
             }
 
             if (!closed) {
-                printf ("Unclosed paren\n");
+                print_token_error (data, current_token (tokens, offset), "Unclosed paren");
                 return NULL;
             }
         }
@@ -345,7 +369,7 @@ parse_expression (OperationFunctionDefinition *function, const char *data, Token
 
     Operation *b = parse_value (function, data, tokens, offset);
     if (b == NULL) {
-        printf ("Missing second value in binary operation\n");
+        print_token_error (data, current_token (tokens, offset), "Missing second value in binary operation");
         operation_free (a);
         return NULL;
     }
@@ -382,7 +406,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 
                 Operation *value = parse_expression (function, data, tokens, offset);
                 if (value == NULL) {
-                    printf ("Invalid value for variable\n");
+                    print_token_error (data, current_token (tokens, offset), "Invalid value for variable");
                     return false;
                 }
                 op = make_variable_definition (data_type, name, value);
@@ -403,7 +427,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 
                     if (parameters_length > 0) {
                         if (t->type != TOKEN_TYPE_COMMA) {
-                            printf ("Missing comma\n");
+                            print_token_error (data, current_token (tokens, offset), "Missing comma");
                             return false;
                         }
                         next_token (offset);
@@ -411,7 +435,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                     }
 
                     if (!is_data_type (data, t)) {
-                        printf ("Parameter not a data type\n");
+                        print_token_error (data, current_token (tokens, offset), "Parameter not a data type");
                         return false;
                     }
                     data_type = t;
@@ -419,7 +443,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 
                     Token *name = current_token (tokens, offset);
                     if (!is_parameter_name (data, name)) {
-                        printf ("Not a parameter name\n");
+                        print_token_error (data, current_token (tokens, offset), "Not a parameter name");
                         return false;
                     }
                     next_token (offset);
@@ -433,13 +457,13 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                 }
 
                 if (!closed) {
-                    printf ("Unclosed paren\n");
+                    print_token_error (data, current_token (tokens, offset), "Unclosed paren");
                     return false;
                 }
 
                 Token *open_brace = current_token (tokens, offset);
                 if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-                    printf ("Missing function open brace\n");
+                    print_token_error (data, current_token (tokens, offset), "Missing function open brace");
                     return false;
                 }
                 next_token (offset);
@@ -456,7 +480,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 
             Operation *value = parse_expression (function, data, tokens, offset);
             if (value == NULL) {
-                printf ("Not valid return value\n");
+                print_token_error (data, current_token (tokens, offset), "Not valid return value");
                 return false;
             }
 
@@ -468,14 +492,14 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 
             Token *assignment_token = current_token (tokens, offset);
             if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
-                 printf ("Missing assignment token\n");
+                 print_token_error (data, current_token (tokens, offset), "Missing assignment token");
                  return false;
             }
             next_token (offset);
 
             Operation *value = parse_expression (function, data, tokens, offset);
             if (value == NULL) {
-                 printf ("Invalid value for variable\n");
+                 print_token_error (data, current_token (tokens, offset), "Invalid value for variable");
                  return false;
             }
 
@@ -485,9 +509,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
             // FIXME: Only allow functions and variable values
         }
         else {
-            char *token_name = token_to_string (token);
-            printf ("Unexpected token %s\n", token_name);
-            free (token_name);
+            print_token_error (data, current_token (tokens, offset), "Unexpected token");
             return false;
         }
 
@@ -498,7 +520,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
     }
 
     if (function->name != NULL) {
-        printf ("Missing close brace\n");
+        print_token_error (data, current_token (tokens, offset), "Missing close brace");
         return false;
     }
 
