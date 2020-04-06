@@ -4,6 +4,91 @@
 
 #include "elf-parser.h"
 
+static Operation *
+make_variable_definition (Token *data_type, Token *name, Operation *value)
+{
+    OperationVariableDefinition *o = malloc (sizeof (OperationVariableDefinition));
+    memset (o, 0, sizeof (OperationVariableDefinition));
+    o->type = OPERATION_TYPE_VARIABLE_DEFINITION;
+    o->data_type = data_type;
+    o->name = name;
+    o->value = value;
+    return (Operation *) o;
+}
+
+static Operation *
+make_variable_assignment (Token *name, Operation *value)
+{
+    OperationVariableAssignment *o = malloc (sizeof (OperationVariableAssignment));
+    memset (o, 0, sizeof (OperationVariableAssignment));
+    o->type = OPERATION_TYPE_VARIABLE_ASSIGNMENT;
+    o->name = name;
+    o->value = value;
+    return (Operation *) o;
+}
+
+static Operation *
+make_function_call (Token *name)
+{
+    OperationFunctionCall *o = malloc (sizeof (OperationFunctionCall));
+    memset (o, 0, sizeof (OperationFunctionCall));
+    o->type = OPERATION_TYPE_FUNCTION_CALL;
+    o->name = name;
+    return (Operation *) o;
+}
+
+static Operation *
+make_return (Operation *value)
+{
+    OperationReturn *o = malloc (sizeof (OperationReturn));
+    memset (o, 0, sizeof (OperationReturn));
+    o->type = OPERATION_TYPE_RETURN;
+    o->value = value;
+    return (Operation *) o;
+}
+
+static Operation *
+make_number_constant (Token *value)
+{
+    OperationNumberConstant *o = malloc (sizeof (OperationNumberConstant));
+    memset (o, 0, sizeof (OperationNumberConstant));
+    o->type = OPERATION_TYPE_NUMBER_CONSTANT;
+    o->value = value;
+    return (Operation *) o;
+}
+
+static Operation *
+make_text_constant (Token *value)
+{
+    OperationTextConstant *o = malloc (sizeof (OperationTextConstant));
+    memset (o, 0, sizeof (OperationTextConstant));
+    o->type = OPERATION_TYPE_TEXT_CONSTANT;
+    o->value = value;
+    return (Operation *) o;
+}
+
+static Operation *
+make_variable_value (Token *name)
+{
+    OperationVariableValue *o = malloc (sizeof (OperationVariableValue));
+    memset (o, 0, sizeof (OperationVariableValue));
+    o->type = OPERATION_TYPE_VARIABLE_VALUE;
+    o->name = name;
+    return (Operation *) o;
+}
+
+static Operation *
+make_binary (Token *operator, Operation *a, Operation *b)
+{
+    OperationBinary *o = malloc (sizeof (OperationBinary));
+    memset (o, 0, sizeof (OperationBinary));
+    o->type = OPERATION_TYPE_BINARY;
+    o->operator = operator;
+    o->a = a;
+    o->b = b;
+    return (Operation *) o;
+}
+
 static bool
 is_number_char (char c)
 {
@@ -217,28 +302,16 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
         return NULL;
 
     if (token->type == TOKEN_TYPE_NUMBER) {
-        OperationNumberConstant *op = malloc (sizeof (OperationNumberConstant));
-        memset (op, 0, sizeof (OperationNumberConstant));
-        op->type = OPERATION_TYPE_NUMBER_CONSTANT;
-        op->value = token;
         (*offset)++;
-        return (Operation *) op;
+        return make_number_constant (token);
     }
     else if (token->type == TOKEN_TYPE_TEXT) {
-        OperationTextConstant *op = malloc (sizeof (OperationTextConstant));
-        memset (op, 0, sizeof (OperationTextConstant));
-        op->type = OPERATION_TYPE_TEXT_CONSTANT;
-        op->value = token;
         (*offset)++;
-        return (Operation *) op;
+        return make_text_constant (token);
     }
     else if (is_variable (function, data, token)) {
-        OperationVariableValue *op = malloc (sizeof (OperationVariableValue));
-        memset (op, 0, sizeof (OperationVariableValue));
-        op->type = OPERATION_TYPE_VARIABLE_VALUE;
-        op->name = token;
         (*offset)++;
-        return (Operation *) op;
+        return make_variable_value (token);
     }
     else if (is_function (function, data, token)) {
         Token *name = token;
@@ -272,11 +345,7 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
             }
         }
 
-        OperationFunctionCall *op = malloc (sizeof (OperationFunctionCall));
-        memset (op, 0, sizeof (OperationFunctionCall));
-        op->type = OPERATION_TYPE_FUNCTION_CALL;
-        op->name = name;
-        return (Operation *) op;
+        return make_function_call (name);
     }
 
     return NULL;
@@ -313,13 +382,7 @@ parse_expression (OperationFunctionDefinition *function, const char *data, Token
         return NULL;
     }
 
-    OperationBinary *op = malloc (sizeof (OperationBinary));
-    memset (op, 0, sizeof (OperationBinary));
-    op->type = OPERATION_TYPE_BINARY;
-    op->operator = operator;
-    op->a = a;
-    op->b = b;
-    return (Operation *) op;
+    return make_binary (operator, a, b);
 }
 
 static bool
@@ -341,24 +404,20 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
             (*offset)++;
 
             Token *assignment_token = tokens[*offset];
-            Operation *value = NULL;
-            if (assignment_token != NULL && assignment_token->type == TOKEN_TYPE_ASSIGN) {
-                 (*offset)++;
+            if (assignment_token == NULL) {
+                op = make_variable_definition (data_type, name, NULL);
+            } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
+                (*offset)++;
 
-                 value = parse_expression (function, data, tokens, offset);
-                 if (value == NULL) {
+                Operation *value = parse_expression (function, data, tokens, offset);
+                if (value == NULL) {
                     printf ("Invalid value for variable\n");
                     return false;
                 }
+                op = make_variable_definition (data_type, name, value);
+            } else {
+                op = make_variable_definition (data_type, name, NULL);
             }
-
-            OperationVariableDefinition *o = malloc (sizeof (OperationVariableDefinition));
-            memset (o, 0, sizeof (OperationVariableDefinition));
-            o->type = OPERATION_TYPE_VARIABLE_DEFINITION;
-            o->data_type = data_type;
-            o->name = name;
-            o->value = value;
-            op = (Operation *) o;
         }
         else if (token_has_text (data, token, "return")) {
             (*offset)++;
@@ -369,11 +428,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                 return false;
             }
 
-            OperationReturn *o = malloc (sizeof (OperationReturn));
-            memset (o, 0, sizeof (OperationReturn));
-            o->type = OPERATION_TYPE_RETURN;
-            o->value = value;
-            op = (Operation *) o;
+            op = make_return (value);
         }
         else if (is_variable (function, data, token)) {
             Token *name = token;
@@ -392,12 +447,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                  return false;
             }
 
-            OperationVariableAssignment *o = malloc (sizeof (OperationVariableAssignment));
-            memset (o, 0, sizeof (OperationVariableAssignment));
-            o->type = OPERATION_TYPE_VARIABLE_ASSIGNMENT;
-            o->name = name;
-            o->value = value;
-            op = (Operation *) o;
+            op = make_variable_assignment (name, value);
         }
         else if ((op = parse_value (function, data, tokens, offset)) != NULL) {
             // FIXME: Only allow functions and variable values
