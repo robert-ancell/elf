@@ -330,44 +330,56 @@ is_function (OperationFunctionDefinition *function, const char *data, Token *tok
     return token_has_text (data, token, "print");
 }
 
+static Token *
+current_token (Token **tokens, size_t *offset)
+{
+    return tokens[*offset];
+}
+
+static void
+next_token (size_t *offset)
+{
+    (*offset)++;
+}
+
 static Operation *parse_expression (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset);
 
 static Operation *
 parse_value (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
 {
-    Token *token = tokens[*offset];
+    Token *token = current_token (tokens, offset);
     if (token == NULL)
         return NULL;
 
     if (token->type == TOKEN_TYPE_NUMBER) {
-        (*offset)++;
+        next_token (offset);
         return make_number_constant (token);
     }
     else if (token->type == TOKEN_TYPE_TEXT) {
-        (*offset)++;
+        next_token (offset);
         return make_text_constant (token);
     }
     else if (is_variable (function, data, token)) {
-        (*offset)++;
+        next_token (offset);
         return make_variable_value (token);
     }
     else if (is_function (function, data, token)) {
         Token *name = token;
-        (*offset)++;
+        next_token (offset);
 
         Operation **parameters = malloc (sizeof (Operation *));
         size_t parameters_length = 0;
         parameters[0] = NULL;
 
-        Token *open_paren_token = tokens[*offset];
+        Token *open_paren_token = current_token (tokens, offset);
         if (open_paren_token != NULL && open_paren_token->type == TOKEN_TYPE_OPEN_PAREN) {
-            (*offset)++;
+            next_token (offset);
 
             bool closed = false;
-            while (tokens[*offset] != NULL) {
-                Token *t = tokens[*offset];
+            while (current_token (tokens, offset) != NULL) {
+                Token *t = current_token (tokens, offset);
                 if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
-                    (*offset)++;
+                    next_token (offset);
                     closed = true;
                     break;
                 }
@@ -377,8 +389,8 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
                         printf ("Missing comma\n");
                         return false;
                     }
-                    (*offset)++;
-                    t = tokens[*offset];
+                    next_token (offset);
+                    t = current_token (tokens, offset);
                 }
 
                 Operation *value = parse_expression (function, data, tokens, offset);
@@ -421,13 +433,13 @@ parse_expression (OperationFunctionDefinition *function, const char *data, Token
     if (a == NULL)
         return NULL;
 
-    Token *operator = tokens[*offset];
+    Token *operator = current_token (tokens, offset);
     if (operator == NULL)
         return a;
 
     if (!token_is_binary_operator (operator))
         return a;
-    (*offset)++;
+    next_token (offset);
 
     Operation *b = parse_value (function, data, tokens, offset);
     if (b == NULL) {
@@ -446,25 +458,25 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 
     function->body = malloc (sizeof (Operation *));
     function->body[0] = NULL;
-    while (tokens[*offset] != NULL) {
-        Token *token = tokens[*offset];
+    while (current_token (tokens, offset) != NULL) {
+        Token *token = current_token (tokens, offset);
 
         Operation *op = NULL;
         if (token->type == TOKEN_TYPE_CLOSE_BRACE && function->name != NULL) {
-            (*offset)++;
+            next_token (offset);
             return true;
         } else if (is_data_type (data, token)) {
             Token *data_type = token;
-            (*offset)++;
+            next_token (offset);
 
-            Token *name = tokens[*offset]; // FIXME: Check valid name
-            (*offset)++;
+            Token *name = current_token (tokens, offset); // FIXME: Check valid name
+            next_token (offset);
 
-            Token *assignment_token = tokens[*offset];
+            Token *assignment_token = current_token (tokens, offset);
             if (assignment_token == NULL) {
                 op = make_variable_definition (data_type, name, NULL);
             } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
-                (*offset)++;
+                next_token (offset);
 
                 Operation *value = parse_expression (function, data, tokens, offset);
                 if (value == NULL) {
@@ -473,16 +485,16 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                 }
                 op = make_variable_definition (data_type, name, value);
             } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
-                (*offset)++;
+                next_token (offset);
 
                 Operation **parameters = malloc (sizeof (Operation *));
                 size_t parameters_length = 0;
                 parameters[0] = NULL;
                 bool closed = false;
-                while (tokens[*offset] != NULL) {
-                    Token *t = tokens[*offset];
+                while (current_token (tokens, offset) != NULL) {
+                    Token *t = current_token (tokens, offset);
                     if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
-                        (*offset)++;
+                        next_token (offset);
                         closed = true;
                         break;
                     }
@@ -492,8 +504,8 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                             printf ("Missing comma\n");
                             return false;
                         }
-                        (*offset)++;
-                        t = tokens[*offset];
+                        next_token (offset);
+                        t = current_token (tokens, offset);
                     }
 
                     if (!is_data_type (data, t)) {
@@ -501,14 +513,14 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                         return false;
                     }
                     data_type = t;
-                    (*offset)++;
+                    next_token (offset);
 
-                    Token *name = tokens[*offset];
+                    Token *name = current_token (tokens, offset);
                     if (!is_parameter_name (data, name)) {
                         printf ("Not a parameter name\n");
                         return false;
                     }
-                    (*offset)++;
+                    next_token (offset);
 
                     Operation *parameter = make_variable_definition (data_type, name, NULL);
 
@@ -523,12 +535,12 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                     return false;
                 }
 
-                Token *open_brace = tokens[*offset];
+                Token *open_brace = current_token (tokens, offset);
                 if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
                     printf ("Missing function open brace\n");
                     return false;
                 }
-                (*offset)++;
+                next_token (offset);
 
                 op = make_function_definition (data_type, name, parameters);
                 if (!parse_function_body ((OperationFunctionDefinition *) op, data, tokens, offset))
@@ -538,7 +550,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
             }
         }
         else if (token_has_text (data, token, "return")) {
-            (*offset)++;
+            next_token (offset);
 
             Operation *value = parse_expression (function, data, tokens, offset);
             if (value == NULL) {
@@ -550,14 +562,14 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
         }
         else if (is_variable (function, data, token)) {
             Token *name = token;
-            (*offset)++;
+            next_token (offset);
 
-            Token *assignment_token = tokens[*offset];
+            Token *assignment_token = current_token (tokens, offset);
             if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
                  printf ("Missing assignment token\n");
                  return false;
             }
-            (*offset)++;
+            next_token (offset);
 
             Operation *value = parse_expression (function, data, tokens, offset);
             if (value == NULL) {
