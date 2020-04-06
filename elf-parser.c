@@ -253,7 +253,26 @@ is_variable (OperationFunctionDefinition *function, const char *data, Token *tok
 static bool
 is_function (OperationFunctionDefinition *function, const char *data, Token *token)
 {
-    return token_has_text (data, token, "print");
+    const char *builtin_functions[] = { "print",
+                                        NULL };
+
+    if (token->type != TOKEN_TYPE_WORD)
+        return false;
+
+    for (int i = 0; function->body[i] != NULL; i++) {
+        if (function->body[i]->type != OPERATION_TYPE_FUNCTION_DEFINITION)
+            continue;
+
+        OperationFunctionDefinition *op = (OperationFunctionDefinition *) function->body[i];
+        if (token_text_matches (data, op->name, token))
+            return true;
+    }
+
+    for (int i = 0; builtin_functions[i] != NULL; i++)
+        if (token_has_text (data, token, builtin_functions[i]))
+            return true;
+
+    return false;
 }
 
 static Token *
