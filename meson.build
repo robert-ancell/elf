@@ -8,5 +8,6 @@ executable ('elf',
                'elf-parser.c',
                'elf-runner.c',
                'elf-token.c',
+               'utils.c',
              ],
              install: true)
