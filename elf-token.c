@@ -52,6 +52,7 @@ token_parse_text_constant (Token *token, const char *data)
         value[length] = c;
         length++;
     }
+    value[length] = '\0';
 
     return value;
 }
