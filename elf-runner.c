@@ -67,10 +67,10 @@ data_value_new (DataType type, const char *name)
     return value;
 }
 
-/*static DataValue *
+static DataValue *
 data_value_new_uint8 (const char *name, uint8_t int_value)
 {
-    DataValue *value = data_value_new (DATA_TYPE_UINT32, name);
+    DataValue *value = data_value_new (DATA_TYPE_UINT8, name);
     value->data[0] = int_value;
     return value;
 }
@@ -78,11 +78,11 @@ data_value_new_uint8 (const char *name, uint8_t int_value)
 static DataValue *
 data_value_new_uint16 (const char *name, uint16_t int_value)
 {
-    DataValue *value = data_value_new (DATA_TYPE_UINT32, name);
+    DataValue *value = data_value_new (DATA_TYPE_UINT16, name);
     value->data[0] = (int_value >>  8) & 0xFF;
     value->data[1] = (int_value >>  0) & 0xFF;
     return value;
-}*/
+}
 
 static DataValue *
 data_value_new_uint32 (const char *name, uint32_t int_value)
@@ -92,6 +92,21 @@ data_value_new_uint32 (const char *name, uint32_t int_value)
     value->data[1] = (int_value >> 16) & 0xFF;
     value->data[2] = (int_value >>  8) & 0xFF;
     value->data[3] = (int_value >>  0) & 0xFF;
+    return value;
+}
+
+static DataValue *
+data_value_new_uint64 (const char *name, uint64_t int_value)
+{
+    DataValue *value = data_value_new (DATA_TYPE_UINT64, name);
+    value->data[0] = (int_value >> 56) & 0xFF;
+    value->data[1] = (int_value >> 48) & 0xFF;
+    value->data[2] = (int_value >> 40) & 0xFF;
+    value->data[3] = (int_value >> 32) & 0xFF;
+    value->data[4] = (int_value >> 24) & 0xFF;
+    value->data[5] = (int_value >> 16) & 0xFF;
+    value->data[6] = (int_value >>  8) & 0xFF;
+    value->data[7] = (int_value >>  0) & 0xFF;
     return value;
 }
 
@@ -183,7 +198,19 @@ run_return (ProgramState *state, OperationReturn *operation)
 static DataValue *
 run_number_constant (ProgramState *state, OperationNumberConstant *operation)
 {
-    return data_value_new_uint32 (NULL, 42); // FIXME
+    uint64_t value = 0;
+
+    for (size_t i = 0; i < operation->value->length; i++)
+        value = value * 10 + state->data[operation->value->offset + i] - '0';
+
+    if (value <= UINT8_MAX)
+        return data_value_new_uint8 (NULL, value);
+    else if (value <= UINT16_MAX)
+        return data_value_new_uint16 (NULL, value);
+    else if (value <= UINT32_MAX)
+        return data_value_new_uint32 (NULL, value);
+    else
+        return data_value_new_uint64 (NULL, value);
 }
 
 static DataValue *
