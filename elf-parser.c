@@ -180,7 +180,8 @@ token_has_text (const char *data, Token *token, const char *value)
 static bool
 is_data_type (const char *data, Token *token)
 {
-    const char *builtin_types[] = { "uint8", "int8",
+    const char *builtin_types[] = { "bool",
+                                    "uint8", "int8",
                                     "uint16", "int16",
                                     "uint32", "int32",
                                     "uint64", "int64",
@@ -219,6 +220,12 @@ token_text_matches (const char *data, Token *a, Token *b)
             return false;
 
     return true;
+}
+
+static bool
+is_boolean (OperationFunctionDefinition *function, const char *data, Token *token)
+{
+    return token_has_text (data, token, "true") || token_has_text (data, token, "false");
 }
 
 static bool
@@ -313,6 +320,10 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
     else if (token->type == TOKEN_TYPE_TEXT) {
         next_token (offset);
         return make_text_constant (token);
+    }
+    else if (is_boolean (function, data, token)) {
+        next_token (offset);
+        return make_boolean_constant (token);
     }
     else if (is_variable (function, data, token)) {
         next_token (offset);

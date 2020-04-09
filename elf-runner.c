@@ -1,5 +1,6 @@
 #include "elf-runner.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,6 +8,7 @@
 #include "utils.h"
 
 typedef enum {
+    DATA_TYPE_BOOL,
     DATA_TYPE_UINT8,
     DATA_TYPE_INT8,
     DATA_TYPE_UINT16,
@@ -48,6 +50,7 @@ data_value_new (DataType type)
     value->type = type;
 
     switch (type) {
+    case DATA_TYPE_BOOL:
     case DATA_TYPE_UINT8:
     case DATA_TYPE_INT8:
         value->data_length = 1;
@@ -71,6 +74,14 @@ data_value_new (DataType type)
     value->data = malloc (value->data_length);
     memset (value->data, 0, value->data_length);
 
+    return value;
+}
+
+static DataValue *
+data_value_new_bool (bool bool_value)
+{
+    DataValue *value = data_value_new (DATA_TYPE_BOOL);
+    value->data[0] = bool_value ? 0xFF : 0x00;
     return value;
 }
 
@@ -201,7 +212,9 @@ make_default_value (ProgramState *state, Token *data_type)
     char *type_name = token_get_text (data_type, state->data);
 
     DataValue *result = NULL;
-    if (strcmp (type_name, "uint8") == 0)
+    if (strcmp (type_name, "bool") == 0)
+        result = data_value_new_bool (false);
+    else if (strcmp (type_name, "uint8") == 0)
         result = data_value_new_uint8 (0);
     else if (strcmp (type_name, "uint16") == 0)
         result = data_value_new_uint16 (0);
@@ -309,6 +322,13 @@ run_return (ProgramState *state, OperationReturn *operation)
 }
 
 static DataValue *
+run_boolean_constant (ProgramState *state, OperationBooleanConstant *operation)
+{
+    bool value = token_parse_boolean_constant (operation->value, state->data);
+    return data_value_new_bool (value);
+}
+
+static DataValue *
 run_number_constant (ProgramState *state, OperationNumberConstant *operation)
 {
     uint64_t value = token_parse_number_constant (operation->value, state->data);
@@ -398,6 +418,8 @@ run_operation (ProgramState *state, Operation *operation)
         return run_function_call (state, (OperationFunctionCall *) operation);
     case OPERATION_TYPE_RETURN:
         return run_return (state, (OperationReturn *) operation);
+    case OPERATION_TYPE_BOOLEAN_CONSTANT:
+        return run_boolean_constant (state, (OperationBooleanConstant *) operation);
     case OPERATION_TYPE_NUMBER_CONSTANT:
         return run_number_constant (state, (OperationNumberConstant *) operation);
     case OPERATION_TYPE_TEXT_CONSTANT:

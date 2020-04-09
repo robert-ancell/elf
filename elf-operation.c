@@ -62,6 +62,16 @@ make_return (Operation *value)
 }
 
 Operation *
+make_boolean_constant (Token *value)
+{
+    OperationBooleanConstant *o = malloc (sizeof (OperationBooleanConstant));
+    memset (o, 0, sizeof (OperationBooleanConstant));
+    o->type = OPERATION_TYPE_BOOLEAN_CONSTANT;
+    o->value = value;
+    return (Operation *) o;
+}
+
+Operation *
 make_number_constant (Token *value)
 {
     OperationNumberConstant *o = malloc (sizeof (OperationNumberConstant));
@@ -119,6 +129,13 @@ operation_to_string (Operation *operation)
         OperationReturn *op = (OperationReturn *) operation;
         char *value_string = operation_to_string (op->value);
         char *string = strdup_printf ("RETURN(%s)", value_string);
+        free (value_string);
+        return string;
+    }
+    case OPERATION_TYPE_BOOLEAN_CONSTANT: {
+        OperationNumberConstant *op = (OperationNumberConstant *) operation;
+        char *value_string = token_to_string (op->value);
+        char *string = strdup_printf ("BOOLEAN_CONSTANT(%s)", value_string);
         free (value_string);
         return string;
     }
@@ -190,6 +207,7 @@ operation_free (Operation *operation)
         operation_free (op->b);
         break;
     }
+    case OPERATION_TYPE_BOOLEAN_CONSTANT:
     case OPERATION_TYPE_NUMBER_CONSTANT:
     case OPERATION_TYPE_TEXT_CONSTANT:
     case OPERATION_TYPE_VARIABLE_VALUE:

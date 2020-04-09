@@ -8,6 +8,7 @@ typedef enum {
     OPERATION_TYPE_FUNCTION_DEFINITION,
     OPERATION_TYPE_FUNCTION_CALL,
     OPERATION_TYPE_RETURN,
+    OPERATION_TYPE_BOOLEAN_CONSTANT,
     OPERATION_TYPE_NUMBER_CONSTANT,
     OPERATION_TYPE_TEXT_CONSTANT,
     OPERATION_TYPE_VARIABLE_VALUE,
@@ -62,6 +63,12 @@ typedef struct {
 } OperationReturn;
 
 typedef struct {
+    OperationType type; // OPERATION_TYPE_BOOLEAN_CONSTANT;
+
+    Token *value;
+} OperationBooleanConstant;
+
+typedef struct {
     OperationType type; // OPERATION_TYPE_NUMBER_CONSTANT;
 
     Token *value;
@@ -96,6 +103,8 @@ Operation *make_function_definition (Token *data_type, Token *name, Operation **
 Operation *make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function);
 
 Operation *make_return (Operation *value);
+
+Operation *make_boolean_constant (Token *value);
 
 Operation *make_number_constant (Token *value);
 

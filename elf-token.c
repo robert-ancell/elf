@@ -15,6 +15,15 @@ token_get_text (Token *token, const char *data)
     return result;
 }
 
+bool
+token_parse_boolean_constant (Token *token, const char *data)
+{
+    char *text = token_get_text (token, data);
+    bool value = strcmp (text, "true") == 0;
+    free (text);
+    return value;
+}
+
 uint64_t
 token_parse_number_constant (Token *token, const char *data)
 {

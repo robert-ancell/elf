@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -26,6 +27,8 @@ typedef struct {
 } Token;
 
 char *token_get_text (Token *token, const char *data);
+
+bool token_parse_boolean_constant (Token *token, const char *data);
 
 uint64_t token_parse_number_constant (Token *token, const char *data);
 
