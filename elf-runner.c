@@ -32,6 +32,7 @@ typedef struct {
 
 typedef struct {
     const char *data;
+
     Variable **variables;
     size_t variables_length;
 } ProgramState;
@@ -219,6 +220,14 @@ make_default_value (ProgramState *state, Token *data_type)
     return result;
 }
 
+static void
+add_variable (ProgramState *state, const char *name, DataValue *value)
+{
+    state->variables_length++;
+    state->variables = realloc (state->variables, sizeof (Variable *) * state->variables_length);
+    state->variables[state->variables_length - 1] = variable_new (name, value);
+}
+
 static DataValue *
 run_variable_definition (ProgramState *state, OperationVariableDefinition *operation)
 {
@@ -230,11 +239,8 @@ run_variable_definition (ProgramState *state, OperationVariableDefinition *opera
     else
         value = make_default_value (state, operation->data_type);
 
-    if (value != NULL) {
-        state->variables_length++;
-        state->variables = realloc (state->variables, sizeof (Variable *) * state->variables_length);
-        state->variables[state->variables_length - 1] = variable_new (variable_name, value);
-    }
+    if (value != NULL)
+        add_variable (state, variable_name, value);
 
     free (variable_name);
     data_value_unref (value);
@@ -265,8 +271,18 @@ run_variable_assignment (ProgramState *state, OperationVariableAssignment *opera
 static DataValue *
 run_function_call (ProgramState *state, OperationFunctionCall *operation)
 {
-    if (operation->function != NULL)
+    if (operation->function != NULL) {
+        // FIXME: Use a stack, these variables shouldn't remain after the call
+        for (int i = 0; operation->parameters[i] != NULL; i++) {
+            DataValue *value = run_operation (state, operation->parameters[i]);
+            OperationVariableDefinition *parameter_definition = (OperationVariableDefinition *) operation->function->parameters[i];
+            char *variable_name = token_get_text (parameter_definition->name, state->data);
+            add_variable (state, variable_name, value);
+            free (variable_name);
+        }
+
         return run_function (state, operation->function);
+    }
 
     char *function_name = token_get_text (operation->name, state->data);
 
