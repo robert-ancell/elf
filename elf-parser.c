@@ -562,7 +562,8 @@ elf_parse (const char *data, size_t data_length)
         return NULL;
     }
 
-    tokens_free (tokens);
+    // FIXME: Need to keep these - they are referred to by the operations
+    //tokens_free (tokens);
 
     return main_function;
 }
