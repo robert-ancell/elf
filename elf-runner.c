@@ -19,25 +19,31 @@ typedef enum {
 } DataType;
 
 typedef struct {
+    int ref_count;
     DataType type;
-    char *name;
     uint8_t *data;
     size_t data_length;
 } DataValue;
 
 typedef struct {
+    char *name;
+    DataValue *value;
+} Variable;
+
+typedef struct {
     const char *data;
-    DataValue **variables;
+    Variable **variables;
+    size_t variables_length;
 } ProgramState;
 
 static DataValue *run_operation (ProgramState *state, Operation *operation);
 
 static DataValue *
-data_value_new (DataType type, const char *name)
+data_value_new (DataType type)
 {
     DataValue *value = malloc (sizeof (DataValue));
     memset (value, 0, sizeof (DataValue));
-    value->name = strdup_printf ("%s", name);
+    value->ref_count = 1;
     value->type = type;
 
     switch (type) {
@@ -68,26 +74,26 @@ data_value_new (DataType type, const char *name)
 }
 
 static DataValue *
-data_value_new_uint8 (const char *name, uint8_t int_value)
+data_value_new_uint8 (uint8_t int_value)
 {
-    DataValue *value = data_value_new (DATA_TYPE_UINT8, name);
+    DataValue *value = data_value_new (DATA_TYPE_UINT8);
     value->data[0] = int_value;
     return value;
 }
 
 static DataValue *
-data_value_new_uint16 (const char *name, uint16_t int_value)
+data_value_new_uint16 (uint16_t int_value)
 {
-    DataValue *value = data_value_new (DATA_TYPE_UINT16, name);
+    DataValue *value = data_value_new (DATA_TYPE_UINT16);
     value->data[0] = (int_value >>  8) & 0xFF;
     value->data[1] = (int_value >>  0) & 0xFF;
     return value;
 }
 
 static DataValue *
-data_value_new_uint32 (const char *name, uint32_t int_value)
+data_value_new_uint32 (uint32_t int_value)
 {
-    DataValue *value = data_value_new (DATA_TYPE_UINT32, name);
+    DataValue *value = data_value_new (DATA_TYPE_UINT32);
     value->data[0] = (int_value >> 24) & 0xFF;
     value->data[1] = (int_value >> 16) & 0xFF;
     value->data[2] = (int_value >>  8) & 0xFF;
@@ -96,9 +102,9 @@ data_value_new_uint32 (const char *name, uint32_t int_value)
 }
 
 static DataValue *
-data_value_new_uint64 (const char *name, uint64_t int_value)
+data_value_new_uint64 (uint64_t int_value)
 {
-    DataValue *value = data_value_new (DATA_TYPE_UINT64, name);
+    DataValue *value = data_value_new (DATA_TYPE_UINT64);
     value->data[0] = (int_value >> 56) & 0xFF;
     value->data[1] = (int_value >> 48) & 0xFF;
     value->data[2] = (int_value >> 40) & 0xFF;
@@ -111,11 +117,11 @@ data_value_new_uint64 (const char *name, uint64_t int_value)
 }
 
 static DataValue *
-data_value_new_utf8 (const char *name, const char *string_value)
+data_value_new_utf8 (const char *string_value)
 {
     DataValue *value = malloc (sizeof (DataValue));
     memset (value, 0, sizeof (DataValue));
-    value->name = strdup_printf ("%s", name);
+    value->ref_count = 1;
     value->type = DATA_TYPE_UTF8;
 
     value->data_length = strlen (string_value) + 1;
@@ -126,15 +132,50 @@ data_value_new_utf8 (const char *name, const char *string_value)
     return value;
 }
 
-void
-data_value_free (DataValue *value)
+static DataValue *
+data_value_ref (DataValue *value)
+{
+    if (value == NULL)
+        return NULL;
+
+    value->ref_count++;
+    return value;
+}
+
+static void
+data_value_unref (DataValue *value)
 {
     if (value == NULL)
         return;
 
-    free (value->name);
+    value->ref_count--;
+    if (value->ref_count > 0)
+        return;
+
     free (value->data);
     free (value);
+}
+
+static Variable *
+variable_new (const char *name, DataValue *value)
+{
+    Variable *variable = malloc (sizeof (Variable));
+    memset (variable, 0, sizeof (Variable));
+    variable->name = strdup_printf ("%s", name);
+    variable->value = data_value_ref (value);
+
+    return variable;
+}
+
+void
+variable_free (Variable *variable)
+{
+    if (variable == NULL)
+        return;
+
+    free (variable->name);
+    data_value_unref (variable->value);
+    free (variable);
 }
 
 static DataValue *
@@ -149,9 +190,31 @@ run_function (ProgramState *state, OperationFunctionDefinition *function)
 static DataValue *
 run_variable_definition (ProgramState *state, OperationVariableDefinition *operation)
 {
+    char *data_type = token_get_text (operation->data_type, state->data);
     char *variable_name = token_get_text (operation->name, state->data);
-    printf ("define variable %s\n", variable_name);
+
+    DataValue *value = NULL;
+    if (operation->value != NULL)
+        value = run_operation (state, operation->value);
+    else if (strcmp (data_type, "uint8") == 0)
+        value = data_value_new_uint8 (0);
+    else if (strcmp (data_type, "uint16") == 0)
+        value = data_value_new_uint16 (0);
+    else if (strcmp (data_type, "uint32") == 0)
+        value = data_value_new_uint32 (0);
+    else if (strcmp (data_type, "uint64") == 0)
+        value = data_value_new_uint64 (0);
+    else
+        printf ("define variable %s (%s)\n", variable_name, data_type);
+
+    if (value != NULL) {
+        state->variables_length++;
+        state->variables = realloc (state->variables, sizeof (Variable *) * state->variables_length);
+        state->variables[state->variables_length - 1] = variable_new (variable_name, value);
+    }
+
     free (variable_name);
+    data_value_unref (value);
 
     return NULL;
 }
@@ -161,6 +224,17 @@ run_variable_assignment (ProgramState *state, OperationVariableAssignment *opera
 {
     char *variable_name = token_get_text (operation->name, state->data);
     printf ("assign variable %s\n", variable_name);
+
+    DataValue *value = run_operation (state, operation->value);
+
+    for (size_t i = 0; state->variables[i] != NULL; i++) {
+        Variable *variable = state->variables[i];
+        if (strcmp (variable->name, variable_name) == 0) {
+            data_value_unref (variable->value);
+            variable->value = data_value_ref (value);
+        }
+    }
+
     free (variable_name);
 
     return NULL;
@@ -178,7 +252,7 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
              printf ("%02X", value->data[i]);
         printf ("\n");
 
-        data_value_free (value);
+        data_value_unref (value);
     }
     else
         printf ("call function %s\n", function_name);
@@ -205,26 +279,34 @@ run_number_constant (ProgramState *state, OperationNumberConstant *operation)
     // FIXME: Catch overflow (numbers > 64 bit not supported)
 
     if (value <= UINT8_MAX)
-        return data_value_new_uint8 (NULL, value);
+        return data_value_new_uint8 (value);
     else if (value <= UINT16_MAX)
-        return data_value_new_uint16 (NULL, value);
+        return data_value_new_uint16 (value);
     else if (value <= UINT32_MAX)
-        return data_value_new_uint32 (NULL, value);
+        return data_value_new_uint32 (value);
     else
-        return data_value_new_uint64 (NULL, value);
+        return data_value_new_uint64 (value);
 }
 
 static DataValue *
 run_text_constant (ProgramState *state, OperationTextConstant *operation)
 {
     printf ("text constant\n");
-    return data_value_new_utf8 (NULL, "TEST"); // FIXME
+    return data_value_new_utf8 ("TEST"); // FIXME
 }
 
 static DataValue *
 run_variable_value (ProgramState *state, OperationVariableValue *operation)
 {
-    printf ("variable value\n");
+    char *variable_name = token_get_text (operation->name, state->data);
+
+    for (size_t i = 0; i < state->variables_length; i++) {
+        Variable *variable = state->variables[i];
+        if (strcmp (variable->name, variable_name) == 0)
+            return data_value_ref (variable->value);
+    }
+
+    printf ("variable value %s\n", variable_name);
     return NULL;
 }
 
@@ -255,9 +337,9 @@ run_binary (ProgramState *state, OperationBinary *operation)
         break;
     }
 
-    DataValue *result = data_value_new_uint8 (NULL, int_value);
-    data_value_free (a);
-    data_value_free (b);
+    DataValue *result = data_value_new_uint8 (int_value);
+    data_value_unref (a);
+    data_value_unref (b);
 
     return result;
 }
@@ -296,12 +378,12 @@ elf_run (const char *data, OperationFunctionDefinition *function)
     ProgramState *state = malloc (sizeof (ProgramState));
     memset (state, 0, sizeof (ProgramState));
     state->data = data;
-    state->variables = malloc (sizeof (DataValue *));
-    state->variables[0] = NULL;
 
     DataValue *result = run_function (state, function);
-    data_value_free (result);
+    data_value_unref (result);
 
+    for (size_t i = 0; i < state->variables_length; i++)
+        variable_free (state->variables[i]);
     free (state->variables);
     free (state);
 }
