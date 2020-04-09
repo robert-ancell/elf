@@ -34,8 +34,6 @@ typedef struct {
     const char *data;
     Variable **variables;
     size_t variables_length;
-    OperationFunctionDefinition **functions;
-    size_t functions_length;
 } ProgramState;
 
 static DataValue *run_operation (ProgramState *state, Operation *operation);
@@ -267,6 +265,9 @@ run_variable_assignment (ProgramState *state, OperationVariableAssignment *opera
 static DataValue *
 run_function_call (ProgramState *state, OperationFunctionCall *operation)
 {
+    if (operation->function != NULL)
+        return run_function (state, operation->function);
+
     char *function_name = token_get_text (operation->name, state->data);
 
     DataValue *result = NULL;
@@ -278,18 +279,6 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
         printf ("\n");
 
         data_value_unref (value);
-    }
-    else {
-        for (size_t i = 0; i < state->functions_length; i++) {
-            OperationFunctionDefinition *f = state->functions[i];
-            char *f_name = token_get_text (f->name, state->data);
-            if (strcmp (f_name, function_name) == 0) {
-                result = run_function (state, f);
-                free (f_name);
-                break;
-            }
-            free (f_name);
-        }
     }
 
     free (function_name);
@@ -386,9 +375,7 @@ run_operation (ProgramState *state, Operation *operation)
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
         return run_variable_assignment (state, (OperationVariableAssignment *) operation);
     case OPERATION_TYPE_FUNCTION_DEFINITION: {
-        state->functions_length++;
-        state->functions = realloc (state->functions, sizeof (OperationFunctionDefinition *) * state->functions_length);
-        state->functions[state->functions_length - 1] = (OperationFunctionDefinition *) operation;
+        // All resolved at compile time
         return NULL;
     }
     case OPERATION_TYPE_FUNCTION_CALL:
@@ -421,6 +408,5 @@ elf_run (const char *data, OperationFunctionDefinition *function)
     for (size_t i = 0; i < state->variables_length; i++)
         variable_free (state->variables[i]);
     free (state->variables);
-    free (state->functions);
     free (state);
 }

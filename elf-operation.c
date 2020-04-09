@@ -40,13 +40,14 @@ make_function_definition (Token *data_type, Token *name, Operation **parameters)
 }
 
 Operation *
-make_function_call (Token *name, Operation **parameters)
+make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function)
 {
     OperationFunctionCall *o = malloc (sizeof (OperationFunctionCall));
     memset (o, 0, sizeof (OperationFunctionCall));
     o->type = OPERATION_TYPE_FUNCTION_CALL;
     o->name = name;
     o->parameters = parameters;
+    o->function = function;
     return (Operation *) o;
 }
 

@@ -50,6 +50,8 @@ typedef struct {
 
     Token *name;
     Operation **parameters;
+
+    OperationFunctionDefinition *function;
 } OperationFunctionCall;
 
 typedef struct {
@@ -91,7 +93,7 @@ Operation *make_variable_assignment (Token *name, Operation *value);
 
 Operation *make_function_definition (Token *data_type, Token *name, Operation **parameters);
 
-Operation *make_function_call (Token *name, Operation **parameters);
+Operation *make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function);
 
 Operation *make_return (Operation *value);
 

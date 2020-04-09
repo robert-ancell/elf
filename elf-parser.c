@@ -250,14 +250,11 @@ is_variable (OperationFunctionDefinition *function, const char *data, Token *tok
     return false;
 }
 
-static bool
-is_function (OperationFunctionDefinition *function, const char *data, Token *token)
+static OperationFunctionDefinition *
+find_function (OperationFunctionDefinition *function, const char *data, Token *token)
 {
-    const char *builtin_functions[] = { "print",
-                                        NULL };
-
     if (token->type != TOKEN_TYPE_WORD)
-        return false;
+        return NULL;
 
     for (int i = 0; function->body[i] != NULL; i++) {
         if (function->body[i]->type != OPERATION_TYPE_FUNCTION_DEFINITION)
@@ -265,8 +262,20 @@ is_function (OperationFunctionDefinition *function, const char *data, Token *tok
 
         OperationFunctionDefinition *op = (OperationFunctionDefinition *) function->body[i];
         if (token_text_matches (data, op->name, token))
-            return true;
+            return op;
     }
+
+    return NULL;
+}
+
+static bool
+is_builtin_function (OperationFunctionDefinition *function, const char *data, Token *token)
+{
+    const char *builtin_functions[] = { "print",
+                                        NULL };
+
+    if (token->type != TOKEN_TYPE_WORD)
+        return false;
 
     for (int i = 0; builtin_functions[i] != NULL; i++)
         if (token_has_text (data, token, builtin_functions[i]))
@@ -296,6 +305,7 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
     if (token == NULL)
         return NULL;
 
+    OperationFunctionDefinition *f;
     if (token->type == TOKEN_TYPE_NUMBER) {
         next_token (offset);
         return make_number_constant (token);
@@ -308,7 +318,7 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
         next_token (offset);
         return make_variable_value (token);
     }
-    else if (is_function (function, data, token)) {
+    else if ((f = find_function (function, data, token)) != NULL || is_builtin_function (function, data, token)) {
         Token *name = token;
         next_token (offset);
 
@@ -356,7 +366,7 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
             }
         }
 
-        return make_function_call (name, parameters);
+        return make_function_call (name, parameters, f);
     }
 
     return NULL;
