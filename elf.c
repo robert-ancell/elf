@@ -61,7 +61,7 @@ run_elf_source (const char *filename)
         return 1;
     }
 
-    elf_run (main_function);
+    elf_run (data, main_function);
 
     munmap_file (fd, data, data_length);
 

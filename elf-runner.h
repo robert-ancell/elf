@@ -2,4 +2,4 @@
 
 #include "elf-operation.h"
 
-void elf_run (OperationFunctionDefinition *function);
+void elf_run (const char *data, OperationFunctionDefinition *function);

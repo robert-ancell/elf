@@ -5,6 +5,16 @@
 #include "utils.h"
 
 char *
+token_get_text (Token *token, const char *data)
+{
+    char *result = malloc (sizeof (char) * (token->length + 1));
+    for (size_t i = 0; i < token->length; i++)
+        result[i] = data[token->offset + i];
+    result[token->length] = '\0';
+    return result;
+}
+
+char *
 token_to_string (Token *token)
 {
     switch (token->type) {

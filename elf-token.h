@@ -24,4 +24,6 @@ typedef struct {
     size_t length;
 } Token;
 
+char *token_get_text (Token *token, const char *data);
+
 char *token_to_string (Token *token);

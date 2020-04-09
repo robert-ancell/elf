@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "utils.h"
+
 typedef enum {
     DATA_TYPE_UINT8,
     DATA_TYPE_INT8,
@@ -24,98 +26,220 @@ typedef struct {
 } DataValue;
 
 typedef struct {
+    const char *data;
     DataValue **variables;
 } ProgramState;
 
-static void run_operation (ProgramState *state, Operation *operation);
+static DataValue *run_operation (ProgramState *state, Operation *operation);
 
-static void
+static DataValue *
+data_value_new (DataType type, const char *name)
+{
+    DataValue *value = malloc (sizeof (DataValue));
+    memset (value, 0, sizeof (DataValue));
+    value->name = strdup_printf ("%s", name);
+    value->type = type;
+
+    switch (type) {
+    case DATA_TYPE_UINT8:
+    case DATA_TYPE_INT8:
+        value->data_length = 1;
+        break;
+    case DATA_TYPE_UINT16:
+    case DATA_TYPE_INT16:
+        value->data_length = 2;
+        break;
+    case DATA_TYPE_UINT32:
+    case DATA_TYPE_INT32:
+        value->data_length = 4;
+        break;
+    case DATA_TYPE_UINT64:
+    case DATA_TYPE_INT64:
+        value->data_length = 8;
+        break;
+    case DATA_TYPE_UTF8:
+        value->data_length = 1;
+        break;
+    }
+    value->data = malloc (value->data_length);
+    memset (value->data, 0, value->data_length);
+
+    return value;
+}
+
+/*static DataValue *
+data_value_new_uint8 (const char *name, uint8_t int_value)
+{
+    DataValue *value = data_value_new (DATA_TYPE_UINT32, name);
+    value->data[0] = int_value;
+    return value;
+}
+
+static DataValue *
+data_value_new_uint16 (const char *name, uint16_t int_value)
+{
+    DataValue *value = data_value_new (DATA_TYPE_UINT32, name);
+    value->data[0] = (int_value >>  8) & 0xFF;
+    value->data[1] = (int_value >>  0) & 0xFF;
+    return value;
+}*/
+
+static DataValue *
+data_value_new_uint32 (const char *name, uint32_t int_value)
+{
+    DataValue *value = data_value_new (DATA_TYPE_UINT32, name);
+    value->data[0] = (int_value >> 24) & 0xFF;
+    value->data[1] = (int_value >> 16) & 0xFF;
+    value->data[2] = (int_value >>  8) & 0xFF;
+    value->data[3] = (int_value >>  0) & 0xFF;
+    return value;
+}
+
+static DataValue *
+data_value_new_utf8 (const char *name, const char *string_value)
+{
+    DataValue *value = malloc (sizeof (DataValue));
+    memset (value, 0, sizeof (DataValue));
+    value->name = strdup_printf ("%s", name);
+    value->type = DATA_TYPE_UTF8;
+
+    value->data_length = strlen (string_value) + 1;
+    value->data = malloc (sizeof (char) * value->data_length);
+    for (size_t i = 0; i < value->data_length; i++)
+        value->data[i] = string_value[i];
+
+    return value;
+}
+
+void
+data_value_free (DataValue *value)
+{
+    if (value == NULL)
+        return;
+
+    free (value->name);
+    free (value->data);
+    free (value);
+}
+
+static DataValue *
 run_function (ProgramState *state, OperationFunctionDefinition *function)
 {
     for (int i = 0; function->body[i] != NULL; i++) {
         run_operation (state, function->body[i]);
     }
+    return NULL;
 }
 
-static void
+static DataValue *
 run_variable_definition (ProgramState *state, OperationVariableDefinition *operation)
 {
-    printf ("define var\n");
+    char *variable_name = token_get_text (operation->name, state->data);
+    printf ("define variable %s\n", variable_name);
+    free (variable_name);
+
+    return NULL;
 }
 
-static void
+static DataValue *
 run_variable_assignment (ProgramState *state, OperationVariableAssignment *operation)
 {
-    printf ("assign var\n");
+    char *variable_name = token_get_text (operation->name, state->data);
+    printf ("assign variable %s\n", variable_name);
+    free (variable_name);
+
+    return NULL;
 }
 
-static void
+static DataValue *
 run_function_call (ProgramState *state, OperationFunctionCall *operation)
 {
-    printf ("call function\n");
+    char *function_name = token_get_text (operation->name, state->data);
+
+    if (strcmp (function_name, "print") == 0) {
+        DataValue *value = run_operation (state, operation->parameters[0]);
+
+        for (size_t i = 0; i < value->data_length; i++)
+             printf ("%02X", value->data[i]);
+        printf ("\n");
+
+        data_value_free (value);
+    }
+    else
+        printf ("call function %s\n", function_name);
+
+    free (function_name);
+
+    return NULL;
 }
 
-static void
+static DataValue *
 run_return (ProgramState *state, OperationReturn *operation)
 {
     printf ("return\n");
+    return NULL;
 }
 
-static void
+static DataValue *
 run_number_constant (ProgramState *state, OperationNumberConstant *operation)
 {
+    return data_value_new_uint32 (NULL, 42); // FIXME
 }
 
-static void
+static DataValue *
 run_text_constant (ProgramState *state, OperationTextConstant *operation)
 {
+    printf ("text constant\n");
+    return data_value_new_utf8 (NULL, "TEST"); // FIXME
 }
 
-static void
+static DataValue *
 run_variable_value (ProgramState *state, OperationVariableValue *operation)
 {
+    printf ("variable value\n");
+    return NULL;
 }
 
-static void
+static DataValue *
 run_operation (ProgramState *state, Operation *operation)
 {
     switch (operation->type) {
     case OPERATION_TYPE_VARIABLE_DEFINITION:
-        run_variable_definition (state, (OperationVariableDefinition *) operation);
-        break;
+        return run_variable_definition (state, (OperationVariableDefinition *) operation);
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
-        run_variable_assignment (state, (OperationVariableAssignment *) operation);
-        break;
+        return run_variable_assignment (state, (OperationVariableAssignment *) operation);
     case OPERATION_TYPE_FUNCTION_DEFINITION:
         // Nothing to do unless called
-        break;
+        return NULL;
     case OPERATION_TYPE_FUNCTION_CALL:
-        run_function_call (state, (OperationFunctionCall *) operation);
-        break;
+        return run_function_call (state, (OperationFunctionCall *) operation);
     case OPERATION_TYPE_RETURN:
-        run_return (state, (OperationReturn *) operation);
-        break;
+        return run_return (state, (OperationReturn *) operation);
     case OPERATION_TYPE_NUMBER_CONSTANT:
-        run_number_constant (state, (OperationNumberConstant *) operation);
-        break;
+        return run_number_constant (state, (OperationNumberConstant *) operation);
     case OPERATION_TYPE_TEXT_CONSTANT:
-        run_text_constant (state, (OperationTextConstant *) operation);
-        break;
+        return run_text_constant (state, (OperationTextConstant *) operation);
     case OPERATION_TYPE_VARIABLE_VALUE:
-        run_variable_value (state, (OperationVariableValue *) operation);
-        break;
+        return run_variable_value (state, (OperationVariableValue *) operation);
     case OPERATION_TYPE_BINARY:
-        break;
+        return NULL;
     }
+
+    return NULL;
 }
 
 void
-elf_run (OperationFunctionDefinition *function)
+elf_run (const char *data, OperationFunctionDefinition *function)
 {
     ProgramState *state = malloc (sizeof (ProgramState));
     memset (state, 0, sizeof (ProgramState));
+    state->data = data;
     state->variables = malloc (sizeof (DataValue *));
     state->variables[0] = NULL;
 
-    run_function (state, function);
+    DataValue *result = run_function (state, function);
+    data_value_free (result);
+
+    free (state->variables);
+    free (state);
 }
