@@ -202,6 +202,7 @@ run_number_constant (ProgramState *state, OperationNumberConstant *operation)
 
     for (size_t i = 0; i < operation->value->length; i++)
         value = value * 10 + state->data[operation->value->offset + i] - '0';
+    // FIXME: Catch overflow (numbers > 64 bit not supported)
 
     if (value <= UINT8_MAX)
         return data_value_new_uint8 (NULL, value);
