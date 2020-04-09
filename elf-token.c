@@ -1,5 +1,6 @@
 #include "elf-token.h"
 
+#include <stdbool.h>
 #include <string.h>
 
 #include "utils.h"
@@ -12,6 +13,47 @@ token_get_text (Token *token, const char *data)
         result[i] = data[token->offset + i];
     result[token->length] = '\0';
     return result;
+}
+
+uint64_t
+token_parse_number_constant (Token *token, const char *data)
+{
+    uint64_t value = 0;
+
+    for (size_t i = 0; i < token->length; i++)
+        value = value * 10 + data[token->offset + i] - '0';
+
+    return value;
+}
+
+char *
+token_parse_text_constant (Token *token, const char *data)
+{
+    char *value = malloc (sizeof (char) * (token->length - 1));
+    size_t length = 0;
+
+    // Iterate over the characters inside the quotes
+    bool in_escape = false;
+    for (size_t i = 1; i < (token->length - 1); i++) {
+        char c = data[token->offset + i];
+
+        if (!in_escape && c == '\\') {
+            in_escape = true;
+            continue;
+        }
+
+        if (in_escape) {
+            if (c == 'n')
+                c = '\n';
+            else if (c == 'r')
+                c = '\r';
+        }
+
+        value[length] = c;
+        length++;
+    }
+
+    return value;
 }
 
 char *

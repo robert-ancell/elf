@@ -271,10 +271,7 @@ run_return (ProgramState *state, OperationReturn *operation)
 static DataValue *
 run_number_constant (ProgramState *state, OperationNumberConstant *operation)
 {
-    uint64_t value = 0;
-
-    for (size_t i = 0; i < operation->value->length; i++)
-        value = value * 10 + state->data[operation->value->offset + i] - '0';
+    uint64_t value = token_parse_number_constant (operation->value, state->data);
     // FIXME: Catch overflow (numbers > 64 bit not supported)
 
     if (value <= UINT8_MAX)
@@ -290,8 +287,10 @@ run_number_constant (ProgramState *state, OperationNumberConstant *operation)
 static DataValue *
 run_text_constant (ProgramState *state, OperationTextConstant *operation)
 {
-    printf ("text constant\n");
-    return data_value_new_utf8 ("TEST"); // FIXME
+    char *value = token_parse_text_constant (operation->value, state->data);
+    DataValue *result = data_value_new_utf8 (value);
+    free (value);
+    return result;
 }
 
 static DataValue *

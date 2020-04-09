@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdint.h>
 
 typedef enum {
     TOKEN_TYPE_WORD,
@@ -25,5 +26,9 @@ typedef struct {
 } Token;
 
 char *token_get_text (Token *token, const char *data);
+
+uint64_t token_parse_number_constant (Token *token, const char *data);
+
+char *token_parse_text_constant (Token *token, const char *data);
 
 char *token_to_string (Token *token);
