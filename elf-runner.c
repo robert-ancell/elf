@@ -229,6 +229,40 @@ run_variable_value (ProgramState *state, OperationVariableValue *operation)
 }
 
 static DataValue *
+run_binary (ProgramState *state, OperationBinary *operation)
+{
+    DataValue *a = run_operation (state, operation->a);
+    DataValue *b = run_operation (state, operation->b);
+
+    if (a->type != DATA_TYPE_UINT8 || b->type != DATA_TYPE_UINT8)
+        return NULL;
+
+    uint8_t int_value = 0;
+    switch (operation->operator->type) {
+    case TOKEN_TYPE_ADD:
+        int_value = a->data[0] + b->data[0];
+        break;
+    case TOKEN_TYPE_SUBTRACT:
+        int_value = a->data[0] - b->data[0];
+        break;
+    case TOKEN_TYPE_MULTIPLY:
+        int_value = a->data[0] * b->data[0];
+        break;
+    case TOKEN_TYPE_DIVIDE:
+        int_value = a->data[0] / b->data[0];
+        break;
+    default:
+        break;
+    }
+
+    DataValue *result = data_value_new_uint8 (NULL, int_value);
+    data_value_free (a);
+    data_value_free (b);
+
+    return result;
+}
+
+static DataValue *
 run_operation (ProgramState *state, Operation *operation)
 {
     switch (operation->type) {
@@ -250,7 +284,7 @@ run_operation (ProgramState *state, Operation *operation)
     case OPERATION_TYPE_VARIABLE_VALUE:
         return run_variable_value (state, (OperationVariableValue *) operation);
     case OPERATION_TYPE_BINARY:
-        return NULL;
+        return run_binary (state, (OperationBinary *) operation);
     }
 
     return NULL;
