@@ -223,7 +223,6 @@ static DataValue *
 run_variable_assignment (ProgramState *state, OperationVariableAssignment *operation)
 {
     char *variable_name = token_get_text (operation->name, state->data);
-    printf ("assign variable %s\n", variable_name);
 
     DataValue *value = run_operation (state, operation->value);
 
