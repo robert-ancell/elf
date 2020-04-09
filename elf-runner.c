@@ -34,6 +34,8 @@ typedef struct {
     const char *data;
     Variable **variables;
     size_t variables_length;
+    OperationFunctionDefinition **functions;
+    size_t functions_length;
 } ProgramState;
 
 static DataValue *run_operation (ProgramState *state, Operation *operation);
@@ -182,30 +184,53 @@ static DataValue *
 run_function (ProgramState *state, OperationFunctionDefinition *function)
 {
     for (int i = 0; function->body[i] != NULL; i++) {
-        run_operation (state, function->body[i]);
+        DataValue *value = run_operation (state, function->body[i]);
+        if (function->body[i]->type == OPERATION_TYPE_RETURN) {
+            // FIXME: Convert result to match return type
+            return value;
+        }
+
+        data_value_unref (value);
     }
+
     return NULL;
+}
+
+static DataValue *
+make_default_value (ProgramState *state, Token *data_type)
+{
+    char *type_name = token_get_text (data_type, state->data);
+
+    DataValue *result = NULL;
+    if (strcmp (type_name, "uint8") == 0)
+        result = data_value_new_uint8 (0);
+    else if (strcmp (type_name, "uint16") == 0)
+        result = data_value_new_uint16 (0);
+    else if (strcmp (type_name, "uint32") == 0)
+        result = data_value_new_uint32 (0);
+    else if (strcmp (type_name, "uint64") == 0)
+        result = data_value_new_uint64 (0);
+    else if (strcmp (type_name, "utf8") == 0)
+        result = data_value_new_utf8 ("");
+
+    if (result == NULL)
+        printf ("default value (%s)\n", type_name);
+
+    free (type_name);
+
+    return result;
 }
 
 static DataValue *
 run_variable_definition (ProgramState *state, OperationVariableDefinition *operation)
 {
-    char *data_type = token_get_text (operation->data_type, state->data);
     char *variable_name = token_get_text (operation->name, state->data);
 
     DataValue *value = NULL;
     if (operation->value != NULL)
         value = run_operation (state, operation->value);
-    else if (strcmp (data_type, "uint8") == 0)
-        value = data_value_new_uint8 (0);
-    else if (strcmp (data_type, "uint16") == 0)
-        value = data_value_new_uint16 (0);
-    else if (strcmp (data_type, "uint32") == 0)
-        value = data_value_new_uint32 (0);
-    else if (strcmp (data_type, "uint64") == 0)
-        value = data_value_new_uint64 (0);
     else
-        printf ("define variable %s (%s)\n", variable_name, data_type);
+        value = make_default_value (state, operation->data_type);
 
     if (value != NULL) {
         state->variables_length++;
@@ -244,6 +269,7 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
 {
     char *function_name = token_get_text (operation->name, state->data);
 
+    DataValue *result = NULL;
     if (strcmp (function_name, "print") == 0) {
         DataValue *value = run_operation (state, operation->parameters[0]);
 
@@ -253,19 +279,28 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
 
         data_value_unref (value);
     }
-    else
-        printf ("call function %s\n", function_name);
+    else {
+        for (size_t i = 0; i < state->functions_length; i++) {
+            OperationFunctionDefinition *f = state->functions[i];
+            char *f_name = token_get_text (f->name, state->data);
+            if (strcmp (f_name, function_name) == 0) {
+                result = run_function (state, f);
+                free (f_name);
+                break;
+            }
+            free (f_name);
+        }
+    }
 
     free (function_name);
 
-    return NULL;
+    return result;
 }
 
 static DataValue *
 run_return (ProgramState *state, OperationReturn *operation)
 {
-    printf ("return\n");
-    return NULL;
+    return run_operation (state, operation->value);
 }
 
 static DataValue *
@@ -350,9 +385,12 @@ run_operation (ProgramState *state, Operation *operation)
         return run_variable_definition (state, (OperationVariableDefinition *) operation);
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
         return run_variable_assignment (state, (OperationVariableAssignment *) operation);
-    case OPERATION_TYPE_FUNCTION_DEFINITION:
-        // Nothing to do unless called
+    case OPERATION_TYPE_FUNCTION_DEFINITION: {
+        state->functions_length++;
+        state->functions = realloc (state->functions, sizeof (OperationFunctionDefinition *) * state->functions_length);
+        state->functions[state->functions_length - 1] = (OperationFunctionDefinition *) operation;
         return NULL;
+    }
     case OPERATION_TYPE_FUNCTION_CALL:
         return run_function_call (state, (OperationFunctionCall *) operation);
     case OPERATION_TYPE_RETURN:
@@ -383,5 +421,6 @@ elf_run (const char *data, OperationFunctionDefinition *function)
     for (size_t i = 0; i < state->variables_length; i++)
         variable_free (state->variables[i]);
     free (state->variables);
+    free (state->functions);
     free (state);
 }
