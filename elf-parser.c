@@ -4,21 +4,50 @@
 #include <stdio.h>
 #include <string.h>
 
+typedef struct {
+   const char *data;
+   size_t data_length;
+
+   Token **tokens;
+   size_t offset;
+} Parser;
+
+static Parser *
+parser_new (const char *data, size_t data_length)
+{
+    Parser *parser = malloc (sizeof (Parser));
+    memset (parser, 0, sizeof (Parser));
+    parser->data = data;
+    parser->data_length = data_length;
+
+    return parser;
+}
+
 static void
-print_token_error (const char *data, Token *token, const char *message)
+parser_free (Parser *parser)
+{
+    // FIXME: Need to keep these - they are referred to by the operations
+    //for (size_t i = 0; parser->tokens[i] != NULL; i++)
+    //  free (parser->tokens[i]);
+
+    free (parser);
+}
+
+static void
+print_token_error (Parser *parser, Token *token, const char *message)
 {
     size_t line_offset = 0;
     size_t line_number = 1;
     for (size_t i = 0; i < token->offset; i++) {
-        if (data[i] == '\n') {
+        if (parser->data[i] == '\n') {
             line_offset = i + 1;
             line_number++;
         }
     }
 
     printf ("Line %zi:\n", line_number);
-    for (size_t i = line_offset; data[i] != '\0' && data[i] != '\n'; i++)
-        printf ("%c", data[i]);
+    for (size_t i = line_offset; parser->data[i] != '\0' && parser->data[i] != '\n'; i++)
+        printf ("%c", parser->data[i]);
     printf ("\n");
     for (size_t i = line_offset; i < token->offset; i++)
         printf (" ");
@@ -158,14 +187,6 @@ elf_lex (const char *data, size_t data_length)
     return tokens;
 }
 
-static void
-tokens_free (Token **tokens)
-{
-    for (size_t i = 0; tokens[i] != NULL; i++)
-        free (tokens[i]);
-    free (tokens);
-}
-
 static bool
 token_has_text (const char *data, Token *token, const char *value)
 {
@@ -178,7 +199,7 @@ token_has_text (const char *data, Token *token, const char *value)
 }
 
 static bool
-is_data_type (const char *data, Token *token)
+is_data_type (Parser *parser, Token *token)
 {
     const char *builtin_types[] = { "bool",
                                     "uint8", "int8",
@@ -192,14 +213,14 @@ is_data_type (const char *data, Token *token)
         return false;
 
     for (int i = 0; builtin_types[i] != NULL; i++)
-        if (token_has_text (data, token, builtin_types[i]))
+        if (token_has_text (parser->data, token, builtin_types[i]))
             return true;
 
     return false;
 }
 
 static bool
-is_parameter_name (const char *data, Token *token)
+is_parameter_name (Parser *parser, Token *token)
 {
     if (token->type != TOKEN_TYPE_WORD)
         return false;
@@ -210,47 +231,47 @@ is_parameter_name (const char *data, Token *token)
 }
 
 static bool
-token_text_matches (const char *data, Token *a, Token *b)
+token_text_matches (Parser *parser, Token *a, Token *b)
 {
     if (a->length != b->length)
         return false;
 
     for (size_t i = 0; i < a->length; i++)
-        if (data[a->offset + i] != data[b->offset + i])
+        if (parser->data[a->offset + i] != parser->data[b->offset + i])
             return false;
 
     return true;
 }
 
 static bool
-is_boolean (OperationFunctionDefinition *function, const char *data, Token *token)
+is_boolean (Parser *parser, Token *token)
 {
-    return token_has_text (data, token, "true") || token_has_text (data, token, "false");
+    return token_has_text (parser->data, token, "true") || token_has_text (parser->data, token, "false");
 }
 
 static bool
-is_variable_definition_with_name (Operation *operation, const char *data, Token *token)
+is_variable_definition_with_name (Parser *parser, Operation *operation, Token *token)
 {
     if (operation->type != OPERATION_TYPE_VARIABLE_DEFINITION)
         return false;
 
     OperationVariableDefinition *op = (OperationVariableDefinition *) operation;
-    if (token_text_matches (data, op->name, token))
+    if (token_text_matches (parser, op->name, token))
         return true;
 
     return false;
 }
 
 static bool
-is_variable (OperationFunctionDefinition *function, const char *data, Token *token)
+is_variable (Parser *parser, OperationFunctionDefinition *function, Token *token)
 {
     for (int i = 0; function->parameters[i] != NULL; i++) {
-        if (is_variable_definition_with_name (function->parameters[i], data, token))
+        if (is_variable_definition_with_name (parser, function->parameters[i], token))
             return true;
     }
 
     for (int i = 0; function->body[i] != NULL; i++) {
-        if (is_variable_definition_with_name (function->body[i], data, token))
+        if (is_variable_definition_with_name (parser, function->body[i], token))
             return true;
     }
 
@@ -258,7 +279,7 @@ is_variable (OperationFunctionDefinition *function, const char *data, Token *tok
 }
 
 static OperationFunctionDefinition *
-find_function (OperationFunctionDefinition *function, const char *data, Token *token)
+find_function (Parser *parser, OperationFunctionDefinition *function, Token *token)
 {
     if (token->type != TOKEN_TYPE_WORD)
         return NULL;
@@ -268,7 +289,7 @@ find_function (OperationFunctionDefinition *function, const char *data, Token *t
             continue;
 
         OperationFunctionDefinition *op = (OperationFunctionDefinition *) function->body[i];
-        if (token_text_matches (data, op->name, token))
+        if (token_text_matches (parser, op->name, token))
             return op;
     }
 
@@ -276,7 +297,7 @@ find_function (OperationFunctionDefinition *function, const char *data, Token *t
 }
 
 static bool
-is_builtin_function (OperationFunctionDefinition *function, const char *data, Token *token)
+is_builtin_function (Parser *parser, OperationFunctionDefinition *function, Token *token)
 {
     const char *builtin_functions[] = { "print",
                                         NULL };
@@ -285,83 +306,83 @@ is_builtin_function (OperationFunctionDefinition *function, const char *data, To
         return false;
 
     for (int i = 0; builtin_functions[i] != NULL; i++)
-        if (token_has_text (data, token, builtin_functions[i]))
+        if (token_has_text (parser->data, token, builtin_functions[i]))
             return true;
 
     return false;
 }
 
 static Token *
-current_token (Token **tokens, size_t *offset)
+current_token (Parser *parser)
 {
-    return tokens[*offset];
+    return parser->tokens[parser->offset];
 }
 
 static void
-next_token (size_t *offset)
+next_token (Parser *parser)
 {
-    (*offset)++;
+    parser->offset++;
 }
 
-static Operation *parse_expression (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset);
+static Operation *parse_expression (Parser *parser, OperationFunctionDefinition *function);
 
 static Operation *
-parse_value (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
+parse_value (Parser *parser, OperationFunctionDefinition *function)
 {
-    Token *token = current_token (tokens, offset);
+    Token *token = current_token (parser);
     if (token == NULL)
         return NULL;
 
     OperationFunctionDefinition *f;
     if (token->type == TOKEN_TYPE_NUMBER) {
-        next_token (offset);
+        next_token (parser);
         return make_number_constant (token);
     }
     else if (token->type == TOKEN_TYPE_TEXT) {
-        next_token (offset);
+        next_token (parser);
         return make_text_constant (token);
     }
-    else if (is_boolean (function, data, token)) {
-        next_token (offset);
+    else if (is_boolean (parser, token)) {
+        next_token (parser);
         return make_boolean_constant (token);
     }
-    else if (is_variable (function, data, token)) {
-        next_token (offset);
+    else if (is_variable (parser, function, token)) {
+        next_token (parser);
         return make_variable_value (token);
     }
-    else if ((f = find_function (function, data, token)) != NULL || is_builtin_function (function, data, token)) {
+    else if ((f = find_function (parser, function, token)) != NULL || is_builtin_function (parser, function, token)) {
         Token *name = token;
-        next_token (offset);
+        next_token (parser);
 
         Operation **parameters = malloc (sizeof (Operation *));
         size_t parameters_length = 0;
         parameters[0] = NULL;
 
-        Token *open_paren_token = current_token (tokens, offset);
+        Token *open_paren_token = current_token (parser);
         if (open_paren_token != NULL && open_paren_token->type == TOKEN_TYPE_OPEN_PAREN) {
-            next_token (offset);
+            next_token (parser);
 
             bool closed = false;
-            while (current_token (tokens, offset) != NULL) {
-                Token *t = current_token (tokens, offset);
+            while (current_token (parser) != NULL) {
+                Token *t = current_token (parser);
                 if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
-                    next_token (offset);
+                    next_token (parser);
                     closed = true;
                     break;
                 }
 
                 if (parameters_length > 0) {
                     if (t->type != TOKEN_TYPE_COMMA) {
-                        print_token_error (data, current_token (tokens, offset), "Missing comma");
+                        print_token_error (parser, current_token (parser), "Missing comma");
                         return false;
                     }
-                    next_token (offset);
-                    t = current_token (tokens, offset);
+                    next_token (parser);
+                    t = current_token (parser);
                 }
 
-                Operation *value = parse_expression (function, data, tokens, offset);
+                Operation *value = parse_expression (parser, function);
                 if (value == NULL) {
-                    print_token_error (data, current_token (tokens, offset), "Invalid parameter");
+                    print_token_error (parser, current_token (parser), "Invalid parameter");
                     return NULL;
                 }
 
@@ -372,7 +393,7 @@ parse_value (OperationFunctionDefinition *function, const char *data, Token **to
             }
 
             if (!closed) {
-                print_token_error (data, current_token (tokens, offset), "Unclosed paren");
+                print_token_error (parser, current_token (parser), "Unclosed paren");
                 return NULL;
             }
         }
@@ -393,23 +414,23 @@ token_is_binary_operator (Token *token)
 }
 
 static Operation *
-parse_expression (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
+parse_expression (Parser *parser, OperationFunctionDefinition *function)
 {
-    Operation *a = parse_value (function, data, tokens, offset);
+    Operation *a = parse_value (parser, function);
     if (a == NULL)
         return NULL;
 
-    Token *operator = current_token (tokens, offset);
+    Token *operator = current_token (parser);
     if (operator == NULL)
         return a;
 
     if (!token_is_binary_operator (operator))
         return a;
-    next_token (offset);
+    next_token (parser);
 
-    Operation *b = parse_value (function, data, tokens, offset);
+    Operation *b = parse_value (parser, function);
     if (b == NULL) {
-        print_token_error (data, current_token (tokens, offset), "Missing second value in binary operation");
+        print_token_error (parser, current_token (parser), "Missing second value in binary operation");
         operation_free (a);
         return NULL;
     }
@@ -418,75 +439,75 @@ parse_expression (OperationFunctionDefinition *function, const char *data, Token
 }
 
 static bool
-parse_function_body (OperationFunctionDefinition *function, const char *data, Token **tokens, size_t *offset)
+parse_function_body (Parser *parser, OperationFunctionDefinition *function)
 {
     size_t body_length = 0;
 
     function->body = malloc (sizeof (Operation *));
     function->body[0] = NULL;
-    while (current_token (tokens, offset) != NULL) {
-        Token *token = current_token (tokens, offset);
+    while (current_token (parser) != NULL) {
+        Token *token = current_token (parser);
 
         Operation *op = NULL;
         if (token->type == TOKEN_TYPE_CLOSE_BRACE && function->name != NULL) {
-            next_token (offset);
+            next_token (parser);
             return true;
-        } else if (is_data_type (data, token)) {
+        } else if (is_data_type (parser, token)) {
             Token *data_type = token;
-            next_token (offset);
+            next_token (parser);
 
-            Token *name = current_token (tokens, offset); // FIXME: Check valid name
-            next_token (offset);
+            Token *name = current_token (parser); // FIXME: Check valid name
+            next_token (parser);
 
-            Token *assignment_token = current_token (tokens, offset);
+            Token *assignment_token = current_token (parser);
             if (assignment_token == NULL) {
                 op = make_variable_definition (data_type, name, NULL);
             } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
-                next_token (offset);
+                next_token (parser);
 
-                Operation *value = parse_expression (function, data, tokens, offset);
+                Operation *value = parse_expression (parser, function);
                 if (value == NULL) {
-                    print_token_error (data, current_token (tokens, offset), "Invalid value for variable");
+                    print_token_error (parser, current_token (parser), "Invalid value for variable");
                     return false;
                 }
                 op = make_variable_definition (data_type, name, value);
             } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
-                next_token (offset);
+                next_token (parser);
 
                 Operation **parameters = malloc (sizeof (Operation *));
                 size_t parameters_length = 0;
                 parameters[0] = NULL;
                 bool closed = false;
-                while (current_token (tokens, offset) != NULL) {
-                    Token *t = current_token (tokens, offset);
+                while (current_token (parser) != NULL) {
+                    Token *t = current_token (parser);
                     if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
-                        next_token (offset);
+                        next_token (parser);
                         closed = true;
                         break;
                     }
 
                     if (parameters_length > 0) {
                         if (t->type != TOKEN_TYPE_COMMA) {
-                            print_token_error (data, current_token (tokens, offset), "Missing comma");
+                            print_token_error (parser, current_token (parser), "Missing comma");
                             return false;
                         }
-                        next_token (offset);
-                        t = current_token (tokens, offset);
+                        next_token (parser);
+                        t = current_token (parser);
                     }
 
-                    if (!is_data_type (data, t)) {
-                        print_token_error (data, current_token (tokens, offset), "Parameter not a data type");
+                    if (!is_data_type (parser, t)) {
+                        print_token_error (parser, current_token (parser), "Parameter not a data type");
                         return false;
                     }
                     data_type = t;
-                    next_token (offset);
+                    next_token (parser);
 
-                    Token *name = current_token (tokens, offset);
-                    if (!is_parameter_name (data, name)) {
-                        print_token_error (data, current_token (tokens, offset), "Not a parameter name");
+                    Token *name = current_token (parser);
+                    if (!is_parameter_name (parser, name)) {
+                        print_token_error (parser, current_token (parser), "Not a parameter name");
                         return false;
                     }
-                    next_token (offset);
+                    next_token (parser);
 
                     Operation *parameter = make_variable_definition (data_type, name, NULL);
 
@@ -497,59 +518,59 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
                 }
 
                 if (!closed) {
-                    print_token_error (data, current_token (tokens, offset), "Unclosed paren");
+                    print_token_error (parser, current_token (parser), "Unclosed paren");
                     return false;
                 }
 
-                Token *open_brace = current_token (tokens, offset);
+                Token *open_brace = current_token (parser);
                 if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-                    print_token_error (data, current_token (tokens, offset), "Missing function open brace");
+                    print_token_error (parser, current_token (parser), "Missing function open brace");
                     return false;
                 }
-                next_token (offset);
+                next_token (parser);
 
                 op = make_function_definition (data_type, name, parameters);
-                if (!parse_function_body ((OperationFunctionDefinition *) op, data, tokens, offset))
+                if (!parse_function_body (parser, (OperationFunctionDefinition *) op))
                     return false;
             } else {
                 op = make_variable_definition (data_type, name, NULL);
             }
         }
-        else if (token_has_text (data, token, "return")) {
-            next_token (offset);
+        else if (token_has_text (parser->data, token, "return")) {
+            next_token (parser);
 
-            Operation *value = parse_expression (function, data, tokens, offset);
+            Operation *value = parse_expression (parser, function);
             if (value == NULL) {
-                print_token_error (data, current_token (tokens, offset), "Not valid return value");
+                print_token_error (parser, current_token (parser), "Not valid return value");
                 return false;
             }
 
             op = make_return (value);
         }
-        else if (is_variable (function, data, token)) {
+        else if (is_variable (parser, function, token)) {
             Token *name = token;
-            next_token (offset);
+            next_token (parser);
 
-            Token *assignment_token = current_token (tokens, offset);
+            Token *assignment_token = current_token (parser);
             if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
-                 print_token_error (data, current_token (tokens, offset), "Missing assignment token");
+                 print_token_error (parser, current_token (parser), "Missing assignment token");
                  return false;
             }
-            next_token (offset);
+            next_token (parser);
 
-            Operation *value = parse_expression (function, data, tokens, offset);
+            Operation *value = parse_expression (parser, function);
             if (value == NULL) {
-                 print_token_error (data, current_token (tokens, offset), "Invalid value for variable");
+                 print_token_error (parser, current_token (parser), "Invalid value for variable");
                  return false;
             }
 
             op = make_variable_assignment (name, value);
         }
-        else if ((op = parse_value (function, data, tokens, offset)) != NULL) {
+        else if ((op = parse_value (parser, function)) != NULL) {
             // FIXME: Only allow functions and variable values
         }
         else {
-            print_token_error (data, current_token (tokens, offset), "Unexpected token");
+            print_token_error (parser, current_token (parser), "Unexpected token");
             return false;
         }
 
@@ -560,7 +581,7 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
     }
 
     if (function->name != NULL) {
-        print_token_error (data, current_token (tokens, offset), "Missing close brace");
+        print_token_error (parser, current_token (parser), "Missing close brace");
         return false;
     }
 
@@ -570,21 +591,21 @@ parse_function_body (OperationFunctionDefinition *function, const char *data, To
 OperationFunctionDefinition *
 elf_parse (const char *data, size_t data_length)
 {
-    Token **tokens = elf_lex (data, data_length);
+    Parser *parser = parser_new (data, data_length);
+
+    parser->tokens = elf_lex (data, data_length);
 
     Operation **parameters = malloc (sizeof (Operation *));
     parameters[0] = NULL;
     OperationFunctionDefinition *main_function = (OperationFunctionDefinition *) make_function_definition (NULL, NULL, parameters);
 
-    size_t offset = 0;
-    if (!parse_function_body (main_function, data, tokens, &offset)) {
+    if (!parse_function_body (parser, main_function)) {
         operation_free ((Operation *) main_function);
-        tokens_free (tokens);
+        parser_free (parser);
         return NULL;
     }
 
-    // FIXME: Need to keep these - they are referred to by the operations
-    //tokens_free (tokens);
+    parser_free (parser);
 
     return main_function;
 }
