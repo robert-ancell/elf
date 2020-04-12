@@ -28,6 +28,16 @@ make_variable_assignment (Token *name, Operation *value)
 }
 
 Operation *
+make_if (Operation *condition)
+{
+    OperationIf *o = malloc (sizeof (OperationIf));
+    memset (o, 0, sizeof (OperationIf));
+    o->type = OPERATION_TYPE_IF;
+    o->condition = condition;
+    return (Operation *) o;
+}
+
+Operation *
 make_function_definition (Token *data_type, Token *name, Operation **parameters)
 {
     OperationFunctionDefinition *o = malloc (sizeof (OperationFunctionDefinition));
@@ -121,6 +131,8 @@ operation_to_string (Operation *operation)
         return strdup_printf ("VARIABLE_DEFINITION");
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
         return strdup_printf ("VARIABLE_ASSIGNMENT");
+    case OPERATION_TYPE_IF:
+        return strdup_printf ("IF");
     case OPERATION_TYPE_FUNCTION_DEFINITION:
         return strdup_printf ("FUNCTION_DEFINITION");
     case OPERATION_TYPE_FUNCTION_CALL:
@@ -177,6 +189,14 @@ operation_free (Operation *operation)
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT: {
         OperationVariableAssignment *op = (OperationVariableAssignment *) operation;
         operation_free (op->value);
+        break;
+    }
+    case OPERATION_TYPE_IF: {
+        OperationIf *op = (OperationIf *) operation;
+        operation_free (op->condition);
+        for (int i = 0; op->body[i] != NULL; i++)
+            operation_free (op->body[i]);
+        free (op->body);
         break;
     }
     case OPERATION_TYPE_FUNCTION_DEFINITION: {

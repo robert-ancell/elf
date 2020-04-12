@@ -282,6 +282,28 @@ run_variable_assignment (ProgramState *state, OperationVariableAssignment *opera
 }
 
 static DataValue *
+run_if (ProgramState *state, OperationIf *operation)
+{
+    DataValue *value = run_operation (state, operation->condition);
+    if (value->type != DATA_TYPE_BOOL) {
+        data_value_unref (value);
+        return NULL;
+    }
+    bool condition = value->data[0] != 0;
+    data_value_unref (value);
+
+    if (!condition)
+        return NULL;
+
+    for (int i = 0; operation->body[i] != NULL; i++) {
+        DataValue *value = run_operation (state, operation->body[i]);
+        data_value_unref (value);
+    }
+
+    return NULL;
+}
+
+static DataValue *
 run_function_call (ProgramState *state, OperationFunctionCall *operation)
 {
     if (operation->function != NULL) {
@@ -410,6 +432,8 @@ run_operation (ProgramState *state, Operation *operation)
         return run_variable_definition (state, (OperationVariableDefinition *) operation);
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
         return run_variable_assignment (state, (OperationVariableAssignment *) operation);
+    case OPERATION_TYPE_IF:
+        return run_if (state, (OperationIf *) operation);
     case OPERATION_TYPE_FUNCTION_DEFINITION: {
         // All resolved at compile time
         return NULL;
