@@ -314,7 +314,7 @@ function_defines_variable (Parser *parser, OperationFunctionDefinition *function
             return true;
     }
 
-    for (int i = 0; function->body[i] != NULL; i++) {
+    for (size_t i = 0; i < function->body_length; i++) {
         if (is_variable_definition_with_name (parser, function->body[i], token))
             return true;
     }
@@ -339,7 +339,7 @@ is_variable (Parser *parser, Token *token)
 static OperationFunctionDefinition *
 function_defines_function (Parser *parser, OperationFunctionDefinition *function, Token *token)
 {
-    for (int i = 0; function->body[i] != NULL; i++) {
+    for (size_t i = 0; i < function->body_length; i++) {
         if (function->body[i]->type != OPERATION_TYPE_FUNCTION_DEFINITION)
             continue;
 
@@ -516,19 +516,7 @@ parse_expression (Parser *parser)
 static bool
 parse_sequence (Parser *parser)
 {
-    size_t body_length = 0;
-
-    Operation *operation = parser->stack[parser->stack_length - 1]->operation;
-    if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
-        OperationFunctionDefinition *function = (OperationFunctionDefinition *) operation;
-        function->body = malloc (sizeof (Operation *));
-        function->body[0] = NULL;
-    }
-    else if (operation->type == OPERATION_TYPE_IF) {
-        OperationIf *o = (OperationIf *) operation;
-        o->body = malloc (sizeof (Operation *));
-        o->body[0] = NULL;
-    }
+    Operation *parent = parser->stack[parser->stack_length - 1]->operation;
 
     while (current_token (parser) != NULL) {
         Token *token = current_token (parser);
@@ -657,7 +645,39 @@ parse_sequence (Parser *parser)
 
             Token *close_brace = current_token (parser);
             if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-                print_token_error (parser, current_token (parser), "Missing function close brace");
+                print_token_error (parser, current_token (parser), "Missing if close brace");
+                return false;
+            }
+            next_token (parser);
+
+            pop_stack (parser);
+        }
+        else if (token_has_text (parser->data, token, "else")) {
+            Operation *last_operation = operation_get_last_child (parent);
+            if (last_operation == NULL || last_operation->type != OPERATION_TYPE_IF) {
+                print_token_error (parser, current_token (parser), "else must follow if");
+                return false;
+            }
+            OperationIf *if_operation = (OperationIf *) last_operation;
+
+            next_token (parser);
+
+            Token *open_brace = current_token (parser);
+            if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
+                print_token_error (parser, current_token (parser), "Missing else open brace");
+                return false;
+            }
+            next_token (parser);
+
+            op = make_else ();
+            if_operation->else_operation = (OperationElse *) op;
+            push_stack (parser, op);
+            if (!parse_sequence (parser))
+                return false;
+
+            Token *close_brace = current_token (parser);
+            if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
+                print_token_error (parser, current_token (parser), "Missing else close brace");
                 return false;
             }
             next_token (parser);
@@ -702,19 +722,7 @@ parse_sequence (Parser *parser)
             return false;
         }
 
-        body_length++;
-        if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
-            OperationFunctionDefinition *function = (OperationFunctionDefinition *) operation;
-            function->body = realloc (function->body, sizeof (Operation *) * (body_length + 1));
-            function->body[body_length - 1] = op;
-            function->body[body_length] = NULL;
-        }
-        else if (operation->type == OPERATION_TYPE_IF) {
-            OperationIf *o = (OperationIf *) operation;
-            o->body = realloc (o->body, sizeof (Operation *) * (body_length + 1));
-            o->body[body_length - 1] = op;
-            o->body[body_length] = NULL;
-        }
+        operation_add_child (parent, op);
     }
 
     return true;

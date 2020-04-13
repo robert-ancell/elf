@@ -38,6 +38,15 @@ make_if (Operation *condition)
 }
 
 Operation *
+make_else (void)
+{
+    OperationElse *o = malloc (sizeof (OperationElse));
+    memset (o, 0, sizeof (OperationElse));
+    o->type = OPERATION_TYPE_ELSE;
+    return (Operation *) o;
+}
+
+Operation *
 make_function_definition (Token *data_type, Token *name, Operation **parameters)
 {
     OperationFunctionDefinition *o = malloc (sizeof (OperationFunctionDefinition));
@@ -123,6 +132,51 @@ make_binary (Token *operator, Operation *a, Operation *b)
     return (Operation *) o;
 }
 
+void
+operation_add_child (Operation *operation, Operation *child)
+{
+    if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
+        OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
+        o->body_length++;
+        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body[o->body_length - 1] = child;
+    }
+    else if (operation->type == OPERATION_TYPE_IF) {
+        OperationIf *o = (OperationIf *) operation;
+        o->body_length++;
+        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body[o->body_length - 1] = child;
+    }
+    else if (operation->type == OPERATION_TYPE_ELSE) {
+        OperationElse *o = (OperationElse *) operation;
+        o->body_length++;
+        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body[o->body_length - 1] = child;
+    }
+}
+
+Operation *
+operation_get_last_child (Operation *operation)
+{
+    if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
+        OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
+        if (o->body_length > 0)
+            return o->body[o->body_length - 1];
+    }
+    else if (operation->type == OPERATION_TYPE_IF) {
+        OperationIf *o = (OperationIf *) operation;
+        if (o->body_length > 0)
+            return o->body[o->body_length - 1];
+    }
+    else if (operation->type == OPERATION_TYPE_ELSE) {
+        OperationElse *o = (OperationElse *) operation;
+        if (o->body_length > 0)
+            return o->body[o->body_length - 1];
+    }
+
+    return NULL;
+}
+
 char *
 operation_to_string (Operation *operation)
 {
@@ -133,6 +187,8 @@ operation_to_string (Operation *operation)
         return strdup_printf ("VARIABLE_ASSIGNMENT");
     case OPERATION_TYPE_IF:
         return strdup_printf ("IF");
+    case OPERATION_TYPE_ELSE:
+       return strdup_printf ("ELSE");
     case OPERATION_TYPE_FUNCTION_DEFINITION:
         return strdup_printf ("FUNCTION_DEFINITION");
     case OPERATION_TYPE_FUNCTION_CALL:
@@ -194,7 +250,14 @@ operation_free (Operation *operation)
     case OPERATION_TYPE_IF: {
         OperationIf *op = (OperationIf *) operation;
         operation_free (op->condition);
-        for (int i = 0; op->body[i] != NULL; i++)
+        for (size_t i = 0; i < op->body_length; i++)
+            operation_free (op->body[i]);
+        free (op->body);
+        break;
+    }
+    case OPERATION_TYPE_ELSE: {
+        OperationElse *op = (OperationElse *) operation;
+        for (size_t i = 0; i < op->body_length; i++)
             operation_free (op->body[i]);
         free (op->body);
         break;
@@ -204,7 +267,7 @@ operation_free (Operation *operation)
         for (int i = 0; op->parameters[i] != NULL; i++)
             operation_free (op->parameters[i]);
         free (op->parameters);
-        for (int i = 0; op->body[i] != NULL; i++)
+        for (size_t i = 0; i < op->body_length; i++)
             operation_free (op->body[i]);
         free (op->body);
         break;

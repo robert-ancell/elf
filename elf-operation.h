@@ -6,6 +6,7 @@ typedef enum {
     OPERATION_TYPE_VARIABLE_DEFINITION,
     OPERATION_TYPE_VARIABLE_ASSIGNMENT,
     OPERATION_TYPE_IF,
+    OPERATION_TYPE_ELSE,
     OPERATION_TYPE_FUNCTION_DEFINITION,
     OPERATION_TYPE_FUNCTION_CALL,
     OPERATION_TYPE_RETURN,
@@ -35,12 +36,23 @@ typedef struct {
     Operation *value;
 } OperationVariableAssignment;
 
+typedef struct _OperationElse OperationElse;
+
 typedef struct {
     OperationType type; // OPERATION_TYPE_IF
 
     Operation *condition;
     Operation **body;
+    size_t body_length;
+    OperationElse *else_operation;
 } OperationIf;
+
+struct _OperationElse {
+    OperationType type; // OPERATION_TYPE_ELSE
+
+    Operation **body;
+    size_t body_length;
+};
 
 typedef struct _OperationFunctionDefinition OperationFunctionDefinition;
 
@@ -52,6 +64,7 @@ struct _OperationFunctionDefinition {
     Token *name;
     Operation **parameters;
     Operation **body;
+    size_t body_length;
 };
 
 typedef struct {
@@ -108,6 +121,8 @@ Operation *make_variable_assignment (Token *name, Operation *value);
 
 Operation *make_if (Operation *condition);
 
+Operation *make_else (void);
+
 Operation *make_function_definition (Token *data_type, Token *name, Operation **parameters);
 
 Operation *make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function);
@@ -123,6 +138,10 @@ Operation *make_text_constant (Token *value);
 Operation *make_variable_value (Token *name);
 
 Operation *make_binary (Token *operator, Operation *a, Operation *b);
+
+void operation_add_child (Operation *operation, Operation *child);
+
+Operation *operation_get_last_child (Operation *operation);
 
 char *operation_to_string (Operation *operation);
 

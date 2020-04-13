@@ -83,7 +83,7 @@ compile_elf_source (const char *filename)
         return 1;
     }
 
-    for (int i = 0; main_function->body[i] != NULL; i++) {
+    for (size_t i = 0; i < main_function->body_length; i++) {
         Operation *op = main_function->body[i];
         char *op_text = operation_to_string (op);
         printf ("%s\n", op_text);
