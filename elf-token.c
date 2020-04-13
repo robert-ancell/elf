@@ -78,6 +78,20 @@ token_to_string (Token *token)
         return strdup_printf ("TEXT");
     case TOKEN_TYPE_ASSIGN:
         return strdup_printf ("ASSIGN");
+    case TOKEN_TYPE_NOT:
+        return strdup_printf ("NOT");
+    case TOKEN_TYPE_EQUAL:
+        return strdup_printf ("EQUAL");
+    case TOKEN_TYPE_NOT_EQUAL:
+        return strdup_printf ("NOT_EQUAL");
+    case TOKEN_TYPE_GREATER:
+        return strdup_printf ("GREATER");
+    case TOKEN_TYPE_GREATER_EQUAL:
+        return strdup_printf ("GREATER_EQUAL");
+    case TOKEN_TYPE_LESS:
+        return strdup_printf ("LESS");
+    case TOKEN_TYPE_LESS_EQUAL:
+        return strdup_printf ("LESS_EQUAL");
     case TOKEN_TYPE_ADD:
         return strdup_printf ("ADD");
     case TOKEN_TYPE_SUBTRACT:

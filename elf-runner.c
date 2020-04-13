@@ -145,6 +145,53 @@ data_value_new_utf8 (const char *string_value)
 }
 
 static DataValue *
+data_value_new_utf8_join (DataValue *a, DataValue *b)
+{
+    DataValue *value = malloc (sizeof (DataValue));
+    memset (value, 0, sizeof (DataValue));
+    value->ref_count = 1;
+    value->type = DATA_TYPE_UTF8;
+
+    value->data_length = a->data_length + b->data_length + 1;
+    value->data = malloc (sizeof (char) * value->data_length);
+    for (size_t i = 0; i < a->data_length; i++)
+        value->data[i] = a->data[i];
+    for (size_t i = 0; i < b->data_length; i++)
+        value->data[a->data_length + i] = b->data[i];
+
+    return value;
+}
+
+static bool
+data_value_is_integer (DataValue *value)
+{
+    return value->type == DATA_TYPE_UINT8 ||
+           value->type == DATA_TYPE_INT8 ||
+           value->type == DATA_TYPE_UINT16 ||
+           value->type == DATA_TYPE_INT16 ||
+           value->type == DATA_TYPE_UINT32 ||
+           value->type == DATA_TYPE_INT32 ||
+           value->type == DATA_TYPE_UINT64 ||
+           value->type == DATA_TYPE_INT64;
+}
+
+static bool
+data_value_equal (DataValue *a, DataValue *b)
+{
+    if (a->type != b->type)
+        return false;
+
+    if (a->data_length != b->data_length)
+        return false;
+
+    for (size_t i = 0; i < a->data_length; i++)
+        if (a->data[i] != b->data[i])
+            return false;
+
+    return true;
+}
+
+static DataValue *
 data_value_ref (DataValue *value)
 {
     if (value == NULL)
@@ -399,33 +446,80 @@ run_variable_value (ProgramState *state, OperationVariableValue *operation)
 }
 
 static DataValue *
+run_binary_boolean (ProgramState *state, OperationBinary *operation, DataValue *a, DataValue *b)
+{
+    switch (operation->operator->type) {
+    case TOKEN_TYPE_EQUAL:
+        return data_value_new_bool (a->data[0] == b->data[0]);
+    case TOKEN_TYPE_NOT_EQUAL:
+        return data_value_new_bool (a->data[0] != b->data[0]);
+    default:
+        return NULL;
+    }
+}
+
+static DataValue *
+run_binary_integer (ProgramState *state, OperationBinary *operation, DataValue *a, DataValue *b)
+{
+    if (a->type != DATA_TYPE_UINT8 || b->type != DATA_TYPE_UINT8)
+        return NULL;
+
+    switch (operation->operator->type) {
+    case TOKEN_TYPE_EQUAL:
+        return data_value_new_bool (a->data[0] == b->data[0]);
+    case TOKEN_TYPE_NOT_EQUAL:
+        return data_value_new_bool (a->data[0] != b->data[0]);
+    case TOKEN_TYPE_GREATER:
+        return data_value_new_bool (a->data[0] > b->data[0]);
+    case TOKEN_TYPE_GREATER_EQUAL:
+        return data_value_new_bool (a->data[0] >= b->data[0]);
+    case TOKEN_TYPE_LESS:
+        return data_value_new_bool (a->data[0] < b->data[0]);
+    case TOKEN_TYPE_LESS_EQUAL:
+        return data_value_new_bool (a->data[0] <= b->data[0]);
+    case TOKEN_TYPE_ADD:
+        return data_value_new_uint8 (a->data[0] + b->data[0]);
+    case TOKEN_TYPE_SUBTRACT:
+        return data_value_new_uint8 (a->data[0] - b->data[0]);
+    case TOKEN_TYPE_MULTIPLY:
+        return data_value_new_uint8 (a->data[0] * b->data[0]);
+    case TOKEN_TYPE_DIVIDE:
+        return data_value_new_uint8 (a->data[0] / b->data[0]);
+    default:
+        return NULL;
+    }
+}
+
+static DataValue *
+run_binary_text (ProgramState *state, OperationBinary *operation, DataValue *a, DataValue *b)
+{
+    switch (operation->operator->type) {
+    case TOKEN_TYPE_EQUAL:
+        return data_value_new_bool (data_value_equal (a, b));
+    case TOKEN_TYPE_NOT_EQUAL:
+        return data_value_new_bool (!data_value_equal (a, b));
+    case TOKEN_TYPE_ADD:
+        return data_value_new_utf8_join (a, b);
+    default:
+        return NULL;
+    }
+}
+
+static DataValue *
 run_binary (ProgramState *state, OperationBinary *operation)
 {
     DataValue *a = run_operation (state, operation->a);
     DataValue *b = run_operation (state, operation->b);
 
-    if (a->type != DATA_TYPE_UINT8 || b->type != DATA_TYPE_UINT8)
-        return NULL;
+    // FIXME: Support string multiply "*" * 5 == "*****"
+    DataValue *result;
+    if (a->type == DATA_TYPE_BOOL && b->type == DATA_TYPE_BOOL)
+        result = run_binary_boolean (state, operation, a, b);
+    else if (data_value_is_integer (a) && data_value_is_integer (b))
+        result = run_binary_integer (state, operation, a, b);
+    else if (a->type == DATA_TYPE_UTF8 && b->type == DATA_TYPE_UTF8)
+        result = run_binary_text (state, operation, a, b);
 
-    uint8_t int_value = 0;
-    switch (operation->operator->type) {
-    case TOKEN_TYPE_ADD:
-        int_value = a->data[0] + b->data[0];
-        break;
-    case TOKEN_TYPE_SUBTRACT:
-        int_value = a->data[0] - b->data[0];
-        break;
-    case TOKEN_TYPE_MULTIPLY:
-        int_value = a->data[0] * b->data[0];
-        break;
-    case TOKEN_TYPE_DIVIDE:
-        int_value = a->data[0] / b->data[0];
-        break;
-    default:
-        break;
-    }
-
-    DataValue *result = data_value_new_uint8 (int_value);
     data_value_unref (a);
     data_value_unref (b);
 

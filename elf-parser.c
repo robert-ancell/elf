@@ -149,7 +149,18 @@ token_is_complete (const char *data, Token *token, char next_c)
        return !is_number_char (next_c);
    case TOKEN_TYPE_TEXT:
        return string_is_complete (data, token);
+   case TOKEN_TYPE_NOT:
+       return next_c != '=';
+   case TOKEN_TYPE_LESS:
+       return next_c != '=';
+   case TOKEN_TYPE_GREATER:
+       return next_c != '=';
    case TOKEN_TYPE_ASSIGN:
+       return next_c != '=';
+   case TOKEN_TYPE_EQUAL:
+   case TOKEN_TYPE_NOT_EQUAL:
+   case TOKEN_TYPE_LESS_EQUAL:
+   case TOKEN_TYPE_GREATER_EQUAL:
    case TOKEN_TYPE_ADD:
    case TOKEN_TYPE_SUBTRACT:
    case TOKEN_TYPE_MULTIPLY:
@@ -206,6 +217,12 @@ elf_lex (const char *data, size_t data_length)
                 token->type = TOKEN_TYPE_CLOSE_BRACE;
             else if (c == '=')
                 token->type = TOKEN_TYPE_ASSIGN;
+            else if (c == '!')
+                token->type = TOKEN_TYPE_NOT;
+            else if (c == '<')
+                token->type = TOKEN_TYPE_LESS;
+            else if (c == '>')
+                token->type = TOKEN_TYPE_GREATER;
             else if (c == '+')
                 token->type = TOKEN_TYPE_ADD;
             else if (c == '-')
@@ -224,6 +241,17 @@ elf_lex (const char *data, size_t data_length)
             current_token = token;
         }
         else {
+            if (c == '=') {
+                if (current_token->type == TOKEN_TYPE_ASSIGN)
+                    current_token->type = TOKEN_TYPE_EQUAL;
+                else if (current_token->type == TOKEN_TYPE_NOT)
+                    current_token->type = TOKEN_TYPE_NOT_EQUAL;
+                else if (current_token->type == TOKEN_TYPE_LESS)
+                    current_token->type = TOKEN_TYPE_LESS_EQUAL;
+                else if (current_token->type == TOKEN_TYPE_GREATER)
+                    current_token->type = TOKEN_TYPE_GREATER_EQUAL;
+            }
+
             current_token->length++;
         }
     }
@@ -482,7 +510,13 @@ parse_value (Parser *parser)
 static bool
 token_is_binary_operator (Token *token)
 {
-    return token->type == TOKEN_TYPE_ADD ||
+    return token->type == TOKEN_TYPE_EQUAL ||
+           token->type == TOKEN_TYPE_NOT_EQUAL ||
+           token->type == TOKEN_TYPE_GREATER ||
+           token->type == TOKEN_TYPE_GREATER_EQUAL ||
+           token->type == TOKEN_TYPE_LESS ||
+           token->type == TOKEN_TYPE_LESS_EQUAL ||
+           token->type == TOKEN_TYPE_ADD ||
            token->type == TOKEN_TYPE_SUBTRACT ||
            token->type == TOKEN_TYPE_MULTIPLY ||
            token->type == TOKEN_TYPE_DIVIDE;
