@@ -129,17 +129,27 @@ data_value_new_uint64 (uint64_t int_value)
 }
 
 static DataValue *
-data_value_new_utf8 (const char *string_value)
+data_value_new_utf8_sized (size_t length)
 {
     DataValue *value = malloc (sizeof (DataValue));
     memset (value, 0, sizeof (DataValue));
     value->ref_count = 1;
     value->type = DATA_TYPE_UTF8;
 
-    value->data_length = strlen (string_value) + 1;
+    value->data_length = length;
     value->data = malloc (sizeof (char) * value->data_length);
+    value->data[0] = '\0';
+
+    return value;
+}
+
+static DataValue *
+data_value_new_utf8 (const char *string_value)
+{
+    DataValue *value = data_value_new_utf8_sized (strlen (string_value) + 1);
     for (size_t i = 0; i < value->data_length; i++)
         value->data[i] = string_value[i];
+    value->data[value->data_length] = '\0';
 
     return value;
 }
@@ -147,17 +157,13 @@ data_value_new_utf8 (const char *string_value)
 static DataValue *
 data_value_new_utf8_join (DataValue *a, DataValue *b)
 {
-    DataValue *value = malloc (sizeof (DataValue));
-    memset (value, 0, sizeof (DataValue));
-    value->ref_count = 1;
-    value->type = DATA_TYPE_UTF8;
-
-    value->data_length = a->data_length + b->data_length + 1;
+    DataValue *value = data_value_new_utf8_sized ((a->data_length - 1) + (b->data_length - 1) + 1);
     value->data = malloc (sizeof (char) * value->data_length);
     for (size_t i = 0; i < a->data_length; i++)
         value->data[i] = a->data[i];
     for (size_t i = 0; i < b->data_length; i++)
-        value->data[a->data_length + i] = b->data[i];
+        value->data[a->data_length - 1 + i] = b->data[i];
+    value->data[value->data_length] = '\0';
 
     return value;
 }
