@@ -145,6 +145,8 @@ token_is_complete (const char *data, Token *token, char next_c)
    switch (token->type) {
    case TOKEN_TYPE_WORD:
        return !is_symbol_char (next_c);
+   case TOKEN_TYPE_MEMBER:
+       return !is_symbol_char (next_c);
    case TOKEN_TYPE_NUMBER:
        return !is_number_char (next_c);
    case TOKEN_TYPE_TEXT:
@@ -235,6 +237,8 @@ elf_lex (const char *data, size_t data_length)
                 token->type = TOKEN_TYPE_NUMBER;
             else if (c == '"' || c == '\'')
                 token->type = TOKEN_TYPE_TEXT;
+            else if (c == '.') // FIXME: Don't allow whitespace before it?
+                token->type = TOKEN_TYPE_MEMBER;
             else if (is_symbol_char (c))
                 token->type = TOKEN_TYPE_WORD;
 
@@ -260,17 +264,6 @@ elf_lex (const char *data, size_t data_length)
 }
 
 static bool
-token_has_text (const char *data, Token *token, const char *value)
-{
-    for (int i = 0; i < token->length; i++) {
-        if (value[i] == '\0' || data[token->offset + i] != value[i])
-            return false;
-    }
-
-    return value[token->length] == '\0';
-}
-
-static bool
 is_data_type (Parser *parser, Token *token)
 {
     const char *builtin_types[] = { "bool",
@@ -285,7 +278,7 @@ is_data_type (Parser *parser, Token *token)
         return false;
 
     for (int i = 0; builtin_types[i] != NULL; i++)
-        if (token_has_text (parser->data, token, builtin_types[i]))
+        if (token_has_text (token, parser->data, builtin_types[i]))
             return true;
 
     return false;
@@ -318,7 +311,7 @@ token_text_matches (Parser *parser, Token *a, Token *b)
 static bool
 is_boolean (Parser *parser, Token *token)
 {
-    return token_has_text (parser->data, token, "true") || token_has_text (parser->data, token, "false");
+    return token_has_text (token, parser->data, "true") || token_has_text (token, parser->data, "false");
 }
 
 static bool
@@ -409,7 +402,7 @@ is_builtin_function (Parser *parser, Token *token)
         return false;
 
     for (int i = 0; builtin_functions[i] != NULL; i++)
-        if (token_has_text (parser->data, token, builtin_functions[i]))
+        if (token_has_text (token, parser->data, builtin_functions[i]))
             return true;
 
     return false;
@@ -437,21 +430,22 @@ parse_value (Parser *parser)
         return NULL;
 
     OperationFunctionDefinition *f;
+    Operation *value = NULL;
     if (token->type == TOKEN_TYPE_NUMBER) {
         next_token (parser);
-        return make_number_constant (token);
+        value = make_number_constant (token);
     }
     else if (token->type == TOKEN_TYPE_TEXT) {
         next_token (parser);
-        return make_text_constant (token);
+        value = make_text_constant (token);
     }
     else if (is_boolean (parser, token)) {
         next_token (parser);
-        return make_boolean_constant (token);
+        value = make_boolean_constant (token);
     }
     else if (is_variable (parser, token)) {
         next_token (parser);
-        return make_variable_value (token);
+        value = make_variable_value (token);
     }
     else if ((f = find_function (parser, token)) != NULL || is_builtin_function (parser, token)) {
         Token *name = token;
@@ -477,7 +471,7 @@ parse_value (Parser *parser)
                 if (parameters_length > 0) {
                     if (t->type != TOKEN_TYPE_COMMA) {
                         print_token_error (parser, current_token (parser), "Missing comma");
-                        return false;
+                        return NULL;
                     }
                     next_token (parser);
                     t = current_token (parser);
@@ -501,10 +495,20 @@ parse_value (Parser *parser)
             }
         }
 
-        return make_function_call (name, parameters, f);
+        value = make_function_call (name, parameters, f);
     }
 
-    return NULL;
+    if (value == NULL)
+        return NULL;
+
+    token = current_token (parser);
+    while (token != NULL && token->type == TOKEN_TYPE_MEMBER) {
+        next_token (parser);
+        value = make_member_value (value, token);
+        token = current_token (parser);
+    }
+
+    return value;
 }
 
 static bool
@@ -656,7 +660,7 @@ parse_sequence (Parser *parser)
                 op = make_variable_definition (data_type, name, NULL);
             }
         }
-        else if (token_has_text (parser->data, token, "if")) {
+        else if (token_has_text (token, parser->data, "if")) {
             next_token (parser);
 
             Operation *condition = parse_expression (parser);
@@ -686,7 +690,7 @@ parse_sequence (Parser *parser)
 
             pop_stack (parser);
         }
-        else if (token_has_text (parser->data, token, "else")) {
+        else if (token_has_text (token, parser->data, "else")) {
             Operation *last_operation = operation_get_last_child (parent);
             if (last_operation == NULL || last_operation->type != OPERATION_TYPE_IF) {
                 print_token_error (parser, current_token (parser), "else must follow if");
@@ -718,7 +722,7 @@ parse_sequence (Parser *parser)
 
             pop_stack (parser);
         }
-        else if (token_has_text (parser->data, token, "while")) {
+        else if (token_has_text (token, parser->data, "while")) {
             next_token (parser);
 
             Operation *condition = parse_expression (parser);
@@ -748,7 +752,7 @@ parse_sequence (Parser *parser)
 
             pop_stack (parser);
         }
-        else if (token_has_text (parser->data, token, "return")) {
+        else if (token_has_text (token, parser->data, "return")) {
             next_token (parser);
 
             Operation *value = parse_expression (parser);

@@ -6,6 +6,7 @@
 
 typedef enum {
     TOKEN_TYPE_WORD,
+    TOKEN_TYPE_MEMBER,
     TOKEN_TYPE_NUMBER,
     TOKEN_TYPE_TEXT,
     TOKEN_TYPE_ASSIGN,
@@ -34,6 +35,8 @@ typedef struct {
 } Token;
 
 char *token_get_text (Token *token, const char *data);
+
+bool token_has_text (Token *token, const char *data, const char *value);
 
 bool token_parse_boolean_constant (Token *token, const char *data);
 

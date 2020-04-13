@@ -15,6 +15,7 @@ typedef enum {
     OPERATION_TYPE_NUMBER_CONSTANT,
     OPERATION_TYPE_TEXT_CONSTANT,
     OPERATION_TYPE_VARIABLE_VALUE,
+    OPERATION_TYPE_MEMBER_VALUE,
     OPERATION_TYPE_BINARY,
 } OperationType;
 
@@ -117,6 +118,13 @@ typedef struct {
 } OperationVariableValue;
 
 typedef struct {
+    OperationType type; // OPERATION_TYPE_MEMBER_VALUE;
+
+    Operation *object;
+    Token *member;
+} OperationMemberValue;
+
+typedef struct {
     OperationType type; // OPERATION_TYPE_BINARY
 
     Token *operator;
@@ -145,6 +153,8 @@ Operation *make_boolean_constant (Token *value);
 Operation *make_number_constant (Token *value);
 
 Operation *make_text_constant (Token *value);
+
+Operation *make_member_value (Operation *object, Token *member);
 
 Operation *make_variable_value (Token *name);
 

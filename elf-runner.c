@@ -500,6 +500,26 @@ run_variable_value (ProgramState *state, OperationVariableValue *operation)
 }
 
 static DataValue *
+run_member_value (ProgramState *state, OperationMemberValue *operation)
+{
+    DataValue *object = run_operation (state, operation->object);
+
+    DataValue *result = NULL;
+    if (object->type == DATA_TYPE_UTF8) {
+        if (token_has_text (operation->member, state->data, ".length"))
+            result = data_value_new_uint8 (object->data_length - 1); // FIXME: Total hack
+        else if (token_has_text (operation->member, state->data, ".upper"))
+            result = data_value_new_utf8 ("FOO"); // FIXME: Total hack
+        else if (token_has_text (operation->member, state->data, ".lower"))
+            result = data_value_new_utf8 ("foo"); // FIXME: Total hack
+    }
+
+    data_value_unref (object);
+
+    return result;
+}
+
+static DataValue *
 run_binary_boolean (ProgramState *state, OperationBinary *operation, DataValue *a, DataValue *b)
 {
     switch (operation->operator->type) {
@@ -610,6 +630,8 @@ run_operation (ProgramState *state, Operation *operation)
         return run_text_constant (state, (OperationTextConstant *) operation);
     case OPERATION_TYPE_VARIABLE_VALUE:
         return run_variable_value (state, (OperationVariableValue *) operation);
+    case OPERATION_TYPE_MEMBER_VALUE:
+        return run_member_value (state, (OperationMemberValue *) operation);
     case OPERATION_TYPE_BINARY:
         return run_binary (state, (OperationBinary *) operation);
     }

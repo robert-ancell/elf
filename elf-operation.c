@@ -131,6 +131,17 @@ make_variable_value (Token *name)
 }
 
 Operation *
+make_member_value (Operation *object, Token *member)
+{
+    OperationMemberValue *o = malloc (sizeof (OperationMemberValue));
+    memset (o, 0, sizeof (OperationMemberValue));
+    o->type = OPERATION_TYPE_MEMBER_VALUE;
+    o->object = object;
+    o->member = member;
+    return (Operation *) o;
+}
+
+Operation *
 make_binary (Token *operator, Operation *a, Operation *b)
 {
     OperationBinary *o = malloc (sizeof (OperationBinary));
@@ -246,6 +257,13 @@ operation_to_string (Operation *operation)
     }
     case OPERATION_TYPE_VARIABLE_VALUE:
         return strdup_printf ("VARIABLE_VALUE");
+    case OPERATION_TYPE_MEMBER_VALUE: {
+        OperationMemberValue *op = (OperationMemberValue *) operation;
+        char *member_string = token_to_string (op->member);
+        char *string = strdup_printf ("MEMBER_VALUE(%s)", member_string);
+        free (member_string);
+        return string;
+    }
     case OPERATION_TYPE_BINARY:
         return strdup_printf ("BINARY");
     }
@@ -325,6 +343,7 @@ operation_free (Operation *operation)
     case OPERATION_TYPE_NUMBER_CONSTANT:
     case OPERATION_TYPE_TEXT_CONSTANT:
     case OPERATION_TYPE_VARIABLE_VALUE:
+    case OPERATION_TYPE_MEMBER_VALUE:
         break;
     }
 

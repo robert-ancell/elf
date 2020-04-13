@@ -16,6 +16,17 @@ token_get_text (Token *token, const char *data)
 }
 
 bool
+token_has_text (Token *token, const char *data, const char *value)
+{
+    for (int i = 0; i < token->length; i++) {
+        if (value[i] == '\0' || data[token->offset + i] != value[i])
+            return false;
+    }
+
+    return value[token->length] == '\0';
+}
+
+bool
 token_parse_boolean_constant (Token *token, const char *data)
 {
     char *text = token_get_text (token, data);
@@ -72,6 +83,8 @@ token_to_string (Token *token)
     switch (token->type) {
     case TOKEN_TYPE_WORD:
         return strdup_printf ("WORD");
+    case TOKEN_TYPE_MEMBER:
+        return strdup_printf ("MEMBER");
     case TOKEN_TYPE_NUMBER:
         return strdup_printf ("NUMBER");
     case TOKEN_TYPE_TEXT:
