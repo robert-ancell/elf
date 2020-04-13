@@ -380,8 +380,30 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
     if (strcmp (function_name, "print") == 0) {
         DataValue *value = run_operation (state, operation->parameters[0]);
 
-        for (size_t i = 0; i < value->data_length; i++)
-             printf ("%02X", value->data[i]);
+        switch (value->type) {
+        case DATA_TYPE_BOOL:
+            if (value->data[0] == 0)
+                printf ("false");
+            else
+                printf ("false");
+            break;
+        case DATA_TYPE_UINT8:
+            printf ("%d", value->data[0]);
+            break;
+        case DATA_TYPE_UINT16:
+            printf ("%d", value->data[0] << 8 | value->data[1]);
+            break;
+        case DATA_TYPE_UINT32:
+            printf ("%d", value->data[3] << 24 | value->data[1] << 16 | value->data[1] << 8 || value->data[0]);
+            break;
+        case DATA_TYPE_UTF8:
+            printf ("%.*s", (int) value->data_length, value->data);
+            break;
+        default:
+            for (size_t i = 0; i < value->data_length; i++)
+                printf ("%02X", value->data[i]);
+            break;
+        }
         printf ("\n");
 
         data_value_unref (value);
