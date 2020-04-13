@@ -718,6 +718,36 @@ parse_sequence (Parser *parser)
 
             pop_stack (parser);
         }
+        else if (token_has_text (parser->data, token, "while")) {
+            next_token (parser);
+
+            Operation *condition = parse_expression (parser);
+            if (condition == NULL) {
+                print_token_error (parser, current_token (parser), "Not valid while condition");
+                return false;
+            }
+
+            Token *open_brace = current_token (parser);
+            if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
+                print_token_error (parser, current_token (parser), "Missing while open brace");
+                return false;
+            }
+            next_token (parser);
+
+            op = make_while (condition);
+            push_stack (parser, op);
+            if (!parse_sequence (parser))
+                return false;
+
+            Token *close_brace = current_token (parser);
+            if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
+                print_token_error (parser, current_token (parser), "Missing while close brace");
+                return false;
+            }
+            next_token (parser);
+
+            pop_stack (parser);
+        }
         else if (token_has_text (parser->data, token, "return")) {
             next_token (parser);
 

@@ -359,6 +359,28 @@ run_if (ProgramState *state, OperationIf *operation)
 }
 
 static DataValue *
+run_while (ProgramState *state, OperationWhile *operation)
+{
+    while (true) {
+        DataValue *value = run_operation (state, operation->condition);
+        if (value->type != DATA_TYPE_BOOL) {
+            data_value_unref (value);
+            return NULL;
+        }
+        bool condition = value->data[0] != 0;
+        data_value_unref (value);
+
+        if (!condition)
+            return NULL;
+
+        for (size_t i = 0; i < operation->body_length; i++) {
+            DataValue *value = run_operation (state, operation->body[i]);
+            data_value_unref (value);
+        }
+    }
+}
+
+static DataValue *
 run_function_call (ProgramState *state, OperationFunctionCall *operation)
 {
     if (operation->function != NULL) {
@@ -560,6 +582,8 @@ run_operation (ProgramState *state, Operation *operation)
         return run_if (state, (OperationIf *) operation);
     case OPERATION_TYPE_ELSE:
         return NULL; // Resolved in IF
+    case OPERATION_TYPE_WHILE:
+        return run_while (state, (OperationWhile *) operation);
     case OPERATION_TYPE_FUNCTION_DEFINITION: {
         // All resolved at compile time
         return NULL;

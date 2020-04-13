@@ -7,6 +7,7 @@ typedef enum {
     OPERATION_TYPE_VARIABLE_ASSIGNMENT,
     OPERATION_TYPE_IF,
     OPERATION_TYPE_ELSE,
+    OPERATION_TYPE_WHILE,
     OPERATION_TYPE_FUNCTION_DEFINITION,
     OPERATION_TYPE_FUNCTION_CALL,
     OPERATION_TYPE_RETURN,
@@ -53,6 +54,14 @@ struct _OperationElse {
     Operation **body;
     size_t body_length;
 };
+
+typedef struct {
+    OperationType type; // OPERATION_TYPE_WHILE
+
+    Operation *condition;
+    Operation **body;
+    size_t body_length;
+} OperationWhile;
 
 typedef struct _OperationFunctionDefinition OperationFunctionDefinition;
 
@@ -122,6 +131,8 @@ Operation *make_variable_assignment (Token *name, Operation *value);
 Operation *make_if (Operation *condition);
 
 Operation *make_else (void);
+
+Operation *make_while (Operation *condition);
 
 Operation *make_function_definition (Token *data_type, Token *name, Operation **parameters);
 

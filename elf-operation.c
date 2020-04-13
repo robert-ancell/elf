@@ -47,6 +47,16 @@ make_else (void)
 }
 
 Operation *
+make_while (Operation *condition)
+{
+    OperationWhile *o = malloc (sizeof (OperationWhile));
+    memset (o, 0, sizeof (OperationWhile));
+    o->type = OPERATION_TYPE_WHILE;
+    o->condition = condition;
+    return (Operation *) o;
+}
+
+Operation *
 make_function_definition (Token *data_type, Token *name, Operation **parameters)
 {
     OperationFunctionDefinition *o = malloc (sizeof (OperationFunctionDefinition));
@@ -153,6 +163,12 @@ operation_add_child (Operation *operation, Operation *child)
         o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
         o->body[o->body_length - 1] = child;
     }
+    else if (operation->type == OPERATION_TYPE_WHILE) {
+        OperationWhile *o = (OperationWhile *) operation;
+        o->body_length++;
+        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body[o->body_length - 1] = child;
+    }
 }
 
 Operation *
@@ -173,6 +189,11 @@ operation_get_last_child (Operation *operation)
         if (o->body_length > 0)
             return o->body[o->body_length - 1];
     }
+    else if (operation->type == OPERATION_TYPE_WHILE) {
+        OperationWhile *o = (OperationWhile *) operation;
+        if (o->body_length > 0)
+            return o->body[o->body_length - 1];
+    }
 
     return NULL;
 }
@@ -189,6 +210,8 @@ operation_to_string (Operation *operation)
         return strdup_printf ("IF");
     case OPERATION_TYPE_ELSE:
        return strdup_printf ("ELSE");
+    case OPERATION_TYPE_WHILE:
+       return strdup_printf ("WHILE");
     case OPERATION_TYPE_FUNCTION_DEFINITION:
         return strdup_printf ("FUNCTION_DEFINITION");
     case OPERATION_TYPE_FUNCTION_CALL:
@@ -257,6 +280,14 @@ operation_free (Operation *operation)
     }
     case OPERATION_TYPE_ELSE: {
         OperationElse *op = (OperationElse *) operation;
+        for (size_t i = 0; i < op->body_length; i++)
+            operation_free (op->body[i]);
+        free (op->body);
+        break;
+    }
+    case OPERATION_TYPE_WHILE: {
+        OperationWhile *op = (OperationWhile *) operation;
+        operation_free (op->condition);
         for (size_t i = 0; i < op->body_length; i++)
             operation_free (op->body[i]);
         free (op->body);
