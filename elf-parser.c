@@ -5,11 +5,34 @@
 #include <string.h>
 
 typedef struct {
-   const char *data;
-   size_t data_length;
+    OperationFunctionDefinition *function;
+} StackEntry;
 
-   Token **tokens;
-   size_t offset;
+static StackEntry *
+stack_entry_new (OperationFunctionDefinition *function)
+{
+    StackEntry *entry = malloc (sizeof (StackEntry));
+    memset (entry, 0, sizeof (StackEntry));
+    entry->function = function;
+
+    return entry;
+}
+
+static void
+stack_entry_free (StackEntry *entry)
+{
+    free (entry);
+}
+
+typedef struct {
+    const char *data;
+    size_t data_length;
+
+    Token **tokens;
+    size_t offset;
+
+    StackEntry **stack;
+    size_t stack_length;
 } Parser;
 
 static Parser *
@@ -27,10 +50,31 @@ static void
 parser_free (Parser *parser)
 {
     // FIXME: Need to keep these - they are referred to by the operations
-    //for (size_t i = 0; parser->tokens[i] != NULL; i++)
+    //for (int i = 0; parser->tokens[i] != NULL; i++)
     //  free (parser->tokens[i]);
+    //free (parser->tokens);
+
+    for (size_t i = 0; i < parser->stack_length; i++)
+       stack_entry_free (parser->stack[i]);
+    free (parser->stack);
 
     free (parser);
+}
+
+static void
+push_stack (Parser *parser, OperationFunctionDefinition *function)
+{
+    parser->stack_length++;
+    parser->stack = realloc (parser->stack, sizeof (StackEntry *) * parser->stack_length);
+    parser->stack[parser->stack_length - 1] = stack_entry_new (function);
+}
+
+static void
+pop_stack (Parser *parser)
+{
+    stack_entry_free (parser->stack[parser->stack_length - 1]);
+    parser->stack_length--;
+    parser->stack = realloc (parser->stack, sizeof (StackEntry *) * parser->stack_length);
 }
 
 static void
@@ -263,7 +307,7 @@ is_variable_definition_with_name (Parser *parser, Operation *operation, Token *t
 }
 
 static bool
-is_variable (Parser *parser, OperationFunctionDefinition *function, Token *token)
+function_defines_variable (Parser *parser, OperationFunctionDefinition *function, Token *token)
 {
     for (int i = 0; function->parameters[i] != NULL; i++) {
         if (is_variable_definition_with_name (parser, function->parameters[i], token))
@@ -278,12 +322,20 @@ is_variable (Parser *parser, OperationFunctionDefinition *function, Token *token
     return false;
 }
 
-static OperationFunctionDefinition *
-find_function (Parser *parser, OperationFunctionDefinition *function, Token *token)
+static bool
+is_variable (Parser *parser, Token *token)
 {
-    if (token->type != TOKEN_TYPE_WORD)
-        return NULL;
+    for (size_t i = parser->stack_length; i > 0; i--) {
+        if (function_defines_variable (parser, parser->stack[i - 1]->function, token))
+            return true;
+    }
 
+    return false;
+}
+
+static OperationFunctionDefinition *
+function_defines_function (Parser *parser, OperationFunctionDefinition *function, Token *token)
+{
     for (int i = 0; function->body[i] != NULL; i++) {
         if (function->body[i]->type != OPERATION_TYPE_FUNCTION_DEFINITION)
             continue;
@@ -296,8 +348,23 @@ find_function (Parser *parser, OperationFunctionDefinition *function, Token *tok
     return NULL;
 }
 
+static OperationFunctionDefinition *
+find_function (Parser *parser, Token *token)
+{
+    if (token->type != TOKEN_TYPE_WORD)
+        return NULL;
+
+    for (size_t i = parser->stack_length; i > 0; i--) {
+        OperationFunctionDefinition *function = function_defines_function (parser, parser->stack[i - 1]->function, token);
+        if (function != NULL)
+            return function;
+    }
+
+    return NULL;
+}
+
 static bool
-is_builtin_function (Parser *parser, OperationFunctionDefinition *function, Token *token)
+is_builtin_function (Parser *parser, Token *token)
 {
     const char *builtin_functions[] = { "print",
                                         NULL };
@@ -324,10 +391,10 @@ next_token (Parser *parser)
     parser->offset++;
 }
 
-static Operation *parse_expression (Parser *parser, OperationFunctionDefinition *function);
+static Operation *parse_expression (Parser *parser);
 
 static Operation *
-parse_value (Parser *parser, OperationFunctionDefinition *function)
+parse_value (Parser *parser)
 {
     Token *token = current_token (parser);
     if (token == NULL)
@@ -346,11 +413,11 @@ parse_value (Parser *parser, OperationFunctionDefinition *function)
         next_token (parser);
         return make_boolean_constant (token);
     }
-    else if (is_variable (parser, function, token)) {
+    else if (is_variable (parser, token)) {
         next_token (parser);
         return make_variable_value (token);
     }
-    else if ((f = find_function (parser, function, token)) != NULL || is_builtin_function (parser, function, token)) {
+    else if ((f = find_function (parser, token)) != NULL || is_builtin_function (parser, token)) {
         Token *name = token;
         next_token (parser);
 
@@ -380,7 +447,7 @@ parse_value (Parser *parser, OperationFunctionDefinition *function)
                     t = current_token (parser);
                 }
 
-                Operation *value = parse_expression (parser, function);
+                Operation *value = parse_expression (parser);
                 if (value == NULL) {
                     print_token_error (parser, current_token (parser), "Invalid parameter");
                     return NULL;
@@ -414,9 +481,9 @@ token_is_binary_operator (Token *token)
 }
 
 static Operation *
-parse_expression (Parser *parser, OperationFunctionDefinition *function)
+parse_expression (Parser *parser)
 {
-    Operation *a = parse_value (parser, function);
+    Operation *a = parse_value (parser);
     if (a == NULL)
         return NULL;
 
@@ -428,7 +495,7 @@ parse_expression (Parser *parser, OperationFunctionDefinition *function)
         return a;
     next_token (parser);
 
-    Operation *b = parse_value (parser, function);
+    Operation *b = parse_value (parser);
     if (b == NULL) {
         print_token_error (parser, current_token (parser), "Missing second value in binary operation");
         operation_free (a);
@@ -439,20 +506,22 @@ parse_expression (Parser *parser, OperationFunctionDefinition *function)
 }
 
 static bool
-parse_function_body (Parser *parser, OperationFunctionDefinition *function)
+parse_function_body (Parser *parser)
 {
     size_t body_length = 0;
+
+    OperationFunctionDefinition *function = parser->stack[parser->stack_length - 1]->function;
 
     function->body = malloc (sizeof (Operation *));
     function->body[0] = NULL;
     while (current_token (parser) != NULL) {
         Token *token = current_token (parser);
 
+        if (token->type == TOKEN_TYPE_CLOSE_BRACE)
+            break;
+
         Operation *op = NULL;
-        if (token->type == TOKEN_TYPE_CLOSE_BRACE && function->name != NULL) {
-            next_token (parser);
-            return true;
-        } else if (is_data_type (parser, token)) {
+        if (is_data_type (parser, token)) {
             Token *data_type = token;
             next_token (parser);
 
@@ -465,7 +534,7 @@ parse_function_body (Parser *parser, OperationFunctionDefinition *function)
             } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
                 next_token (parser);
 
-                Operation *value = parse_expression (parser, function);
+                Operation *value = parse_expression (parser);
                 if (value == NULL) {
                     print_token_error (parser, current_token (parser), "Invalid value for variable");
                     return false;
@@ -530,8 +599,18 @@ parse_function_body (Parser *parser, OperationFunctionDefinition *function)
                 next_token (parser);
 
                 op = make_function_definition (data_type, name, parameters);
-                if (!parse_function_body (parser, (OperationFunctionDefinition *) op))
+                push_stack (parser, (OperationFunctionDefinition *) op);
+                if (!parse_function_body (parser))
                     return false;
+
+                Token *close_brace = current_token (parser);
+                if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
+                    print_token_error (parser, current_token (parser), "Missing function close brace");
+                    return false;
+                }
+                next_token (parser);
+
+                pop_stack (parser);
             } else {
                 op = make_variable_definition (data_type, name, NULL);
             }
@@ -539,7 +618,7 @@ parse_function_body (Parser *parser, OperationFunctionDefinition *function)
         else if (token_has_text (parser->data, token, "return")) {
             next_token (parser);
 
-            Operation *value = parse_expression (parser, function);
+            Operation *value = parse_expression (parser);
             if (value == NULL) {
                 print_token_error (parser, current_token (parser), "Not valid return value");
                 return false;
@@ -547,7 +626,7 @@ parse_function_body (Parser *parser, OperationFunctionDefinition *function)
 
             op = make_return (value);
         }
-        else if (is_variable (parser, function, token)) {
+        else if (is_variable (parser, token)) {
             Token *name = token;
             next_token (parser);
 
@@ -558,7 +637,7 @@ parse_function_body (Parser *parser, OperationFunctionDefinition *function)
             }
             next_token (parser);
 
-            Operation *value = parse_expression (parser, function);
+            Operation *value = parse_expression (parser);
             if (value == NULL) {
                  print_token_error (parser, current_token (parser), "Invalid value for variable");
                  return false;
@@ -566,7 +645,7 @@ parse_function_body (Parser *parser, OperationFunctionDefinition *function)
 
             op = make_variable_assignment (name, value);
         }
-        else if ((op = parse_value (parser, function)) != NULL) {
+        else if ((op = parse_value (parser)) != NULL) {
             // FIXME: Only allow functions and variable values
         }
         else {
@@ -578,11 +657,6 @@ parse_function_body (Parser *parser, OperationFunctionDefinition *function)
         function->body = realloc (function->body, sizeof (Operation *) * (body_length + 1));
         function->body[body_length - 1] = op;
         function->body[body_length] = NULL;
-    }
-
-    if (function->name != NULL) {
-        print_token_error (parser, current_token (parser), "Missing close brace");
-        return false;
     }
 
     return true;
@@ -598,10 +672,16 @@ elf_parse (const char *data, size_t data_length)
     Operation **parameters = malloc (sizeof (Operation *));
     parameters[0] = NULL;
     OperationFunctionDefinition *main_function = (OperationFunctionDefinition *) make_function_definition (NULL, NULL, parameters);
+    push_stack (parser, main_function);
 
-    if (!parse_function_body (parser, main_function)) {
+    if (!parse_function_body (parser)) {
         operation_free ((Operation *) main_function);
         parser_free (parser);
+        return NULL;
+    }
+
+    if (current_token (parser) != NULL) {
+        printf ("Expected end of input\n");
         return NULL;
     }
 
