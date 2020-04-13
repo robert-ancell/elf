@@ -37,6 +37,9 @@ typedef struct {
 
     Variable **variables;
     size_t variables_length;
+
+    bool run_return;
+    DataValue *return_value;
 } ProgramState;
 
 static DataValue *run_operation (ProgramState *state, Operation *operation);
@@ -246,17 +249,15 @@ variable_free (Variable *variable)
 static DataValue *
 run_function (ProgramState *state, OperationFunctionDefinition *function)
 {
-    for (size_t i = 0; i < function->body_length; i++) {
+    for (size_t i = 0; i < function->body_length && !state->run_return; i++) {
         DataValue *value = run_operation (state, function->body[i]);
-        if (function->body[i]->type == OPERATION_TYPE_RETURN) {
-            // FIXME: Convert result to match return type
-            return value;
-        }
-
         data_value_unref (value);
     }
 
-    return NULL;
+    DataValue *return_value = state->return_value;
+    state->run_return = false;
+    state->return_value = NULL;
+    return return_value;
 }
 
 static DataValue *
@@ -356,7 +357,7 @@ run_if (ProgramState *state, OperationIf *operation)
         body_length = operation->else_operation->body_length;
     }
 
-    for (size_t i = 0; i < body_length; i++) {
+    for (size_t i = 0; i < body_length && !state->run_return; i++) {
         DataValue *value = run_operation (state, body[i]);
         data_value_unref (value);
     }
@@ -379,7 +380,7 @@ run_while (ProgramState *state, OperationWhile *operation)
         if (!condition)
             return NULL;
 
-        for (size_t i = 0; i < operation->body_length; i++) {
+        for (size_t i = 0; i < operation->body_length && !state->run_return; i++) {
             DataValue *value = run_operation (state, operation->body[i]);
             data_value_unref (value);
         }
@@ -445,7 +446,10 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
 static DataValue *
 run_return (ProgramState *state, OperationReturn *operation)
 {
-    return run_operation (state, operation->value);
+    DataValue *value = run_operation (state, operation->value);
+    state->run_return = true;
+    state->return_value = data_value_ref (value);
+    return value;
 }
 
 static DataValue *
