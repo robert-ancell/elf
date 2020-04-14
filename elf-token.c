@@ -91,48 +91,48 @@ token_to_string (Token *token)
 {
     switch (token->type) {
     case TOKEN_TYPE_WORD:
-        return strdup_printf ("WORD");
+        return str_printf ("WORD");
     case TOKEN_TYPE_MEMBER:
-        return strdup_printf ("MEMBER");
+        return str_printf ("MEMBER");
     case TOKEN_TYPE_NUMBER:
-        return strdup_printf ("NUMBER");
+        return str_printf ("NUMBER");
     case TOKEN_TYPE_TEXT:
-        return strdup_printf ("TEXT");
+        return str_printf ("TEXT");
     case TOKEN_TYPE_ASSIGN:
-        return strdup_printf ("ASSIGN");
+        return str_printf ("ASSIGN");
     case TOKEN_TYPE_NOT:
-        return strdup_printf ("NOT");
+        return str_printf ("NOT");
     case TOKEN_TYPE_EQUAL:
-        return strdup_printf ("EQUAL");
+        return str_printf ("EQUAL");
     case TOKEN_TYPE_NOT_EQUAL:
-        return strdup_printf ("NOT_EQUAL");
+        return str_printf ("NOT_EQUAL");
     case TOKEN_TYPE_GREATER:
-        return strdup_printf ("GREATER");
+        return str_printf ("GREATER");
     case TOKEN_TYPE_GREATER_EQUAL:
-        return strdup_printf ("GREATER_EQUAL");
+        return str_printf ("GREATER_EQUAL");
     case TOKEN_TYPE_LESS:
-        return strdup_printf ("LESS");
+        return str_printf ("LESS");
     case TOKEN_TYPE_LESS_EQUAL:
-        return strdup_printf ("LESS_EQUAL");
+        return str_printf ("LESS_EQUAL");
     case TOKEN_TYPE_ADD:
-        return strdup_printf ("ADD");
+        return str_printf ("ADD");
     case TOKEN_TYPE_SUBTRACT:
-        return strdup_printf ("SUBTRACT");
+        return str_printf ("SUBTRACT");
     case TOKEN_TYPE_MULTIPLY:
-        return strdup_printf ("MULTIPLY");
+        return str_printf ("MULTIPLY");
     case TOKEN_TYPE_DIVIDE:
-        return strdup_printf ("DIVIDE");
+        return str_printf ("DIVIDE");
     case TOKEN_TYPE_OPEN_PAREN:
-        return strdup_printf ("OPEN_PAREN");
+        return str_printf ("OPEN_PAREN");
     case TOKEN_TYPE_CLOSE_PAREN:
-        return strdup_printf ("CLOSE_PAREN");
+        return str_printf ("CLOSE_PAREN");
     case TOKEN_TYPE_COMMA:
-        return strdup_printf ("COMMA");
+        return str_printf ("COMMA");
     case TOKEN_TYPE_OPEN_BRACE:
-        return strdup_printf ("OPEN_BRACE");
+        return str_printf ("OPEN_BRACE");
     case TOKEN_TYPE_CLOSE_BRACE:
-        return strdup_printf ("CLOSE_BRACE");
+        return str_printf ("CLOSE_BRACE");
     }
 
-    return strdup_printf ("UNKNOWN(%d)", token->type);
+    return str_printf ("UNKNOWN(%d)", token->type);
 }

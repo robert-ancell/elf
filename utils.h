@@ -9,4 +9,14 @@
 
 #pragma once
 
-char *strdup_printf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+#include <stdbool.h>
+
+void str_free (char **value);
+
+#define autofree_str __attribute__((cleanup(str_free))) char*
+
+bool str_has_suffix (const char *value, const char *suffix);
+
+char *str_slice (const char *value, int start, int end);
+
+char *str_printf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));

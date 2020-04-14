@@ -12,9 +12,57 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+void
+str_free (char **value)
+{
+    free (*value);
+    *value = NULL;
+}
+
+bool
+str_has_suffix (const char *value, const char *suffix)
+{
+    size_t value_length = strlen (value);
+    size_t suffix_length = strlen (suffix);
+
+    if (suffix_length > value_length)
+        return false;
+
+    return strcmp (value + value_length - suffix_length, suffix) == 0;
+}
 
 char *
-strdup_printf (const char *format, ...)
+str_slice (const char *value, int start, int end)
+{
+    size_t value_length = strlen (value);
+    if (start < 0)
+        start += value_length;
+    if (end <= 0)
+        end += value_length;
+
+    if (start < 0)
+        start = 0;
+    if (start > value_length)
+        start = value_length;
+    if (end > value_length)
+        end = value_length;
+
+    if (end < start)
+        end = start;
+
+    size_t result_length = end - start;
+    char *result = malloc (sizeof (char) * (result_length + 1));
+    for (int i = 0; i < result_length; i++)
+        result[i] = value[start + i];
+    result[result_length] = '\0';
+
+    return result;
+}
+
+char *
+str_printf (const char *format, ...)
 {
     va_list ap;
 

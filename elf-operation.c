@@ -223,61 +223,51 @@ operation_to_string (Operation *operation)
 {
     switch (operation->type) {
     case OPERATION_TYPE_VARIABLE_DEFINITION:
-        return strdup_printf ("VARIABLE_DEFINITION");
+        return str_printf ("VARIABLE_DEFINITION");
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
-        return strdup_printf ("VARIABLE_ASSIGNMENT");
+        return str_printf ("VARIABLE_ASSIGNMENT");
     case OPERATION_TYPE_IF:
-        return strdup_printf ("IF");
+        return str_printf ("IF");
     case OPERATION_TYPE_ELSE:
-       return strdup_printf ("ELSE");
+       return str_printf ("ELSE");
     case OPERATION_TYPE_WHILE:
-       return strdup_printf ("WHILE");
+       return str_printf ("WHILE");
     case OPERATION_TYPE_FUNCTION_DEFINITION:
-        return strdup_printf ("FUNCTION_DEFINITION");
+        return str_printf ("FUNCTION_DEFINITION");
     case OPERATION_TYPE_FUNCTION_CALL:
-        return strdup_printf ("FUNCTION_CALL");
+        return str_printf ("FUNCTION_CALL");
     case OPERATION_TYPE_RETURN: {
         OperationReturn *op = (OperationReturn *) operation;
-        char *value_string = operation_to_string (op->value);
-        char *string = strdup_printf ("RETURN(%s)", value_string);
-        free (value_string);
-        return string;
+        autofree_str value_string = operation_to_string (op->value);
+        return str_printf ("RETURN(%s)", value_string);
     }
     case OPERATION_TYPE_BOOLEAN_CONSTANT: {
         OperationNumberConstant *op = (OperationNumberConstant *) operation;
-        char *value_string = token_to_string (op->value);
-        char *string = strdup_printf ("BOOLEAN_CONSTANT(%s)", value_string);
-        free (value_string);
-        return string;
+        autofree_str value_string = token_to_string (op->value);
+        return str_printf ("BOOLEAN_CONSTANT(%s)", value_string);
     }
     case OPERATION_TYPE_NUMBER_CONSTANT: {
         OperationNumberConstant *op = (OperationNumberConstant *) operation;
-        char *value_string = token_to_string (op->value);
-        char *string = strdup_printf ("NUMBER_CONSTANT(%s)", value_string);
-        free (value_string);
-        return string;
+        autofree_str value_string = token_to_string (op->value);
+        return str_printf ("NUMBER_CONSTANT(%s)", value_string);
     }
     case OPERATION_TYPE_TEXT_CONSTANT: {
         OperationTextConstant *op = (OperationTextConstant *) operation;
-        char *value_string = token_to_string (op->value);
-        char *string = strdup_printf ("TEXT_CONSTANT(%s)", value_string);
-        free (value_string);
-        return string;
+        autofree_str value_string = token_to_string (op->value);
+        return str_printf ("TEXT_CONSTANT(%s)", value_string);
     }
     case OPERATION_TYPE_VARIABLE_VALUE:
-        return strdup_printf ("VARIABLE_VALUE");
+        return str_printf ("VARIABLE_VALUE");
     case OPERATION_TYPE_MEMBER_VALUE: {
         OperationMemberValue *op = (OperationMemberValue *) operation;
         char *member_string = token_to_string (op->member);
-        char *string = strdup_printf ("MEMBER_VALUE(%s)", member_string);
-        free (member_string);
-        return string;
+        return str_printf ("MEMBER_VALUE(%s)", member_string);
     }
     case OPERATION_TYPE_BINARY:
-        return strdup_printf ("BINARY");
+        return str_printf ("BINARY");
     }
 
-    return strdup_printf ("UNKNOWN(%d)", operation->type);
+    return str_printf ("UNKNOWN(%d)", operation->type);
 }
 
 void

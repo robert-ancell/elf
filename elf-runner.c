@@ -238,7 +238,7 @@ variable_new (const char *name, DataValue *value)
 {
     Variable *variable = malloc (sizeof (Variable));
     memset (variable, 0, sizeof (Variable));
-    variable->name = strdup_printf ("%s", name);
+    variable->name = str_printf ("%s", name);
     variable->value = data_value_ref (value);
 
     return variable;
