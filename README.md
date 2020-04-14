@@ -1,3 +1,5 @@
+[![elf](https://snapcraft.io//elf/badge.svg)](https://snapcraft.io/elf)
+
 ## Elf
 
 Elf is a low-level language designed for educational purposes. It is
