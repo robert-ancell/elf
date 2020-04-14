@@ -1,0 +1,32 @@
+name: elf
+base: core18
+summary: Elf programming language
+adopt-info: elf
+description: |
+  Elf is a low level educational programing language.
+
+architectures:
+  - build-on: amd64
+    run-on: amd64
+  - build-on: armhf
+    run-on: armhf
+
+grade: stable
+confinement: strict
+
+parts:
+  elf:
+    plugin: meson
+    source: .
+    override-pull: |
+      snapcraftctl pull
+      DATE=$(date --utc +%Y%m%d)
+      REVISION=$(cut -c -7 .git/refs/heads/master)
+      snapcraftctl set-version "$DATE.$REVISION"
+
+apps:
+  elf:
+    command: elf
+    plugs:
+      - home
+      - network
