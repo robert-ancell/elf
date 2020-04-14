@@ -36,11 +36,14 @@ mmap_file (const char *filename, char **data, size_t *data_length)
     }
     size_t data_length_ = file_info.st_size;
 
-    char *data_ = mmap (NULL, data_length_, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (data_ == MAP_FAILED) {
-        close (fd);
-        printf ("Failed to map file: %s\n", strerror (errno));
-        return -1;
+    char *data_ = NULL;
+    if (data_length_ > 0) {
+        data_ = mmap (NULL, data_length_, PROT_READ, MAP_PRIVATE, fd, 0);
+        if (data_ == MAP_FAILED) {
+            close (fd);
+            printf ("Failed to map file: %s\n", strerror (errno));
+            return -1;
+        }
     }
 
     *data = data_;
@@ -51,7 +54,8 @@ mmap_file (const char *filename, char **data, size_t *data_length)
 static void
 munmap_file (int fd, char *data, size_t data_length)
 {
-    munmap (data, data_length);
+    if (data_length > 0)
+        munmap (data, data_length);
     close (fd);
 }
 
