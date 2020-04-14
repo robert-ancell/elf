@@ -3,7 +3,7 @@ base: core18
 summary: Elf programming language
 adopt-info: elf
 description: |
-  Elf is a low level educational programing language.
+  Elf is a low level educational programming language.
 
 architectures:
   - build-on: amd64
