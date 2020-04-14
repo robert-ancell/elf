@@ -12,3 +12,8 @@ utf8 welcome_text () {
 
 print (welcome_text ())
 ```
+
+Elf is distributed as a Snap, install it with:
+```
+$ snap install elf
+```
