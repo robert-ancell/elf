@@ -152,6 +152,8 @@ static bool
 token_is_complete (const char *data, Token *token, char next_c)
 {
    switch (token->type) {
+   case TOKEN_TYPE_COMMENT:
+       return next_c == '\n' || next_c == '\0';
    case TOKEN_TYPE_WORD:
        return !is_symbol_char (next_c);
    case TOKEN_TYPE_MEMBER:
@@ -568,11 +570,15 @@ parse_sequence (Parser *parser)
     while (current_token (parser) != NULL) {
         Token *token = current_token (parser);
 
+        // Stop when sequence ends
         if (token->type == TOKEN_TYPE_CLOSE_BRACE)
             break;
 
-        if (token->type == TOKEN_TYPE_CLOSE_BRACE)
-            break;
+        // Ignore comments
+        if (token->type == TOKEN_TYPE_COMMENT) {
+            next_token (parser);
+            continue;
+        }
 
         Operation *op = NULL;
         if (is_data_type (parser, token)) {

@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 typedef enum {
+    TOKEN_TYPE_COMMENT,
     TOKEN_TYPE_WORD,
     TOKEN_TYPE_MEMBER,
     TOKEN_TYPE_NUMBER,

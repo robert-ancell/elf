@@ -89,6 +89,7 @@ run_tutorial (void)
             "Open this with your favourite editor to continue.\n", source_name);
 
     const char *hello_world =
+        "# Write something to the outside world\n"
         "print (\"Hello world!\")\n";
     write (fd, hello_world, strlen (hello_world));
     close (fd);

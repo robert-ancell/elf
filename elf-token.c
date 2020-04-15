@@ -90,6 +90,8 @@ char *
 token_to_string (Token *token)
 {
     switch (token->type) {
+    case TOKEN_TYPE_COMMENT:
+        return str_printf ("COMMENT");
     case TOKEN_TYPE_WORD:
         return str_printf ("WORD");
     case TOKEN_TYPE_MEMBER:
