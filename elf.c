@@ -84,9 +84,23 @@ run_tutorial (void)
 
     printf ("Welcome to Elf. Elf is a language designed to help you learn how computers work.\n"
             "\n"
-            "Let's get started! I've make your first Elf program in the file '%s'. If will show you the basic concepts of the language.\n"
+            "Let's get started! I've made a simple Elf program in the file '%s' that shows some of the basic concepts of the language.\n"
+            "You can open this in your favourite editor or see the contents with the following command:\n"
             "\n"
-            "Open this with your favourite editor to continue.\n", source_name);
+            "    $ cat %s\n"
+            "\n"
+            "You can run this program using the following command:\n"
+            "\n"
+            "    $ elf run %s\n"
+            "\n"
+            "It should print out the text 'Hello world!'. Try modifying it to write something else, then run it again.\n"
+            "\n"
+            "The next step is to compile the Elf program into an executable. This will make it run directly on the CPU and be able to be run without Elf installed.\n"
+            "\n"
+            "    $ elf compile %s\n"
+            "\n"
+            "Have fun!\n",
+            source_name, source_name, source_name, source_name);
 
     const char *hello_world =
         "# Write something to the outside world\n"
