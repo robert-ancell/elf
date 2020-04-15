@@ -330,7 +330,7 @@ main (int argc, char **argv)
         return compile_elf_source (filename);
     }
     else if (strcmp (command, "version") == 0) {
-        printf ("0\n");
+        printf ("%s\n", VERSION);
         return 0;
     }
     else if (strcmp (command, "help") == 0) {

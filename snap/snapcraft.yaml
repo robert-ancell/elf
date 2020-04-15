@@ -20,9 +20,7 @@ parts:
     source: .
     override-pull: |
       snapcraftctl pull
-      DATE=$(date --utc +%Y%m%d)
-      REVISION=$(cut -c -7 .git/refs/heads/master)
-      snapcraftctl set-version "$DATE.$REVISION"
+      snapcraftctl set-version "$(./make-version)"
 
 apps:
   elf:

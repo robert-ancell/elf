@@ -1,0 +1,4 @@
+#!/bin/sh
+DATE=$(date --utc +%Y%m%d)
+REVISION=$(cut -c -7 .git/refs/heads/master)
+echo "$DATE.$REVISION"
