@@ -19,4 +19,6 @@ bool str_has_suffix (const char *value, const char *suffix);
 
 char *str_slice (const char *value, int start, int end);
 
+char *str_new (const char *value);
+
 char *str_printf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));

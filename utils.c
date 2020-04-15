@@ -62,6 +62,15 @@ str_slice (const char *value, int start, int end)
 }
 
 char *
+str_new (const char *value)
+{
+    size_t value_length = strlen (value) + 1;
+    char *output = malloc (sizeof (char) * value_length);
+    memcpy (output, value, value_length);
+    return output;
+}
+
+char *
 str_printf (const char *format, ...)
 {
     va_list ap;

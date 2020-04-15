@@ -62,6 +62,41 @@ munmap_file (int fd, char *data, size_t data_length)
 }
 
 static int
+run_tutorial (void)
+{
+    autofree_str source_name = str_new ("tutorial.elf");
+    int index = 0;
+    int fd = 0;
+    while (true) {
+        fd = open (source_name, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (fd > 0)
+            break;
+
+        if (errno != EEXIST) {
+            printf ("Failed to make %s: %s", source_name, strerror (errno));
+            return 1;
+        }
+
+        str_free (&source_name);
+        index++;
+        source_name = str_printf ("tutorial-%d.elf", index);
+    }
+
+    printf ("Welcome to Elf. Elf is a language designed to help you learn how computers work.\n"
+            "\n"
+            "Let's get started! I've make your first Elf program in the file '%s'. If will show you the basic concepts of the language.\n"
+            "\n"
+            "Open this with your favourite editor to continue.\n", source_name);
+
+    const char *hello_world =
+        "print (\"Hello world!\")\n";
+    write (fd, hello_world, strlen (hello_world));
+    close (fd);
+
+    return 0;
+}
+
+static int
 run_elf_source (const char *filename)
 {
     char *data;
@@ -235,7 +270,10 @@ main (int argc, char **argv)
     if (argc > 1)
         command = argv[1];
 
-    if (strcmp (command, "run") == 0) {
+    if (strcmp (command, "tutorial") == 0) {
+        return run_tutorial ();
+    }
+    else if (strcmp (command, "run") == 0) {
         if (argc < 3) {
             printf ("Need file to run, run elf help for more information\n");
             return 1;
@@ -261,6 +299,7 @@ main (int argc, char **argv)
         printf ("Elf is a programming languge designed for teching how memory works.\n"
                 "\n"
                 "Usage:\n"
+                "  elf tutorial        - Get an introduction to Elf\n"
                 "  elf run <file>      - Run an elf program\n"
                 "  elf compile <file>  - Compile an elf program\n"
                 "  elf version         - Show the version of the Elf tool\n"
