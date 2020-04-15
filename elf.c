@@ -90,7 +90,30 @@ run_tutorial (void)
 
     const char *hello_world =
         "# Write something to the outside world\n"
-        "print (\"Hello world!\")\n";
+        "print ('Hello world!')\n"
+        "\n"
+        "# Variables can store values. Integers can be 8, 16, 32 or 64 bit, signed or unsigned \n"
+        "uint8 the_meaning_of_life = 6 * 7\n"
+        "\n"
+        "# Strings are stored in UTF-8 encoding\n"
+        "utf8 name = 'Zelda'\n"
+        "\n"
+        "# Functions allow you to re-use code\n"
+        "uint32 add (uint32 a, uint32 b) {\n"
+        "  return a + b\n"
+        "}\n"
+        "uint32 three = add (1, 2)\n"
+        "\n"
+        "# Conditionals allow you to run code if something is true\n"
+        "if three != 3 {\n"
+        "  print ('uh oh...')\n"
+        "}\n"
+        "\n"
+        "# Loops allow you to repeat code\n"
+        "int8 countdown = 10\n"
+        "while countdown > 0 {\n"
+        "    countdown = countdown - 1\n"
+        "}\n";
     write (fd, hello_world, strlen (hello_world));
     close (fd);
 
