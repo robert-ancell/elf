@@ -7,6 +7,7 @@
  * (at your option) any later version.
  */
 
+#include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -18,6 +19,7 @@
 
 #include "elf-parser.h"
 #include "elf-runner.h"
+#include "utils.h"
 
 static int
 mmap_file (const char *filename, char **data, size_t *data_length)
@@ -81,9 +83,119 @@ run_elf_source (const char *filename)
     return 0;
 }
 
+static void
+write_binary (int fd, uint8_t *text, size_t text_length, uint8_t *rodata, size_t rodata_length)
+{
+    const char *section_names[] = { "", ".shrtrtab", ".text", ".rodata", NULL };
+    size_t shrtrtab_length = 0;
+    for (int i = 0; section_names[i] != NULL; i++)
+        shrtrtab_length += strlen (section_names[i]) + 1;
+
+    char padding[16] = { 0 };
+    size_t text_padding_length = text_length % 16;
+    if (text_padding_length > 0)
+        text_padding_length = 16 - text_padding_length;
+    size_t rodata_padding_length = rodata_length % 16;
+    if (rodata_padding_length > 0)
+        rodata_padding_length = 16 - rodata_padding_length;
+    size_t shrtrtab_padding_length = shrtrtab_length % 16;
+    if (shrtrtab_padding_length > 0)
+        shrtrtab_padding_length = 16 - shrtrtab_padding_length;
+
+    Elf64_Ehdr elf_header = { 0 };
+    elf_header.e_ident[EI_MAG0] = ELFMAG0;
+    elf_header.e_ident[EI_MAG1] = ELFMAG1;
+    elf_header.e_ident[EI_MAG2] = ELFMAG2;
+    elf_header.e_ident[EI_MAG3] = ELFMAG3;
+    elf_header.e_ident[EI_CLASS] = ELFCLASS64;
+    elf_header.e_ident[EI_DATA] = ELFDATA2LSB;
+    elf_header.e_ident[EI_VERSION] = EV_CURRENT;
+    elf_header.e_type = ET_EXEC;
+    elf_header.e_machine = EM_X86_64;
+    elf_header.e_version = EV_CURRENT;
+    elf_header.e_entry = 0x8000000 + sizeof (Elf64_Ehdr) + sizeof (Elf64_Phdr);
+    elf_header.e_phoff = sizeof (elf_header);
+    elf_header.e_shoff = sizeof (Elf64_Ehdr) + sizeof (Elf64_Phdr) + text_length + text_padding_length + rodata_length + rodata_padding_length + shrtrtab_length + shrtrtab_padding_length;
+    elf_header.e_ehsize = sizeof (Elf64_Ehdr);
+    elf_header.e_phentsize = sizeof (Elf64_Phdr);
+    elf_header.e_phnum = 1;
+    elf_header.e_shentsize = sizeof (Elf64_Shdr);
+    elf_header.e_shnum = 4; // Matches length of section_names
+    elf_header.e_shstrndx = 3; // ".shrtrtab" from section header table
+
+    ssize_t n_written = 0;
+    n_written += write (fd, &elf_header, sizeof (elf_header));
+
+    Elf64_Phdr program_header = { 0 };
+    program_header.p_type = PT_LOAD;
+    program_header.p_flags = PF_R | PF_X;
+    program_header.p_offset = 0;
+    program_header.p_vaddr = 0x8000000;
+    program_header.p_paddr = 0x8000000;
+    program_header.p_filesz = sizeof (Elf64_Ehdr) + sizeof (Elf64_Phdr) + text_length + text_padding_length + rodata_length + rodata_padding_length;
+    program_header.p_memsz = program_header.p_filesz;
+
+    n_written += write (fd, &program_header, sizeof (program_header));
+
+    ssize_t text_offset = n_written;
+    n_written += write (fd, text, text_length);
+    n_written += write (fd, padding, text_padding_length);
+
+    ssize_t rodata_offset = n_written;
+    n_written += write (fd, rodata, rodata_length);
+    n_written += write (fd, padding, rodata_padding_length);
+
+    ssize_t shrtrtab_offset = n_written;
+    ssize_t null_name_offset = n_written - shrtrtab_offset;
+    n_written += write (fd, section_names[0], strlen (section_names[0]) + 1);
+    ssize_t shrtrtab_name_offset = n_written - shrtrtab_offset;
+    n_written += write (fd, section_names[1], strlen (section_names[1]) + 1);
+    ssize_t text_name_offset = n_written - shrtrtab_offset;
+    n_written += write (fd, section_names[2], strlen (section_names[2]) + 1);
+    ssize_t rodata_name_offset = n_written - shrtrtab_offset;
+    n_written += write (fd, section_names[3], strlen (section_names[3]) + 1);
+    n_written += write (fd, padding, shrtrtab_padding_length);
+
+    Elf64_Shdr null_section_header = { 0 };
+    null_section_header.sh_name = null_name_offset;
+    null_section_header.sh_type = SHT_NULL;
+    n_written += write (fd, &null_section_header, sizeof (null_section_header));
+
+    Elf64_Shdr text_section_header = { 0 };
+    text_section_header.sh_name = text_name_offset;
+    text_section_header.sh_type = SHT_PROGBITS;
+    text_section_header.sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+    text_section_header.sh_addr = 0x8000000 + text_offset;
+    text_section_header.sh_offset = text_offset;
+    text_section_header.sh_size = text_length;
+    n_written += write (fd, &text_section_header, sizeof (text_section_header));
+
+    Elf64_Shdr rodata_section_header = { 0 };
+    rodata_section_header.sh_name = rodata_name_offset;
+    rodata_section_header.sh_type = SHT_PROGBITS;
+    rodata_section_header.sh_flags = SHF_ALLOC;
+    rodata_section_header.sh_addr = 0x80000000 + rodata_offset;
+    rodata_section_header.sh_offset = rodata_offset;
+    rodata_section_header.sh_size = rodata_length;
+    n_written += write (fd, &rodata_section_header, sizeof (rodata_section_header));
+
+    Elf64_Shdr shrtrtab_section_header = { 0 };
+    shrtrtab_section_header.sh_name = shrtrtab_name_offset;
+    shrtrtab_section_header.sh_type = SHT_STRTAB;
+    shrtrtab_section_header.sh_offset = shrtrtab_offset;
+    shrtrtab_section_header.sh_size = shrtrtab_length;
+    n_written += write (fd, &shrtrtab_section_header, sizeof (shrtrtab_section_header));
+}
+
 static int
 compile_elf_source (const char *filename)
 {
+    if (!str_has_suffix (filename, ".elf")) {
+        printf ("Elf program doesn't have standard extension, can't determine name of binary to write\n");
+        return 1;
+    }
+    autofree_str binary_name = str_slice (filename, 0, -4);
+
     char *data;
     size_t data_length;
     int fd = mmap_file (filename, &data, &data_length);
@@ -96,11 +208,18 @@ compile_elf_source (const char *filename)
         return 1;
     }
 
-    for (size_t i = 0; i < main_function->body_length; i++) {
-        Operation *op = main_function->body[i];
-        char *op_text = operation_to_string (op);
-        printf ("%s\n", op_text);
+    int binary_fd = open (binary_name, O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+    if (binary_fd < 0) {
+        printf ("Failed to open '%s' to write program to\n", binary_name);
+        return 1;
     }
+
+    write_binary (binary_fd, NULL, 0, NULL, 0);
+
+    close (binary_fd);
+
+    printf ("%s compiled to '%s', run with:\n", filename, binary_name);
+    printf ("$ ./%s\n", binary_name);
 
     operation_free ((Operation *) main_function);
 
