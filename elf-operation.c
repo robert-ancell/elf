@@ -215,6 +215,58 @@ operation_is_constant (Operation *operation)
     return false;
 }
 
+char *
+operation_get_data_type (Operation *operation, const char *data)
+{
+    switch (operation->type) {
+    case OPERATION_TYPE_VARIABLE_DEFINITION: {
+        OperationVariableDefinition *op = (OperationVariableDefinition *) operation;
+        return token_get_text (op->data_type, data);
+    }
+    case OPERATION_TYPE_VARIABLE_ASSIGNMENT: {
+        OperationVariableAssignment *op = (OperationVariableAssignment *) operation;
+        return operation_get_data_type ((Operation *) op->variable, data);
+    }
+    case OPERATION_TYPE_FUNCTION_CALL: {
+        OperationFunctionCall *op = (OperationFunctionCall *) operation;
+        return operation_get_data_type ((Operation *) op->function, data);
+    }
+    case OPERATION_TYPE_RETURN: {
+        OperationReturn *op = (OperationReturn *) operation;
+        return operation_get_data_type ((Operation *) op->function, data);
+    }
+    case OPERATION_TYPE_BOOLEAN_CONSTANT:
+        return str_new ("bool");
+    case OPERATION_TYPE_NUMBER_CONSTANT:
+        return str_new ("uint8"); // FIXME: Find minimum size
+    case OPERATION_TYPE_TEXT_CONSTANT:
+        return str_new ("utf8");
+    case OPERATION_TYPE_VARIABLE_VALUE: {
+        OperationVariableValue *op = (OperationVariableValue *) operation;
+        return operation_get_data_type ((Operation *) op->variable, data);
+    }
+    case OPERATION_TYPE_MEMBER_VALUE: {
+        // FIXME:
+        return NULL;
+    }
+    case OPERATION_TYPE_BINARY: {
+        OperationBinary *op = (OperationBinary *) operation;
+        // FIXME: Need to combine data type
+        return operation_get_data_type (op->a, data);
+    }
+    case OPERATION_TYPE_FUNCTION_DEFINITION: {
+        OperationFunctionDefinition *op = (OperationFunctionDefinition *) operation;
+        return token_get_text (op->data_type, data);
+    }
+    case OPERATION_TYPE_IF:
+    case OPERATION_TYPE_ELSE:
+    case OPERATION_TYPE_WHILE:
+        return NULL;
+    }
+
+    return NULL;
+}
+
 void
 operation_add_child (Operation *operation, Operation *child)
 {

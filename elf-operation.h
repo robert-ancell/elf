@@ -179,6 +179,8 @@ Operation *make_binary (Token *operator, Operation *a, Operation *b);
 
 bool operation_is_constant (Operation *operation);
 
+char *operation_get_data_type (Operation *operation, const char *data);
+
 void operation_add_child (Operation *operation, Operation *child);
 
 Operation *operation_get_last_child (Operation *operation);
