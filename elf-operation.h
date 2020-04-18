@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 #include "elf-token.h"
 
 typedef enum {
@@ -168,6 +170,8 @@ Operation *make_member_value (Operation *object, Token *member);
 Operation *make_variable_value (Token *name);
 
 Operation *make_binary (Token *operator, Operation *a, Operation *b);
+
+bool operation_is_constant (Operation *operation);
 
 void operation_add_child (Operation *operation, Operation *child);
 

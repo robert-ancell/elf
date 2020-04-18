@@ -162,6 +162,56 @@ make_binary (Token *operator, Operation *a, Operation *b)
     return (Operation *) o;
 }
 
+bool
+operation_is_constant (Operation *operation)
+{
+    switch (operation->type) {
+    case OPERATION_TYPE_VARIABLE_DEFINITION: {
+        OperationVariableDefinition *op = (OperationVariableDefinition *) operation;
+        return op->value == NULL || operation_is_constant (op->value);
+    }
+    case OPERATION_TYPE_VARIABLE_ASSIGNMENT: {
+        OperationVariableAssignment *op = (OperationVariableAssignment *) operation;
+        return operation_is_constant (op->value);
+    }
+    case OPERATION_TYPE_FUNCTION_CALL: {
+        OperationFunctionCall *op = (OperationFunctionCall *) operation;
+        // FIXME: Check if parameters are constant
+        return operation_is_constant ((Operation *) op->function);
+    }
+    case OPERATION_TYPE_RETURN: {
+        OperationReturn *op = (OperationReturn *) operation;
+        return op->value == NULL || operation_is_constant (op->value);
+    }
+    case OPERATION_TYPE_BOOLEAN_CONSTANT:
+    case OPERATION_TYPE_NUMBER_CONSTANT:
+    case OPERATION_TYPE_TEXT_CONSTANT:
+        return true;
+    case OPERATION_TYPE_VARIABLE_VALUE: {
+        // FIXME: Have to follow chain of variable assignment
+        return false;
+    }
+    case OPERATION_TYPE_MEMBER_VALUE: {
+        // FIXME:
+        return false;
+    }
+    case OPERATION_TYPE_BINARY: {
+        OperationBinary *op = (OperationBinary *) operation;
+        return operation_is_constant (op->a) && operation_is_constant (op->b);
+    }
+    case OPERATION_TYPE_FUNCTION_DEFINITION: {
+        // FIXME: Should scan function for return value
+        return false;
+    }
+    case OPERATION_TYPE_IF:
+    case OPERATION_TYPE_ELSE:
+    case OPERATION_TYPE_WHILE:
+        return false;
+    }
+
+    return false;
+}
+
 void
 operation_add_child (Operation *operation, Operation *child)
 {
