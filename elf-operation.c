@@ -26,13 +26,14 @@ make_variable_definition (Token *data_type, Token *name, Operation *value)
 }
 
 Operation *
-make_variable_assignment (Token *name, Operation *value)
+make_variable_assignment (Token *name, Operation *value, OperationVariableDefinition *variable)
 {
     OperationVariableAssignment *o = malloc (sizeof (OperationVariableAssignment));
     memset (o, 0, sizeof (OperationVariableAssignment));
     o->type = OPERATION_TYPE_VARIABLE_ASSIGNMENT;
     o->name = name;
     o->value = value;
+    o->variable = variable;
     return (Operation *) o;
 }
 
@@ -90,12 +91,13 @@ make_function_call (Token *name, Operation **parameters, OperationFunctionDefini
 }
 
 Operation *
-make_return (Operation *value)
+make_return (Operation *value, OperationFunctionDefinition *function)
 {
     OperationReturn *o = malloc (sizeof (OperationReturn));
     memset (o, 0, sizeof (OperationReturn));
     o->type = OPERATION_TYPE_RETURN;
     o->value = value;
+    o->function = function;
     return (Operation *) o;
 }
 
@@ -130,12 +132,13 @@ make_text_constant (Token *value)
 }
 
 Operation *
-make_variable_value (Token *name)
+make_variable_value (Token *name, OperationVariableDefinition *variable)
 {
     OperationVariableValue *o = malloc (sizeof (OperationVariableValue));
     memset (o, 0, sizeof (OperationVariableValue));
     o->type = OPERATION_TYPE_VARIABLE_VALUE;
     o->name = name;
+    o->variable = variable;
     return (Operation *) o;
 }
 

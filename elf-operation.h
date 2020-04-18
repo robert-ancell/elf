@@ -47,6 +47,8 @@ typedef struct {
 
     Token *name;
     Operation *value;
+
+    OperationVariableDefinition *variable;
 } OperationVariableAssignment;
 
 typedef struct _OperationElse OperationElse;
@@ -102,6 +104,8 @@ typedef struct {
 
     Token *name;
     Operation *value;
+
+    OperationFunctionDefinition *function;
 } OperationReturn;
 
 typedef struct {
@@ -126,6 +130,8 @@ typedef struct {
     OperationType type; // OPERATION_TYPE_VARIABLE_VALUE;
 
     Token *name;
+
+    OperationVariableDefinition *variable;
 } OperationVariableValue;
 
 typedef struct {
@@ -145,7 +151,7 @@ typedef struct {
 
 Operation *make_variable_definition (Token *data_type, Token *name, Operation *value);
 
-Operation *make_variable_assignment (Token *name, Operation *value);
+Operation *make_variable_assignment (Token *name, Operation *value, OperationVariableDefinition *variable);
 
 Operation *make_if (Operation *condition);
 
@@ -157,7 +163,7 @@ Operation *make_function_definition (Token *data_type, Token *name, Operation **
 
 Operation *make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function);
 
-Operation *make_return (Operation *value);
+Operation *make_return (Operation *value, OperationFunctionDefinition *function);
 
 Operation *make_boolean_constant (Token *value);
 
@@ -167,7 +173,7 @@ Operation *make_text_constant (Token *value);
 
 Operation *make_member_value (Operation *object, Token *member);
 
-Operation *make_variable_value (Token *name);
+Operation *make_variable_value (Token *name, OperationVariableDefinition *variable);
 
 Operation *make_binary (Token *operator, Operation *a, Operation *b);
 

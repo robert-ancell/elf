@@ -338,34 +338,37 @@ is_variable_definition_with_name (Parser *parser, Operation *operation, Token *t
     return false;
 }
 
-static bool
+static OperationVariableDefinition *
 function_defines_variable (Parser *parser, OperationFunctionDefinition *function, Token *token)
 {
     for (int i = 0; function->parameters[i] != NULL; i++) {
         if (is_variable_definition_with_name (parser, function->parameters[i], token))
-            return true;
+            return (OperationVariableDefinition *) function->parameters[i];
     }
 
     for (size_t i = 0; i < function->body_length; i++) {
         if (is_variable_definition_with_name (parser, function->body[i], token))
-            return true;
+            return (OperationVariableDefinition *) function->body[i];
     }
 
-    return false;
+    return NULL;
 }
 
-static bool
-is_variable (Parser *parser, Token *token)
+static OperationVariableDefinition *
+find_variable (Parser *parser, Token *token)
 {
     for (size_t i = parser->stack_length; i > 0; i--) {
         Operation *operation = parser->stack[i - 1]->operation;
 
-        if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION &&
-            function_defines_variable (parser, (OperationFunctionDefinition *) operation, token))
-            return true;
+        if (operation->type != OPERATION_TYPE_FUNCTION_DEFINITION)
+            continue;
+
+        OperationVariableDefinition *definition = function_defines_variable (parser, (OperationFunctionDefinition *) operation, token);
+        if (definition != NULL)
+            return definition;
     }
 
-    return false;
+    return NULL;
 }
 
 static OperationFunctionDefinition *
@@ -441,6 +444,7 @@ parse_value (Parser *parser)
         return NULL;
 
     OperationFunctionDefinition *f;
+    OperationVariableDefinition *v;
     Operation *value = NULL;
     if (token->type == TOKEN_TYPE_NUMBER) {
         next_token (parser);
@@ -454,9 +458,9 @@ parse_value (Parser *parser)
         next_token (parser);
         value = make_boolean_constant (token);
     }
-    else if (is_variable (parser, token)) {
+    else if ((v = find_variable (parser, token)) != NULL) {
         next_token (parser);
-        value = make_variable_value (token);
+        value = make_variable_value (token, v);
     }
     else if ((f = find_function (parser, token)) != NULL || is_builtin_function (parser, token)) {
         Token *name = token;
@@ -562,6 +566,17 @@ parse_expression (Parser *parser)
     return make_binary (operator, a, b);
 }
 
+static OperationFunctionDefinition *
+get_current_function (Parser *parser)
+{
+   for (size_t i = parser->stack_length; i > 0; i--) {
+       if (parser->stack[i - 1]->operation->type == OPERATION_TYPE_FUNCTION_DEFINITION)
+           return (OperationFunctionDefinition *) parser->stack[i - 1]->operation;
+   }
+
+   return NULL;
+}
+
 static bool
 parse_sequence (Parser *parser)
 {
@@ -581,6 +596,7 @@ parse_sequence (Parser *parser)
         }
 
         Operation *op = NULL;
+        OperationVariableDefinition *v;
         if (is_data_type (parser, token)) {
             Token *data_type = token;
             next_token (parser);
@@ -776,9 +792,9 @@ parse_sequence (Parser *parser)
                 return false;
             }
 
-            op = make_return (value);
+            op = make_return (value, get_current_function (parser));
         }
-        else if (is_variable (parser, token)) {
+        else if ((v = find_variable (parser, token)) != NULL) {
             Token *name = token;
             next_token (parser);
 
@@ -795,7 +811,7 @@ parse_sequence (Parser *parser)
                  return false;
             }
 
-            op = make_variable_assignment (name, value);
+            op = make_variable_assignment (name, value, v);
         }
         else if ((op = parse_value (parser)) != NULL) {
             // FIXME: Only allow functions and variable values
