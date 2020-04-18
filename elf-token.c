@@ -10,7 +10,6 @@
 #include "elf-token.h"
 
 #include <stdbool.h>
-#include <string.h>
 
 #include "utils.h"
 
@@ -38,10 +37,8 @@ token_has_text (Token *token, const char *data, const char *value)
 bool
 token_parse_boolean_constant (Token *token, const char *data)
 {
-    char *text = token_get_text (token, data);
-    bool value = strcmp (text, "true") == 0;
-    free (text);
-    return value;
+    autofree_str text = token_get_text (token, data);
+    return str_equal (text, "true");
 }
 
 uint64_t

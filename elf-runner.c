@@ -275,17 +275,17 @@ make_default_value (ProgramState *state, Token *data_type)
     char *type_name = token_get_text (data_type, state->data);
 
     DataValue *result = NULL;
-    if (strcmp (type_name, "bool") == 0)
+    if (str_equal (type_name, "bool"))
         result = data_value_new_bool (false);
-    else if (strcmp (type_name, "uint8") == 0)
+    else if (str_equal (type_name, "uint8"))
         result = data_value_new_uint8 (0);
-    else if (strcmp (type_name, "uint16") == 0)
+    else if (str_equal (type_name, "uint16"))
         result = data_value_new_uint16 (0);
-    else if (strcmp (type_name, "uint32") == 0)
+    else if (str_equal (type_name, "uint32"))
         result = data_value_new_uint32 (0);
-    else if (strcmp (type_name, "uint64") == 0)
+    else if (str_equal (type_name, "uint64"))
         result = data_value_new_uint64 (0);
-    else if (strcmp (type_name, "utf8") == 0)
+    else if (str_equal (type_name, "utf8"))
         result = data_value_new_utf8 ("");
 
     if (result == NULL)
@@ -333,7 +333,7 @@ run_variable_assignment (ProgramState *state, OperationVariableAssignment *opera
 
     for (size_t i = 0; state->variables[i] != NULL; i++) {
         Variable *variable = state->variables[i];
-        if (strcmp (variable->name, variable_name) == 0) {
+        if (str_equal (variable->name, variable_name)) {
             data_value_unref (variable->value);
             variable->value = data_value_ref (value);
         }
@@ -415,7 +415,7 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
     char *function_name = token_get_text (operation->name, state->data);
 
     DataValue *result = NULL;
-    if (strcmp (function_name, "print") == 0) {
+    if (str_equal (function_name, "print")) {
         DataValue *value = run_operation (state, operation->parameters[0]);
 
         switch (value->type) {
@@ -500,7 +500,7 @@ run_variable_value (ProgramState *state, OperationVariableValue *operation)
 
     for (size_t i = 0; i < state->variables_length; i++) {
         Variable *variable = state->variables[i];
-        if (strcmp (variable->name, variable_name) == 0)
+        if (str_equal (variable->name, variable_name))
             return data_value_ref (variable->value);
     }
 

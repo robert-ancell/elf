@@ -15,6 +15,8 @@ void str_free (char **value);
 
 #define autofree_str __attribute__((cleanup(str_free))) char*
 
+bool str_equal (const char *a, const char *b);
+
 bool str_has_suffix (const char *value, const char *suffix);
 
 char *str_slice (const char *value, int start, int end);

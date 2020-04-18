@@ -308,10 +308,10 @@ main (int argc, char **argv)
     if (argc > 1)
         command = argv[1];
 
-    if (strcmp (command, "tutorial") == 0) {
+    if (str_equal (command, "tutorial")) {
         return run_tutorial ();
     }
-    else if (strcmp (command, "run") == 0) {
+    else if (str_equal (command, "run")) {
         if (argc < 3) {
             printf ("Need file to run, run elf help for more information\n");
             return 1;
@@ -320,7 +320,7 @@ main (int argc, char **argv)
 
         return run_elf_source (filename);
     }
-    else if (strcmp (command, "compile") == 0) {
+    else if (str_equal (command, "compile")) {
         if (argc < 3) {
             printf ("Need file to compile, run elf help for more information\n");
             return 1;
@@ -329,11 +329,11 @@ main (int argc, char **argv)
 
         return compile_elf_source (filename);
     }
-    else if (strcmp (command, "version") == 0) {
+    else if (str_equal (command, "version")) {
         printf ("%s\n", VERSION);
         return 0;
     }
-    else if (strcmp (command, "help") == 0) {
+    else if (str_equal (command, "help")) {
         printf ("Elf is a programming languge designed for teching how memory works.\n"
                 "\n"
                 "Usage:\n"

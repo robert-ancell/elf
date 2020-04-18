@@ -22,6 +22,19 @@ str_free (char **value)
 }
 
 bool
+str_equal (const char *a, const char *b)
+{
+    int i = 0;
+    while (a[i] != '\0' && b[i] != '\0') {
+        if (a[i] != b[i])
+            return false;
+        i++;
+    }
+
+    return a[i] == b[i];
+}
+
+bool
 str_has_suffix (const char *value, const char *suffix)
 {
     size_t value_length = strlen (value);
@@ -30,7 +43,7 @@ str_has_suffix (const char *value, const char *suffix)
     if (suffix_length > value_length)
         return false;
 
-    return strcmp (value + value_length - suffix_length, suffix) == 0;
+    return str_equal (value + value_length - suffix_length, suffix);
 }
 
 char *
