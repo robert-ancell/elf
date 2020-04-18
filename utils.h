@@ -10,6 +10,8 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 void str_free (char **value);
 
@@ -24,3 +26,17 @@ char *str_slice (const char *value, int start, int end);
 char *str_new (const char *value);
 
 char *str_printf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+
+typedef struct {
+    size_t allocated;
+    size_t length;
+    uint8_t *data;
+} Bytes;
+
+void bytes_free (Bytes *value);
+
+#define autofree_bytes __attribute__((cleanup(bytes_free))) Bytes
+
+Bytes *bytes_new (size_t size);
+
+void bytes_add (Bytes *bytes, uint8_t value);

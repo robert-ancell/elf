@@ -101,3 +101,34 @@ str_printf (const char *format, ...)
 
     return output;
 }
+
+void
+bytes_free (Bytes *value)
+{
+    free (value->data);
+    free (value);
+}
+
+Bytes *
+bytes_new (size_t size)
+{
+    Bytes *bytes = malloc (sizeof (Bytes));
+    bytes->allocated = size;
+    bytes->length = 0;
+    bytes->data = malloc (sizeof (uint8_t) * size);
+
+    return bytes;
+}
+
+void
+bytes_add (Bytes *bytes, uint8_t value)
+{
+    bytes->length++;
+    if (bytes->length > bytes->allocated) {
+        bytes->allocated *= 2;
+        if (bytes->allocated < 16)
+            bytes->allocated = 16;
+        bytes->data = realloc (bytes->data, bytes->allocated);
+    }
+    bytes->data[bytes->length - 1] = value;
+}
