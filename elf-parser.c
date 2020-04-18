@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "utils.h"
+
 typedef struct {
     Operation *operation;
 } StackEntry;
@@ -808,6 +810,14 @@ parse_sequence (Parser *parser)
             Operation *value = parse_expression (parser);
             if (value == NULL) {
                  print_token_error (parser, current_token (parser), "Invalid value for variable");
+                 return false;
+            }
+
+            autofree_str variable_type = operation_get_data_type ((Operation *) v, parser->data);
+            autofree_str value_type = operation_get_data_type (value, parser->data);
+            if (strcmp (variable_type, value_type) != 0) {
+                 autofree_str message = str_printf ("Variable is of type %s, but value is of type %s", variable_type, value_type);
+                 print_token_error (parser, name, message);
                  return false;
             }
 
