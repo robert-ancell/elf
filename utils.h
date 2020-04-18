@@ -33,9 +33,9 @@ typedef struct {
     uint8_t *data;
 } Bytes;
 
-void bytes_free (Bytes *value);
+void bytes_free (Bytes **value);
 
-#define autofree_bytes __attribute__((cleanup(bytes_free))) Bytes
+#define autofree_bytes __attribute__((cleanup(bytes_free))) Bytes*
 
 Bytes *bytes_new (size_t size);
 

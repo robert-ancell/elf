@@ -103,10 +103,11 @@ str_printf (const char *format, ...)
 }
 
 void
-bytes_free (Bytes *value)
+bytes_free (Bytes **value)
 {
-    free (value->data);
-    free (value);
+    free ((*value)->data);
+    free (*value);
+    *value = NULL;
 }
 
 Bytes *

@@ -287,7 +287,22 @@ compile_elf_source (const char *filename)
         return 1;
     }
 
-    write_binary (binary_fd, NULL, 0, NULL, 0);
+    autofree_bytes text = bytes_new (0);
+    bytes_add (text, 0xBB); // MOV %ebx
+    bytes_add (text, 0x01);
+    bytes_add (text, 0x00);
+    bytes_add (text, 0x00);
+    bytes_add (text, 0x00);
+    bytes_add (text, 0xB8); // MOV %eax
+    bytes_add (text, 0x3C);
+    bytes_add (text, 0x00);
+    bytes_add (text, 0x00);
+    bytes_add (text, 0x00);
+    bytes_add (text, 0x0F); // SYSCALL
+    bytes_add (text, 0x05); // ...
+    autofree_bytes rodata = bytes_new (0);
+    bytes_add (rodata, 0x00);
+    write_binary (binary_fd, text->data, text->length, rodata->data, rodata->length);
 
     close (binary_fd);
 
