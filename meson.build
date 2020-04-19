@@ -10,6 +10,7 @@ executable ('elf',
                'elf-runner.c',
                'elf-token.c',
                'utils.c',
+               'x86_64.c',
              ],
              c_args: [ '-DVERSION="@0@"'.format (version.stdout ().strip ()) ],
              install: true)

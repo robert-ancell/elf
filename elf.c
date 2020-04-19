@@ -20,6 +20,7 @@
 #include "elf-parser.h"
 #include "elf-runner.h"
 #include "utils.h"
+#include "x86_64.h"
 
 static int
 mmap_file (const char *filename, char **data, size_t *data_length)
@@ -288,18 +289,9 @@ compile_elf_source (const char *filename)
     }
 
     autofree_bytes text = bytes_new (0);
-    bytes_add (text, 0xBB); // MOV %ebx
-    bytes_add (text, 0x01);
-    bytes_add (text, 0x00);
-    bytes_add (text, 0x00);
-    bytes_add (text, 0x00);
-    bytes_add (text, 0xB8); // MOV %eax
-    bytes_add (text, 0x3C);
-    bytes_add (text, 0x00);
-    bytes_add (text, 0x00);
-    bytes_add (text, 0x00);
-    bytes_add (text, 0x0F); // SYSCALL
-    bytes_add (text, 0x05); // ...
+    x86_64_mov (text, 2, 1); // MOV %ebx
+    x86_64_mov (text, 0, 0x3C); // MOV %eax
+    x86_64_syscall (text);
     autofree_bytes rodata = bytes_new (0);
     bytes_add (rodata, 0x00);
     write_binary (binary_fd, text->data, text->length, rodata->data, rodata->length);
