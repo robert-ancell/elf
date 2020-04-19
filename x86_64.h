@@ -13,25 +13,15 @@
 
 #include "utils.h"
 
-// 32 bit registers
-#define X86_64_REG_EAX 0
-#define X86_64_REG_ECX 1
-#define X86_64_REG_EDX 2
-#define X86_64_REG_EBX 3
-#define X86_64_REG_ESP 4
-#define X86_64_REG_EBP 5
-#define X86_64_REG_ESI 6
-#define X86_64_REG_EDI 7
-
-// 64 bit registers
-#define X86_64_REG_RAX 0
-#define X86_64_REG_RCX 1
-#define X86_64_REG_RDX 2
-#define X86_64_REG_RBX 3
-#define X86_64_REG_RSP 4
-#define X86_64_REG_RBP 5
-#define X86_64_REG_RSI 6
-#define X86_64_REG_RDI 7
+// Registers
+#define X86_64_REG_ACCUMULATOR 0
+#define X86_64_REG_COUNTER 1
+#define X86_64_REG_DATA 2
+#define X86_64_REG_BASE 3
+#define X86_64_REG_STACK_POINTER 4
+#define X86_64_REG_STACK_BASE_POINTER 5
+#define X86_64_REG_SOURCE 6
+#define X86_64_REG_DESTINATION 7
 
 void x86_64_mov32 (Bytes *buffer, int reg, uint32_t value);
 
