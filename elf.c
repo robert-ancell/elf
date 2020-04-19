@@ -289,8 +289,8 @@ compile_elf_source (const char *filename)
     }
 
     autofree_bytes text = bytes_new (0);
-    x86_64_mov (text, 2, 1); // MOV %ebx
-    x86_64_mov (text, 0, 0x3C); // MOV %eax
+    x86_64_mov32 (text, X86_64_REG_EBX, 1);
+    x86_64_mov32 (text, X86_64_REG_EAX, 0x3C);
     x86_64_syscall (text);
     autofree_bytes rodata = bytes_new (0);
     bytes_add (rodata, 0x00);
