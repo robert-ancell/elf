@@ -23,11 +23,11 @@
 #define X86_64_REG_SOURCE 6
 #define X86_64_REG_DESTINATION 7
 
-void x86_64_mov32 (Bytes *buffer, int reg, uint32_t value);
+void x86_64_mov32_val (Bytes *buffer, int reg, uint32_t value);
 
 void x86_64_mov32_mem (Bytes *buffer, int reg, uint32_t offset);
 
-void x86_64_mov64 (Bytes *buffer, int reg, uint64_t value);
+void x86_64_mov64_val (Bytes *buffer, int reg, uint64_t value);
 
 void x86_64_mov64_mem (Bytes *buffer, int reg, uint32_t offset);
 

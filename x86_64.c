@@ -1,13 +1,20 @@
 #include "x86_64.h"
 
 void
-x86_64_mov32 (Bytes *buffer, int reg, uint32_t value)
+x86_64_mov32_val (Bytes *buffer, int reg, uint32_t value)
 {
     bytes_add (buffer, 0xB8 + reg);
     bytes_add (buffer, (value >>  0) & 0xFF);
     bytes_add (buffer, (value >>  8) & 0xFF);
     bytes_add (buffer, (value >> 16) & 0xFF);
     bytes_add (buffer, (value >> 24) & 0xFF);
+}
+
+void
+x86_64_mov32_reg (Bytes *buffer, int reg1, int reg2)
+{
+    bytes_add (buffer, 0x89);
+    bytes_add (buffer, 0xC0 | (reg1 << 3) | reg2);
 }
 
 void
@@ -22,7 +29,7 @@ x86_64_mov32_mem (Bytes *buffer, int reg, uint32_t offset)
 }
 
 void
-x86_64_mov64 (Bytes *buffer, int reg, uint64_t value)
+x86_64_mov64_val (Bytes *buffer, int reg, uint64_t value)
 {
     bytes_add (buffer, 0x48);
     bytes_add (buffer, 0xB8 + reg);
@@ -34,6 +41,14 @@ x86_64_mov64 (Bytes *buffer, int reg, uint64_t value)
     bytes_add (buffer, (value >> 40) & 0xFF);
     bytes_add (buffer, (value >> 48) & 0xFF);
     bytes_add (buffer, (value >> 56) & 0xFF);
+}
+
+void
+x86_64_mov64_reg (Bytes *buffer, int reg1, int reg2)
+{
+    bytes_add (buffer, 0x48);
+    bytes_add (buffer, 0x89);
+    bytes_add (buffer, 0xC0 | (reg1 << 3) | reg2);
 }
 
 void
