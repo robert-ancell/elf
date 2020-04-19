@@ -1,6 +1,13 @@
 #include "x86_64.h"
 
 void
+x86_64_mov8_val (Bytes *buffer, int reg, uint8_t value)
+{
+    bytes_add (buffer, 0xB0 + reg);
+    bytes_add (buffer, value);
+}
+
+void
 x86_64_mov32_val (Bytes *buffer, int reg, uint32_t value)
 {
     bytes_add (buffer, 0xB8 + reg);
