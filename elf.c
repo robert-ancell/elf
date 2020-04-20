@@ -290,7 +290,7 @@ compile_elf_source (const char *filename)
 
     autofree_bytes text = bytes_new (0);
     x86_64_mov32_val (text, X86_64_REG_ACCUMULATOR, 0x3C); // exit
-    x86_64_mov32_val (text, X86_64_REG_BASE, 1); // status = 1
+    x86_64_mov32_val (text, X86_64_REG_DESTINATION, 1); // status = 1
     x86_64_syscall (text);
     autofree_bytes rodata = bytes_new (0);
     bytes_add (rodata, 0x00);
