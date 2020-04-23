@@ -427,6 +427,56 @@ next_token (Parser *parser)
 
 static Operation *parse_expression (Parser *parser);
 
+static Operation **
+parse_parameters (Parser *parser)
+{
+    Operation **parameters = malloc (sizeof (Operation *));
+    size_t parameters_length = 0;
+    parameters[0] = NULL;
+
+    Token *open_paren_token = current_token (parser);
+    if (open_paren_token == NULL || open_paren_token->type != TOKEN_TYPE_OPEN_PAREN)
+        return parameters;
+    next_token (parser);
+
+    bool closed = false;
+    while (current_token (parser) != NULL) {
+        Token *t = current_token (parser);
+        if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
+            next_token (parser);
+            closed = true;
+            break;
+        }
+
+        if (parameters_length > 0) {
+            if (t->type != TOKEN_TYPE_COMMA) {
+                print_token_error (parser, current_token (parser), "Missing comma");
+                return NULL;
+            }
+            next_token (parser);
+            t = current_token (parser);
+        }
+
+        Operation *value = parse_expression (parser);
+        if (value == NULL) {
+            print_token_error (parser, current_token (parser), "Invalid parameter");
+            return NULL;
+        }
+
+        parameters_length++;
+        parameters = realloc (parameters, sizeof (Operation *) * (parameters_length + 1));
+        parameters[parameters_length - 1] = value;
+        parameters[parameters_length] = NULL;
+    }
+
+    if (!closed) {
+        print_token_error (parser, current_token (parser), "Unclosed paren");
+        return NULL;
+    }
+
+    return parameters;
+}
+
 static Operation *
 parse_value (Parser *parser)
 {
@@ -457,49 +507,9 @@ parse_value (Parser *parser)
         Token *name = token;
         next_token (parser);
 
-        Operation **parameters = malloc (sizeof (Operation *));
-        size_t parameters_length = 0;
-        parameters[0] = NULL;
-
-        Token *open_paren_token = current_token (parser);
-        if (open_paren_token != NULL && open_paren_token->type == TOKEN_TYPE_OPEN_PAREN) {
-            next_token (parser);
-
-            bool closed = false;
-            while (current_token (parser) != NULL) {
-                Token *t = current_token (parser);
-                if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
-                    next_token (parser);
-                    closed = true;
-                    break;
-                }
-
-                if (parameters_length > 0) {
-                    if (t->type != TOKEN_TYPE_COMMA) {
-                        print_token_error (parser, current_token (parser), "Missing comma");
-                        return NULL;
-                    }
-                    next_token (parser);
-                    t = current_token (parser);
-                }
-
-                Operation *value = parse_expression (parser);
-                if (value == NULL) {
-                    print_token_error (parser, current_token (parser), "Invalid parameter");
-                    return NULL;
-                }
-
-                parameters_length++;
-                parameters = realloc (parameters, sizeof (Operation *) * (parameters_length + 1));
-                parameters[parameters_length - 1] = value;
-                parameters[parameters_length] = NULL;
-            }
-
-            if (!closed) {
-                print_token_error (parser, current_token (parser), "Unclosed paren");
-                return NULL;
-            }
-        }
+        Operation **parameters = parse_parameters (parser);
+        if (parameters == NULL)
+            return NULL;
 
         value = make_function_call (name, parameters, f);
     }
