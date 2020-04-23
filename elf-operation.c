@@ -152,13 +152,14 @@ make_variable_value (Token *name, OperationVariableDefinition *variable)
 }
 
 Operation *
-make_member_value (Operation *object, Token *member)
+make_member_value (Operation *object, Token *member, Operation **parameters)
 {
     OperationMemberValue *o = malloc (sizeof (OperationMemberValue));
     memset (o, 0, sizeof (OperationMemberValue));
     o->type = OPERATION_TYPE_MEMBER_VALUE;
     o->object = object;
     o->member = member;
+    o->parameters = parameters;
     return (Operation *) o;
 }
 
@@ -503,6 +504,9 @@ operation_free (Operation *operation)
     case OPERATION_TYPE_MEMBER_VALUE: {
         OperationMemberValue *op = (OperationMemberValue *) operation;
         operation_free (op->object);
+        for (int i = 0; op->parameters[i] != NULL; i++)
+            operation_free (op->parameters[i]);
+        free (op->parameters);
         break;
     }
     case OPERATION_TYPE_BINARY: {

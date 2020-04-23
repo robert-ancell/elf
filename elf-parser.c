@@ -520,7 +520,12 @@ parse_value (Parser *parser)
     token = current_token (parser);
     while (token != NULL && token->type == TOKEN_TYPE_MEMBER) {
         next_token (parser);
-        value = make_member_value (value, token);
+
+        Operation **parameters = parse_parameters (parser);
+        if (parameters == NULL)
+            return NULL;
+
+        value = make_member_value (value, token, parameters);
         token = current_token (parser);
     }
 

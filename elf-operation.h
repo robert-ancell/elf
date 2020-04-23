@@ -147,6 +147,7 @@ typedef struct {
 
     Operation *object;
     Token *member;
+    Operation **parameters;
 } OperationMemberValue;
 
 typedef struct {
@@ -181,7 +182,7 @@ Operation *make_number_constant (Token *value);
 
 Operation *make_text_constant (Token *value);
 
-Operation *make_member_value (Operation *object, Token *member);
+Operation *make_member_value (Operation *object, Token *member, Operation **parameters);
 
 Operation *make_variable_value (Token *name, OperationVariableDefinition *variable);
 
