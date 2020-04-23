@@ -466,6 +466,11 @@ operation_free (Operation *operation)
         operation_free (op->value);
         break;
     }
+    case OPERATION_TYPE_MEMBER_VALUE: {
+        OperationMemberValue *op = (OperationMemberValue *) operation;
+        operation_free (op->object);
+        break;
+    }
     case OPERATION_TYPE_BINARY: {
         OperationBinary *op = (OperationBinary *) operation;
         operation_free (op->a);
@@ -476,7 +481,6 @@ operation_free (Operation *operation)
     case OPERATION_TYPE_NUMBER_CONSTANT:
     case OPERATION_TYPE_TEXT_CONSTANT:
     case OPERATION_TYPE_VARIABLE_VALUE:
-    case OPERATION_TYPE_MEMBER_VALUE:
         break;
     }
 
