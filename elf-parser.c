@@ -413,6 +413,22 @@ is_builtin_function (Parser *parser, Token *token)
     return false;
 }
 
+static bool
+has_member (Parser *parser, Operation *value, Token *member)
+{
+    autofree_str data_type = operation_get_data_type (value, parser->data);
+
+    // FIXME: Super hacky. The NULL is because Elf can't determine the return value of a member yet
+    // i.e. "foo".upper.length
+    if (data_type == NULL || str_equal (data_type, "utf8")) {
+        return token_has_text (member, parser->data, ".length") ||
+               token_has_text (member, parser->data, ".upper") ||
+               token_has_text (member, parser->data, ".lower");
+    }
+
+    return false;
+}
+
 static Token *
 current_token (Parser *parser)
 {
@@ -519,6 +535,10 @@ parse_value (Parser *parser)
 
     token = current_token (parser);
     while (token != NULL && token->type == TOKEN_TYPE_MEMBER) {
+        if (!has_member (parser, value, token)) {
+            print_token_error (parser, token, "Member not available");
+            return NULL;
+        }
         next_token (parser);
 
         Operation **parameters = parse_parameters (parser);
