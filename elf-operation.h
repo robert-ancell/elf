@@ -183,6 +183,10 @@ char *operation_get_data_type (Operation *operation, const char *data);
 
 void operation_add_child (Operation *operation, Operation *child);
 
+size_t operation_get_n_children (Operation *operation);
+
+Operation *operation_get_child (Operation *operation, size_t index);
+
 Operation *operation_get_last_child (Operation *operation);
 
 char *operation_to_string (Operation *operation);

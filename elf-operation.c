@@ -296,31 +296,60 @@ operation_add_child (Operation *operation, Operation *child)
     }
 }
 
-Operation *
-operation_get_last_child (Operation *operation)
+size_t
+operation_get_n_children (Operation *operation)
 {
     if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
         OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
-        if (o->body_length > 0)
-            return o->body[o->body_length - 1];
+        return o->body_length;
     }
     else if (operation->type == OPERATION_TYPE_IF) {
         OperationIf *o = (OperationIf *) operation;
-        if (o->body_length > 0)
-            return o->body[o->body_length - 1];
+        return o->body_length;
     }
     else if (operation->type == OPERATION_TYPE_ELSE) {
         OperationElse *o = (OperationElse *) operation;
-        if (o->body_length > 0)
-            return o->body[o->body_length - 1];
+        return o->body_length;
     }
     else if (operation->type == OPERATION_TYPE_WHILE) {
         OperationWhile *o = (OperationWhile *) operation;
-        if (o->body_length > 0)
-            return o->body[o->body_length - 1];
+        return o->body_length;
+    }
+
+    return 0;
+}
+
+Operation *
+operation_get_child (Operation *operation, size_t index)
+{
+    if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
+        OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
+        return o->body[index];
+    }
+    else if (operation->type == OPERATION_TYPE_IF) {
+        OperationIf *o = (OperationIf *) operation;
+        return o->body[index];
+    }
+    else if (operation->type == OPERATION_TYPE_ELSE) {
+        OperationElse *o = (OperationElse *) operation;
+        return o->body[index];
+    }
+    else if (operation->type == OPERATION_TYPE_WHILE) {
+        OperationWhile *o = (OperationWhile *) operation;
+        return o->body[index];
     }
 
     return NULL;
+}
+
+Operation *
+operation_get_last_child (Operation *operation)
+{
+    size_t n_children = operation_get_n_children (operation);
+    if (n_children > 0)
+        return operation_get_child (operation, n_children - 1);
+    else
+        return NULL;
 }
 
 char *
