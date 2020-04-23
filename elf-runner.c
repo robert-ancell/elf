@@ -636,10 +636,8 @@ run_operation (ProgramState *state, Operation *operation)
         return NULL; // Resolved in IF
     case OPERATION_TYPE_WHILE:
         return run_while (state, (OperationWhile *) operation);
-    case OPERATION_TYPE_FUNCTION_DEFINITION: {
-        // All resolved at compile time
-        return NULL;
-    }
+    case OPERATION_TYPE_FUNCTION_DEFINITION:
+        return NULL; // Resolved at compile time
     case OPERATION_TYPE_FUNCTION_CALL:
         return run_function_call (state, (OperationFunctionCall *) operation);
     case OPERATION_TYPE_RETURN:
