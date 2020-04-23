@@ -15,6 +15,7 @@
 
 typedef enum {
     OPERATION_TYPE_MODULE,
+    OPERATION_TYPE_USE_MODULE,
     OPERATION_TYPE_VARIABLE_DEFINITION,
     OPERATION_TYPE_VARIABLE_ASSIGNMENT,
     OPERATION_TYPE_IF,
@@ -26,6 +27,7 @@ typedef enum {
     OPERATION_TYPE_BOOLEAN_CONSTANT,
     OPERATION_TYPE_NUMBER_CONSTANT,
     OPERATION_TYPE_TEXT_CONSTANT,
+    OPERATION_TYPE_ACCESS_MODULE,
     OPERATION_TYPE_VARIABLE_VALUE,
     OPERATION_TYPE_MEMBER_VALUE,
     OPERATION_TYPE_BINARY,
@@ -41,6 +43,12 @@ typedef struct {
     Operation **body;
     size_t body_length;
 } OperationModule;
+
+typedef struct {
+    OperationType type; // OPERATION_TYPE_USE_MODULE
+
+    Token *module_name;
+} OperationUseModule;
 
 typedef struct {
     OperationType type; // OPERATION_TYPE_VARIABLE_DEFINITION
@@ -135,6 +143,14 @@ typedef struct {
 } OperationTextConstant;
 
 typedef struct {
+    OperationType type; // OPERATION_TYPE_ACCESS_MODULE
+
+    Token *module_name;
+
+    OperationUseModule *module;
+} OperationAccessModule;
+
+typedef struct {
     OperationType type; // OPERATION_TYPE_VARIABLE_VALUE;
 
     Token *name;
@@ -160,6 +176,8 @@ typedef struct {
 
 Operation *make_module (void);
 
+Operation *make_use_module (Token *module_name);
+
 Operation *make_variable_definition (Token *data_type, Token *name, Operation *value);
 
 Operation *make_variable_assignment (Token *name, Operation *value, OperationVariableDefinition *variable);
@@ -183,6 +201,8 @@ Operation *make_number_constant (Token *value);
 Operation *make_text_constant (Token *value);
 
 Operation *make_member_value (Operation *object, Token *member, Operation **parameters);
+
+Operation *make_access_module (Token *module_name, OperationUseModule *module);
 
 Operation *make_variable_value (Token *name, OperationVariableDefinition *variable);
 

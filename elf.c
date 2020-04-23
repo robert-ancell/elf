@@ -128,7 +128,12 @@ run_tutorial (void)
         "int8 countdown = 10\n"
         "while countdown > 0 {\n"
         "    countdown = countdown - 1\n"
-        "}\n";
+        "}\n"
+        "\n"
+        "# Use external modules\n"
+        "use syscall\n"
+        "syscall.exit (0)\n"
+        "\n";
     write (fd, hello_world, strlen (hello_world));
     close (fd);
 

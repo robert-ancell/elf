@@ -397,6 +397,31 @@ find_function (Parser *parser, Token *token)
     return NULL;
 }
 
+static OperationUseModule *
+find_module (Parser *parser, Token *token)
+{
+    if (token->type != TOKEN_TYPE_WORD)
+        return NULL;
+
+    for (size_t i = parser->stack_length; i > 0; i--) {
+        Operation *operation = parser->stack[i - 1]->operation;
+
+        size_t n_children = operation_get_n_children (operation);
+        for (size_t j = 0; j < n_children; j++) {
+            Operation *child = operation_get_child (operation, j);
+
+            if (child->type != OPERATION_TYPE_USE_MODULE)
+               continue;
+
+            OperationUseModule *op = (OperationUseModule *) child;
+            if (token_text_matches (parser, op->module_name, token))
+                return op;
+        }
+    }
+
+    return NULL;
+}
+
 static bool
 is_builtin_function (Parser *parser, Token *token)
 {
@@ -414,8 +439,22 @@ is_builtin_function (Parser *parser, Token *token)
 }
 
 static bool
+module_has_member (Parser *parser, OperationAccessModule *module, Token *member)
+{
+    if (token_has_text (module->module_name, parser->data, "syscall")) {
+        if (token_has_text (member, parser->data, ".exit"))
+            return true;
+    }
+
+    return false;
+}
+
+static bool
 has_member (Parser *parser, Operation *value, Token *member)
 {
+    if (value->type == OPERATION_TYPE_ACCESS_MODULE)
+        return module_has_member (parser, (OperationAccessModule *) value, member);
+
     autofree_str data_type = operation_get_data_type (value, parser->data);
 
     // FIXME: Super hacky. The NULL is because Elf can't determine the return value of a member yet
@@ -502,6 +541,7 @@ parse_value (Parser *parser)
 
     OperationFunctionDefinition *f;
     OperationVariableDefinition *v;
+    OperationUseModule *m;
     Operation *value = NULL;
     if (token->type == TOKEN_TYPE_NUMBER) {
         next_token (parser);
@@ -518,6 +558,10 @@ parse_value (Parser *parser)
     else if ((v = find_variable (parser, token)) != NULL) {
         next_token (parser);
         value = make_variable_value (token, v);
+    }
+    else if ((m = find_module (parser, token)) != NULL) {
+        next_token (parser);
+        value = make_access_module (token, m);
     }
     else if ((f = find_function (parser, token)) != NULL || is_builtin_function (parser, token)) {
         Token *name = token;
@@ -623,7 +667,24 @@ parse_sequence (Parser *parser)
 
         Operation *op = NULL;
         OperationVariableDefinition *v;
-        if (is_data_type (parser, token)) {
+        if (token_has_text (token, parser->data, "use")) {
+            next_token (parser);
+
+            Token *module_name = current_token (parser);
+            if (module_name == NULL || module_name->type != TOKEN_TYPE_WORD) {
+                print_token_error (parser, module_name, "Invalid module name");
+                return false;
+            }
+            next_token (parser);
+
+            if (!token_has_text (module_name, parser->data, "syscall")) {
+                print_token_error (parser, module_name, "Unknown module");
+                return false;
+            }
+
+            op = make_use_module (module_name);
+        }
+        else if (is_data_type (parser, token)) {
             Token *data_type = token;
             next_token (parser);
 

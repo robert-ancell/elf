@@ -23,6 +23,16 @@ make_module (void)
 }
 
 Operation *
+make_use_module (Token *module_name)
+{
+    OperationUseModule *o = malloc (sizeof (OperationUseModule));
+    memset (o, 0, sizeof (OperationUseModule));
+    o->type = OPERATION_TYPE_USE_MODULE;
+    o->module_name = module_name;
+    return (Operation *) o;
+}
+
+Operation *
 make_variable_definition (Token *data_type, Token *name, Operation *value)
 {
     OperationVariableDefinition *o = malloc (sizeof (OperationVariableDefinition));
@@ -141,6 +151,17 @@ make_text_constant (Token *value)
 }
 
 Operation *
+make_access_module (Token *module_name, OperationUseModule *module)
+{
+    OperationAccessModule *o = malloc (sizeof (OperationAccessModule));
+    memset (o, 0, sizeof (OperationAccessModule));
+    o->type = OPERATION_TYPE_ACCESS_MODULE;
+    o->module_name = module_name;
+    o->module = module;
+    return (Operation *) o;
+}
+
+Operation *
 make_variable_value (Token *name, OperationVariableDefinition *variable)
 {
     OperationVariableValue *o = malloc (sizeof (OperationVariableValue));
@@ -217,6 +238,8 @@ operation_is_constant (Operation *operation)
         return false;
     }
     case OPERATION_TYPE_MODULE:
+    case OPERATION_TYPE_USE_MODULE:
+    case OPERATION_TYPE_ACCESS_MODULE:
     case OPERATION_TYPE_IF:
     case OPERATION_TYPE_ELSE:
     case OPERATION_TYPE_WHILE:
@@ -270,6 +293,8 @@ operation_get_data_type (Operation *operation, const char *data)
         return token_get_text (op->data_type, data);
     }
     case OPERATION_TYPE_MODULE:
+    case OPERATION_TYPE_USE_MODULE:
+    case OPERATION_TYPE_ACCESS_MODULE:
     case OPERATION_TYPE_IF:
     case OPERATION_TYPE_ELSE:
     case OPERATION_TYPE_WHILE:
@@ -384,6 +409,11 @@ operation_to_string (Operation *operation)
     switch (operation->type) {
     case OPERATION_TYPE_MODULE:
         return str_printf ("MODULE");
+    case OPERATION_TYPE_USE_MODULE: {
+        OperationUseModule *op = (OperationUseModule *) operation;
+        autofree_str value_string = token_to_string (op->module_name);
+        return str_printf ("USE_MODULE(%s)", value_string);
+    }
     case OPERATION_TYPE_VARIABLE_DEFINITION:
         return str_printf ("VARIABLE_DEFINITION");
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
@@ -417,6 +447,11 @@ operation_to_string (Operation *operation)
         OperationTextConstant *op = (OperationTextConstant *) operation;
         autofree_str value_string = token_to_string (op->value);
         return str_printf ("TEXT_CONSTANT(%s)", value_string);
+    }
+    case OPERATION_TYPE_ACCESS_MODULE: {
+        OperationAccessModule *op = (OperationAccessModule *) operation;
+        autofree_str value_string = token_to_string (op->module_name);
+        return str_printf ("ACCESS_MODULE(%s)", value_string);
     }
     case OPERATION_TYPE_VARIABLE_VALUE:
         return str_printf ("VARIABLE_VALUE");
@@ -515,6 +550,8 @@ operation_free (Operation *operation)
         operation_free (op->b);
         break;
     }
+    case OPERATION_TYPE_USE_MODULE:
+    case OPERATION_TYPE_ACCESS_MODULE:
     case OPERATION_TYPE_BOOLEAN_CONSTANT:
     case OPERATION_TYPE_NUMBER_CONSTANT:
     case OPERATION_TYPE_TEXT_CONSTANT:
