@@ -144,13 +144,13 @@ run_elf_source (const char *filename)
     if (fd < 0)
         return 1;
 
-    OperationFunctionDefinition *main_function = elf_parse (data, data_length);
-    if (main_function == NULL) {
+    OperationModule *module = elf_parse (data, data_length);
+    if (module == NULL) {
         munmap_file (fd, data, data_length);
         return 1;
     }
 
-    elf_run (data, main_function);
+    elf_run (data, module);
 
     munmap_file (fd, data, data_length);
 
@@ -276,8 +276,8 @@ compile_elf_source (const char *filename)
     if (fd < 0)
         return 1;
 
-    OperationFunctionDefinition *main_function = elf_parse (data, data_length);
-    if (main_function == NULL) {
+    OperationModule *module = elf_parse (data, data_length);
+    if (module == NULL) {
         munmap_file (fd, data, data_length);
         return 1;
     }
@@ -301,7 +301,7 @@ compile_elf_source (const char *filename)
     printf ("%s compiled to '%s', run with:\n", filename, binary_name);
     printf ("$ ./%s\n", binary_name);
 
-    operation_free ((Operation *) main_function);
+    operation_free ((Operation *) module);
 
     munmap_file (fd, data, data_length);
 

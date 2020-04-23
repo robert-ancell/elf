@@ -14,6 +14,15 @@
 #include "utils.h"
 
 Operation *
+make_module (void)
+{
+    OperationModule *o = malloc (sizeof (OperationModule));
+    memset (o, 0, sizeof (OperationModule));
+    o->type = OPERATION_TYPE_MODULE;
+    return (Operation *) o;
+}
+
+Operation *
 make_variable_definition (Token *data_type, Token *name, Operation *value)
 {
     OperationVariableDefinition *o = malloc (sizeof (OperationVariableDefinition));
@@ -206,6 +215,7 @@ operation_is_constant (Operation *operation)
         // FIXME: Should scan function for return value
         return false;
     }
+    case OPERATION_TYPE_MODULE:
     case OPERATION_TYPE_IF:
     case OPERATION_TYPE_ELSE:
     case OPERATION_TYPE_WHILE:
@@ -258,6 +268,7 @@ operation_get_data_type (Operation *operation, const char *data)
         OperationFunctionDefinition *op = (OperationFunctionDefinition *) operation;
         return token_get_text (op->data_type, data);
     }
+    case OPERATION_TYPE_MODULE:
     case OPERATION_TYPE_IF:
     case OPERATION_TYPE_ELSE:
     case OPERATION_TYPE_WHILE:
@@ -270,7 +281,13 @@ operation_get_data_type (Operation *operation, const char *data)
 void
 operation_add_child (Operation *operation, Operation *child)
 {
-    if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
+    if (operation->type == OPERATION_TYPE_MODULE) {
+        OperationModule *o = (OperationModule *) operation;
+        o->body_length++;
+        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body[o->body_length - 1] = child;
+    }
+    else if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
         OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
         o->body_length++;
         o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
@@ -299,7 +316,11 @@ operation_add_child (Operation *operation, Operation *child)
 size_t
 operation_get_n_children (Operation *operation)
 {
-    if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
+    if (operation->type == OPERATION_TYPE_MODULE) {
+        OperationModule *o = (OperationModule *) operation;
+        return o->body_length;
+    }
+    else if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
         OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
         return o->body_length;
     }
@@ -322,7 +343,11 @@ operation_get_n_children (Operation *operation)
 Operation *
 operation_get_child (Operation *operation, size_t index)
 {
-    if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
+    if (operation->type == OPERATION_TYPE_MODULE) {
+        OperationModule *o = (OperationModule *) operation;
+        return o->body[index];
+    }
+    else if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
         OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
         return o->body[index];
     }
@@ -356,6 +381,8 @@ char *
 operation_to_string (Operation *operation)
 {
     switch (operation->type) {
+    case OPERATION_TYPE_MODULE:
+        return str_printf ("MODULE");
     case OPERATION_TYPE_VARIABLE_DEFINITION:
         return str_printf ("VARIABLE_DEFINITION");
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
@@ -411,6 +438,13 @@ operation_free (Operation *operation)
         return;
 
     switch (operation->type) {
+    case OPERATION_TYPE_MODULE: {
+        OperationModule *op = (OperationModule *) operation;
+        for (size_t i = 0; i < op->body_length; i++)
+            operation_free (op->body[i]);
+        free (op->body);
+        break;
+    }
     case OPERATION_TYPE_VARIABLE_DEFINITION: {
         OperationVariableDefinition *op = (OperationVariableDefinition *) operation;
         operation_free (op->value);

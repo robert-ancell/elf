@@ -14,6 +14,7 @@
 #include "elf-token.h"
 
 typedef enum {
+    OPERATION_TYPE_MODULE,
     OPERATION_TYPE_VARIABLE_DEFINITION,
     OPERATION_TYPE_VARIABLE_ASSIGNMENT,
     OPERATION_TYPE_IF,
@@ -33,6 +34,13 @@ typedef enum {
 typedef struct {
     OperationType type;
 } Operation;
+
+typedef struct {
+    OperationType type; // OPERATION_TYPE_MODULE
+
+    Operation **body;
+    size_t body_length;
+} OperationModule;
 
 typedef struct {
     OperationType type; // OPERATION_TYPE_VARIABLE_DEFINITION
@@ -148,6 +156,8 @@ typedef struct {
     Operation *a;
     Operation *b;
 } OperationBinary;
+
+Operation *make_module (void);
 
 Operation *make_variable_definition (Token *data_type, Token *name, Operation *value);
 

@@ -256,6 +256,17 @@ variable_free (Variable *variable)
 }
 
 static DataValue *
+run_module (ProgramState *state, OperationModule *module)
+{
+    for (size_t i = 0; i < module->body_length && !state->run_return; i++) {
+        DataValue *value = run_operation (state, module->body[i]);
+        data_value_unref (value);
+    }
+
+    return NULL;
+}
+
+static DataValue *
 run_function (ProgramState *state, OperationFunctionDefinition *function)
 {
     for (size_t i = 0; i < function->body_length && !state->run_return; i++) {
@@ -613,6 +624,8 @@ static DataValue *
 run_operation (ProgramState *state, Operation *operation)
 {
     switch (operation->type) {
+    case OPERATION_TYPE_MODULE:
+        return run_module (state, (OperationModule *) operation);
     case OPERATION_TYPE_VARIABLE_DEFINITION:
         return run_variable_definition (state, (OperationVariableDefinition *) operation);
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
@@ -649,13 +662,13 @@ run_operation (ProgramState *state, Operation *operation)
 }
 
 void
-elf_run (const char *data, OperationFunctionDefinition *function)
+elf_run (const char *data, OperationModule *module)
 {
     ProgramState *state = malloc (sizeof (ProgramState));
     memset (state, 0, sizeof (ProgramState));
     state->data = data;
 
-    DataValue *result = run_function (state, function);
+    DataValue *result = run_module (state, module);
     data_value_unref (result);
 
     for (size_t i = 0; i < state->variables_length; i++)

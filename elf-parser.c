@@ -826,20 +826,18 @@ parse_sequence (Parser *parser)
     return true;
 }
 
-OperationFunctionDefinition *
+OperationModule *
 elf_parse (const char *data, size_t data_length)
 {
     Parser *parser = parser_new (data, data_length);
 
     parser->tokens = elf_lex (data, data_length);
 
-    Operation **parameters = malloc (sizeof (Operation *));
-    parameters[0] = NULL;
-    Operation *main_function = make_function_definition (NULL, NULL, parameters);
-    push_stack (parser, main_function);
+    Operation *module = make_module ();
+    push_stack (parser, module);
 
     if (!parse_sequence (parser)) {
-        operation_free (main_function);
+        operation_free (module);
         parser_free (parser);
         return NULL;
     }
@@ -851,5 +849,5 @@ elf_parse (const char *data, size_t data_length)
 
     parser_free (parser);
 
-    return (OperationFunctionDefinition *) main_function;
+    return (OperationModule *) module;
 }
