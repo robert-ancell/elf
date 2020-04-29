@@ -39,4 +39,14 @@ void bytes_free (Bytes **value);
 
 Bytes *bytes_new (size_t size);
 
+void bytes_resize (Bytes *bytes, size_t size);
+
 void bytes_add (Bytes *bytes, uint8_t value);
+
+void bytes_trim (Bytes *bytes);
+
+bool bytes_equal (Bytes *a, Bytes *b);
+
+Bytes *readall (int fd);
+
+Bytes *file_readall (const char *pathname);
