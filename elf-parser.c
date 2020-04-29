@@ -341,6 +341,21 @@ is_variable_definition_with_name (Parser *parser, Operation *operation, Token *t
 }
 
 static OperationVariableDefinition *
+find_parameter_with_name (Parser *parser, Operation *operation, Token *token)
+{
+    if (operation->type != OPERATION_TYPE_FUNCTION_DEFINITION)
+        return NULL;
+
+    OperationFunctionDefinition *function = (OperationFunctionDefinition *) operation;
+    for (int i = 0; function->parameters[i] != NULL; i++) {
+        if (is_variable_definition_with_name (parser, function->parameters[i], token))
+            return (OperationVariableDefinition *) function->parameters[i];
+    }
+
+    return NULL;
+}
+
+static OperationVariableDefinition *
 find_variable (Parser *parser, Token *token)
 {
     if (token->type != TOKEN_TYPE_WORD)
@@ -353,19 +368,12 @@ find_variable (Parser *parser, Token *token)
         for (size_t j = 0; j < n_children; j++) {
             Operation *child = operation_get_child (operation, j);
 
-            if (child->type != OPERATION_TYPE_FUNCTION_DEFINITION)
-               continue;
+            if (is_variable_definition_with_name (parser, child, token))
+                return (OperationVariableDefinition *) child;
 
-            OperationFunctionDefinition *function = (OperationFunctionDefinition *) child;
-            for (int k = 0; function->parameters[k] != NULL; k++) {
-                if (is_variable_definition_with_name (parser, function->parameters[k], token))
-                    return (OperationVariableDefinition *) function->parameters[k];
-            }
-
-            for (size_t k = 0; k < function->body_length; k++) {
-                if (is_variable_definition_with_name (parser, function->body[k], token))
-                    return (OperationVariableDefinition *) function->body[k];
-            }
+            OperationVariableDefinition *parameter = find_parameter_with_name (parser, child, token);
+            if (parameter != NULL)
+               return parameter;
         }
     }
 
