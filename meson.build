@@ -20,6 +20,11 @@ test_runner = executable ('test-runner',
                             'utils.c',
                           ])
 
-foreach test : [ 'empty-file', 'hello-world' ]
+foreach test : [ 'empty-file',
+                 'hello-world',
+                 'add',
+                 'subtract',
+                 'multiply',
+               ]
   test (test, test_runner, args : [ elf.full_path (), '@0@/tests/@1@.elf'.format (meson.current_source_dir (), test) ])
 endforeach
