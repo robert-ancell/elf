@@ -1,0 +1,2 @@
+uint8 value = 42
+print (value)

@@ -443,8 +443,20 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
             printf ("%d", value->data[0] << 8 | value->data[1]);
             break;
         case DATA_TYPE_UINT32:
-            printf ("%d", value->data[3] << 24 | value->data[1] << 16 | value->data[1] << 8 || value->data[0]);
+            printf ("%d", value->data[3] << 24 | value->data[1] << 16 | value->data[1] << 8 | value->data[0]);
             break;
+        case DATA_TYPE_UINT64: {
+            uint64_t v = (uint64_t) value->data[7] << 56 |
+                         (uint64_t) value->data[6] << 48 |
+                         (uint64_t) value->data[5] << 40 |
+                         (uint64_t) value->data[4] << 32 |
+                         (uint64_t) value->data[3] << 24 |
+                         (uint64_t) value->data[1] << 16 |
+                         (uint64_t) value->data[1] << 8 |
+                         (uint64_t) value->data[0];
+            printf ("%lu", v);
+            break;
+        }
         case DATA_TYPE_UTF8:
             printf ("%.*s", (int) value->data_length, value->data);
             break;

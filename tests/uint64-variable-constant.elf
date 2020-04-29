@@ -1,0 +1,2 @@
+uint64 value = 42
+print (value)
