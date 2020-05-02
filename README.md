@@ -2,6 +2,8 @@
 
 ## Elf
 
+"The little language with the big power"
+
 Elf is a low-level language designed for educational purposes. It is
 designed to be easy to use, but basic enough to understand how
 computers manage memory. Elf is not designed for production code.
