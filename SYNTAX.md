@@ -1,0 +1,177 @@
+# FIXME: Specify when newlines are allowed
+# FIXME: Arrays
+# FIXME: Member access
+
+module
+    statements
+
+statements
+    statement
+    statement nl statement
+
+statement
+    comment
+    use_statement
+    variable_definition
+    function_definition
+    variable_assignment
+    function_call
+    if_statement
+    while_statement
+    return_statement
+
+comment
+    '#' * nl
+
+use_statement
+    "use" ws module_name
+
+module_name
+    name
+
+name
+    name_start_char
+    name_start_char name_chars
+
+name_start_char
+    'a' . 'z'
+    'A' . 'Z'
+    '_'
+
+name_chars
+    name_char
+    name_char name_char
+
+name_char
+    name_start_char
+    digit
+
+variable_defintion
+    type_name ws variable_name
+    type_name ws variable_name ws '=' ws expression
+
+expression
+    constant
+    expression
+    variable_name
+    function_call
+    binary_operation
+
+constant
+    boolean_constant
+    integer_constant
+    hex_constant
+    string_constant
+
+boolean_constant
+    "true"
+    "false"
+
+integer_constant
+    digit
+    onenine digits
+    '-' digit
+    '-' onenine digits
+
+hex_constant
+    "0x" hex_digits
+
+digits
+    digit
+    digit digits
+
+digit
+    '0'
+    onenine
+
+onenine
+    '1' . '9'
+
+hex_digits
+    hex_digit
+    hex_digit hex_digits
+
+hex_digit
+    digit
+    'A' . 'F'
+    'a' . 'f'
+
+string_constant
+    '"' characters '"'
+
+characters
+    ""
+    character characters
+
+character
+    '0020' . '10FFFF' - '"' - '\'
+    '\' escape
+
+escape
+    '"'
+    '\'
+    'b'
+    'f'
+    'n'
+    'r'
+    't'
+    'u' hex_digit hex_digit hex_digit hex_digit
+
+variable_name
+    name
+
+function_call
+    function_name ws '(' arguments ')'
+
+function_name
+    name
+
+binary_operation
+    expression '+' expression
+    expression '-' expression
+    expression '/' expression
+    expression '*' expression
+
+function_defintion
+    type_name ws function_name ws statement_block
+
+statement_block
+    '{' ws nl statements '}'
+
+variable_assignment
+    variable_name ws '=' ws expression
+
+function_call
+    function_name ws '(' arguments ')'
+
+arguments
+    argument
+    argument ',' argument
+
+if_statement
+    "if" condition ws statement_block
+    "if" condition ws statement_block "else" statement_block
+
+while_statement
+    "while" condition ws statement_block
+
+condition
+    expression
+    expression '==' expression
+    expression '!=' expression
+    expression '>' expression
+    expression '>=' expression
+    expression '<' expression
+    expression '<=' expression
+
+return_statement
+    "return" ws expression
+
+nl
+   '000A'
+
+ws
+    ""
+    '0020' ws
+    '000D' ws
+    '0009' ws
