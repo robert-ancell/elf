@@ -434,7 +434,7 @@ run_function_call (ProgramState *state, OperationFunctionCall *operation)
             if (value->data[0] == 0)
                 printf ("false");
             else
-                printf ("false");
+                printf ("true");
             break;
         case DATA_TYPE_UINT8:
             printf ("%d", value->data[0]);
