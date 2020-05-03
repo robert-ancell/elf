@@ -75,9 +75,6 @@ integer_constant
     '-' digit
     '-' onenine digits
 
-hex_constant
-    "0x" hex_digits
-
 digits
     digit
     digit digits
@@ -88,6 +85,20 @@ digit
 
 onenine
     '1' . '9'
+
+bin_constant
+    "0b" bin_digits
+
+bin_digits
+    bin_digit
+    bin_digit bin_digits
+
+bin_digit
+    '0'
+    '1'
+
+hex_constant
+    "0x" hex_digits
 
 hex_digits
     hex_digit
