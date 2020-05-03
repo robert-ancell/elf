@@ -74,6 +74,7 @@ token_parse_text_constant (Token *token, const char *data)
     bool in_escape = false;
     for (size_t i = 1; i < (token->length - 1); i++) {
         char c = data[token->offset + i];
+        size_t n_remaining = token->length - 1;
 
         if (!in_escape && c == '\\') {
             in_escape = true;
@@ -94,10 +95,23 @@ token_parse_text_constant (Token *token, const char *data)
                 c = '\r';
             else if (c == 't')
                 c = '\t';
+            else if (c == 'x') {
+                if (n_remaining < 3)
+                    break;
+
+                int digit0 = hex_digit(data[token->offset + i + 1]);
+                int digit1 = hex_digit(data[token->offset + i + 2]);
+                i += 2;
+                if (digit0 >= 0 && digit1 >= 0)
+                    bytes_add (buffer, digit0 << 4 | digit1);
+                else
+                    bytes_add (buffer, '?');
+                continue;
+            }
             else if (c == 'u' || c == 'U') {
                 size_t length = c == 'u' ? 4 : 8;
 
-                if (i + length > token->length)
+                if (n_remaining < 1 + length)
                     break;
 
                 uint32_t unichar = 0;

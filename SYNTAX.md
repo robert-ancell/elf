@@ -140,6 +140,7 @@ escape
     'n'
     'r'
     't'
+    'x' hex_digit hex_digit
     'u' hex_digit hex_digit hex_digit hex_digit
     'U' hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit
 
