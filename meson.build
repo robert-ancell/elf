@@ -52,6 +52,7 @@ foreach test : [ 'empty-file',
                  'if-false',
                  'if-true-else',
                  'if-false-else',
+                 'while',
                ]
   test (test, test_runner, args : [ elf.full_path (), '@0@/tests/@1@.elf'.format (meson.current_source_dir (), test) ])
 endforeach
