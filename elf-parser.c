@@ -125,15 +125,6 @@ is_symbol_char (char c)
 }
 
 static char
-ending_char_is_escaped (const char *data, Token *token)
-{
-    if (token->length < 3)
-        return false;
-
-    return data[token->offset + token->length - 2] == '\\';
-}
-
-static char
 string_is_complete (const char *data, Token *token)
 {
     // Need at least an open and closing quote
@@ -146,8 +137,19 @@ string_is_complete (const char *data, Token *token)
     if (end_char != start_char)
         return false;
 
+    bool in_escape = false;
+    for (size_t i = 1; i < token->length - 1; i++) {
+        if (in_escape) {
+            in_escape = false;
+            continue;
+        }
+
+        if (data[token->offset + i] == '\\')
+            in_escape = true;
+    }
+
     // Closing quote needs to be non-escaped
-    return !ending_char_is_escaped (data, token);
+    return !in_escape;
 }
 
 static bool
