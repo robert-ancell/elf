@@ -13,6 +13,19 @@
 
 #include "utils.h"
 
+static int
+hex_digit (char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    else if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    else if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    else
+        return -1;
+}
+
 char *
 token_get_text (Token *token, const char *data)
 {
@@ -55,8 +68,7 @@ token_parse_number_constant (Token *token, const char *data)
 char *
 token_parse_text_constant (Token *token, const char *data)
 {
-    char *value = malloc (sizeof (char) * (token->length - 1));
-    size_t length = 0;
+    autofree_bytes buffer = bytes_new (token->length);
 
     // Iterate over the characters inside the quotes
     bool in_escape = false;
@@ -69,18 +81,43 @@ token_parse_text_constant (Token *token, const char *data)
         }
 
         if (in_escape) {
+            in_escape = false;
+            if (c == '\"')
+                c = '\"';
+            if (c == '\'')
+                c = '\'';
+            if (c == '\\')
+                c = '\\';
             if (c == 'n')
                 c = '\n';
             else if (c == 'r')
                 c = '\r';
+            else if (c == 't')
+                c = '\t';
+            else if (c == 'u') {
+                if (i + 4 > token->length)
+                    break;
+                int digit0 = hex_digit(data[token->offset + i + 1]);
+                int digit1 = hex_digit(data[token->offset + i + 2]);
+                int digit2 = hex_digit(data[token->offset + i + 3]);
+                int digit3 = hex_digit(data[token->offset + i + 4]);
+                i += 4;
+                if (digit0 >= 0 && digit1 >= 0 && digit2 >= 0 && digit3 >= 0) {
+                    uint32_t unichar = digit0 << 12 | digit1 << 8 | digit2 << 4 | digit3;
+                    utf8_encode (buffer, unichar);
+                    continue;
+                }
+                else
+                    c = '?';
+            }
         }
 
-        value[length] = c;
-        length++;
+        bytes_add (buffer, c);
     }
-    value[length] = '\0';
+    bytes_add (buffer, '\0');
+    bytes_trim (buffer);
 
-    return value;
+    return (char *) bytes_steal (buffer);
 }
 
 char *

@@ -138,7 +138,7 @@ bytes_resize (Bytes *bytes, size_t size)
 void
 bytes_add (Bytes *bytes, uint8_t value)
 {
-    bytes->length++;
+     bytes->length++;
     if (bytes->length > bytes->allocated)
         bytes_resize (bytes, bytes->allocated == 0 ? 16 : bytes->allocated * 2);
     bytes->data[bytes->length - 1] = value;
@@ -169,6 +169,14 @@ bytes_equal (Bytes *a, Bytes *b)
     }
 
     return true;
+}
+
+uint8_t *
+bytes_steal (Bytes *bytes)
+{
+    uint8_t *value = bytes->data;
+    bytes->data = NULL;
+    return value;
 }
 
 Bytes *
@@ -206,4 +214,69 @@ file_readall (const char *pathname)
     close (fd);
 
     return data;
+}
+
+uint32_t
+utf8_decode (const uint8_t *data, size_t data_length, size_t *offset)
+{
+    if (*offset >= data_length)
+        return UTF8_INVALID_CHAR;
+
+    uint8_t c = data[*offset];
+    (*offset)++;
+    if (c < (1 << 7))
+        return c;
+
+    size_t byte_count;
+    if ((c & 0xE0) == 0xC0) {
+        c = c & 0x1F;
+        byte_count = 1;
+    }
+    else if ((c & 0xF0) == 0xE0) {
+        c = c & 0x0F;
+        byte_count = 2;
+    }
+    else if ((c & 0xF8) == 0xF0) {
+        c = c & 0x07;
+        byte_count = 3;
+    }
+    else
+        return UTF8_INVALID_CHAR;
+
+    if (*offset + byte_count > data_length)
+        return UTF8_INVALID_CHAR;
+
+    for (size_t i = 0; i < byte_count; i++) {
+        uint8_t b = data[*offset];
+        (*offset)++;
+
+        if ((b & 0xC0) != 0x80)
+            return UTF8_INVALID_CHAR;
+
+        c = c << 6 | (b & 0x3F);
+    }
+
+    return c;
+}
+
+void
+utf8_encode (Bytes *bytes, uint32_t c)
+{
+    if (c < (1 << 7)) {
+        bytes_add (bytes, c);
+    } else if (c < (1 << 11)) {
+        bytes_add (bytes, 0xC0 |  (c >> 6));
+        bytes_add (bytes, 0x80 | ((c >> 0) & 0x3F));
+    } else if (c < (1 << 16)) {
+        bytes_add (bytes, 0xE0 |  (c >> 12));
+        bytes_add (bytes, 0x80 | ((c >> 6) & 0x3F));
+        bytes_add (bytes, 0x80 | ((c >> 0) & 0x3F));
+    } else if (c < (1 << 21)) {
+        bytes_add (bytes, 0xF0 |  (c >> 18));
+        bytes_add (bytes, 0x80 | ((c >> 12) & 0x3F));
+        bytes_add (bytes, 0x80 | ((c >>  6) & 0x3F));
+        bytes_add (bytes, 0x80 | ((c >>  0) & 0x3F));
+    } else  {
+        bytes_add (bytes, '?');
+    }
 }

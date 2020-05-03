@@ -47,6 +47,14 @@ void bytes_trim (Bytes *bytes);
 
 bool bytes_equal (Bytes *a, Bytes *b);
 
+uint8_t *bytes_steal (Bytes *bytes);
+
 Bytes *readall (int fd);
 
 Bytes *file_readall (const char *pathname);
+
+#define UTF8_INVALID_CHAR 0xFFFFFFFF
+
+uint32_t utf8_decode (const uint8_t *text, size_t data_length, size_t *offset);
+
+void utf8_encode (Bytes *bytes, uint32_t c);
