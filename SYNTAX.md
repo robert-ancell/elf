@@ -141,6 +141,7 @@ escape
     'r'
     't'
     'u' hex_digit hex_digit hex_digit hex_digit
+    'U' hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit
 
 variable_name
     name

@@ -36,6 +36,7 @@ foreach test : [ 'empty-file',
                  'utf8-variable',
                  'utf8-variable-constant-single-quotes',
                  'utf8-variable-constant-double-quotes',
+                 'utf8-variable-constant-escape-unicode',
                ]
   test (test, test_runner, args : [ elf.full_path (), '@0@/tests/@1@.elf'.format (meson.current_source_dir (), test) ])
 endforeach

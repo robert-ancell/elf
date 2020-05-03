@@ -94,21 +94,27 @@ token_parse_text_constant (Token *token, const char *data)
                 c = '\r';
             else if (c == 't')
                 c = '\t';
-            else if (c == 'u') {
-                if (i + 4 > token->length)
+            else if (c == 'u' || c == 'U') {
+                size_t length = c == 'u' ? 4 : 8;
+
+                if (i + length > token->length)
                     break;
-                int digit0 = hex_digit(data[token->offset + i + 1]);
-                int digit1 = hex_digit(data[token->offset + i + 2]);
-                int digit2 = hex_digit(data[token->offset + i + 3]);
-                int digit3 = hex_digit(data[token->offset + i + 4]);
-                i += 4;
-                if (digit0 >= 0 && digit1 >= 0 && digit2 >= 0 && digit3 >= 0) {
-                    uint32_t unichar = digit0 << 12 | digit1 << 8 | digit2 << 4 | digit3;
-                    utf8_encode (buffer, unichar);
-                    continue;
+
+                uint32_t unichar = 0;
+                bool valid = true;
+                for (int j = 0; j < length; j++) {
+                    int digit = hex_digit(data[token->offset + i + 1 + j]);
+                    if (digit < 0)
+                        valid = false;
+                    else
+                        unichar = unichar << 4 | digit;
                 }
+                i += length;
+                if (valid)
+                    utf8_encode (buffer, unichar);
                 else
-                    c = '?';
+                    bytes_add (buffer, '?');
+                continue;
             }
         }
 
