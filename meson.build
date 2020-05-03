@@ -21,7 +21,6 @@ test_runner = executable ('test-runner',
                           ])
 
 foreach test : [ 'empty-file',
-                 'hello-world',
                  'add',
                  'subtract',
                  'multiply',
