@@ -48,6 +48,10 @@ foreach test : [ 'empty-file',
                  'utf8-constant-escape-carriage-return',
                  'utf8-constant-escape-hex',
                  'utf8-constant-escape-unicode',
+                 'if-true',
+                 'if-false',
+                 'if-true-else',
+                 'if-false-else',
                ]
   test (test, test_runner, args : [ elf.full_path (), '@0@/tests/@1@.elf'.format (meson.current_source_dir (), test) ])
 endforeach
