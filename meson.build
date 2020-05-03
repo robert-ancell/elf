@@ -36,6 +36,8 @@ foreach test : [ 'empty-file',
                  'utf8-variable',
                  'utf8-variable-constant-single-quotes',
                  'utf8-variable-constant-double-quotes',
+                 'utf8-variable-constant-escape-single-quote',
+                 'utf8-variable-constant-escape-double-quote',
                  'utf8-variable-constant-escape-hex',
                  'utf8-variable-constant-escape-unicode',
                ]
