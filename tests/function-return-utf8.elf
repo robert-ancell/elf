@@ -1,0 +1,4 @@
+utf8 foo () {
+   return 'Hello World'
+}
+print (foo ())
