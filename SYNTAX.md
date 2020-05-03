@@ -62,7 +62,8 @@ constant
     boolean_constant
     integer_constant
     hex_constant
-    string_constant
+    string_constant_single
+    string_constant_double
 
 boolean_constant
     "true"
@@ -97,19 +98,31 @@ hex_digit
     'A' . 'F'
     'a' . 'f'
 
-string_constant
-    '"' characters '"'
+string_constant_single
+    "'" characters_single "'"
 
-characters
+characters_single
     ""
-    character characters
+    character_single characters_single
 
-character
+character_single
     '0020' . '10FFFF' - '"' - '\'
+    '\' escape
+
+string_constant_double
+    '"' characters_double '"'
+
+characters_double
+    ""
+    character_double characters_double
+
+character_double
+    '0020' . '10FFFF' - "'" - '\'
     '\' escape
 
 escape
     '"'
+    "'"
     '\'
     'b'
     'f'
