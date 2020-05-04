@@ -76,7 +76,7 @@ make_while (Operation *condition)
 }
 
 Operation *
-make_function_definition (Token *data_type, Token *name, Operation **parameters)
+make_function_definition (Token *data_type, Token *name, OperationVariableDefinition **parameters)
 {
     OperationFunctionDefinition *o = malloc (sizeof (OperationFunctionDefinition));
     memset (o, 0, sizeof (OperationFunctionDefinition));
@@ -506,7 +506,7 @@ operation_free (Operation *operation)
     case OPERATION_TYPE_FUNCTION_DEFINITION: {
         OperationFunctionDefinition *op = (OperationFunctionDefinition *) operation;
         for (int i = 0; op->parameters[i] != NULL; i++)
-            operation_free (op->parameters[i]);
+            operation_free ((Operation *) op->parameters[i]);
         free (op->parameters);
         for (size_t i = 0; i < op->body_length; i++)
             operation_free (op->body[i]);

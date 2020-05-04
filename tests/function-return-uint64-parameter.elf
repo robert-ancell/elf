@@ -1,0 +1,4 @@
+uint64 foo (uint64 value) {
+   return value
+}
+print (foo (42))

@@ -1,0 +1,4 @@
+uint32 foo (uint32 value) {
+   return value
+}
+print (foo (42))

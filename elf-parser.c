@@ -17,22 +17,26 @@
 
 typedef struct {
     Operation *operation;
-} StackEntry;
 
-static StackEntry *
-stack_entry_new (Operation *operation)
+    OperationVariableDefinition **variables;
+    size_t variables_length;
+} StackFrame;
+
+static StackFrame *
+stack_frame_new (Operation *operation)
 {
-    StackEntry *entry = malloc (sizeof (StackEntry));
-    memset (entry, 0, sizeof (StackEntry));
-    entry->operation = operation;
+    StackFrame *frame = malloc (sizeof (StackFrame));
+    memset (frame, 0, sizeof (StackFrame));
+    frame->operation = operation;
 
-    return entry;
+    return frame;
 }
 
 static void
-stack_entry_free (StackEntry *entry)
+stack_frame_free (StackFrame *frame)
 {
-    free (entry);
+    free (frame->variables);
+    free (frame);
 }
 
 typedef struct {
@@ -42,7 +46,7 @@ typedef struct {
     Token **tokens;
     size_t offset;
 
-    StackEntry **stack;
+    StackFrame **stack;
     size_t stack_length;
 } Parser;
 
@@ -66,7 +70,7 @@ parser_free (Parser *parser)
     //free (parser->tokens);
 
     for (size_t i = 0; i < parser->stack_length; i++)
-       stack_entry_free (parser->stack[i]);
+       stack_frame_free (parser->stack[i]);
     free (parser->stack);
 
     free (parser);
@@ -76,16 +80,26 @@ static void
 push_stack (Parser *parser, Operation *operation)
 {
     parser->stack_length++;
-    parser->stack = realloc (parser->stack, sizeof (StackEntry *) * parser->stack_length);
-    parser->stack[parser->stack_length - 1] = stack_entry_new (operation);
+    parser->stack = realloc (parser->stack, sizeof (StackFrame *) * parser->stack_length);
+    parser->stack[parser->stack_length - 1] = stack_frame_new (operation);
+}
+
+static void
+add_stack_variable (Parser *parser, OperationVariableDefinition *definition)
+{
+    StackFrame *frame = parser->stack[parser->stack_length - 1];
+
+    frame->variables_length++;
+    frame->variables = realloc (frame->variables, sizeof (OperationVariableDefinition *) * frame->variables_length);
+    frame->variables[frame->variables_length - 1] = definition;
 }
 
 static void
 pop_stack (Parser *parser)
 {
-    stack_entry_free (parser->stack[parser->stack_length - 1]);
+    stack_frame_free (parser->stack[parser->stack_length - 1]);
     parser->stack_length--;
-    parser->stack = realloc (parser->stack, sizeof (StackEntry *) * parser->stack_length);
+    parser->stack = realloc (parser->stack, sizeof (StackFrame *) * parser->stack_length);
 }
 
 static void
@@ -329,34 +343,6 @@ is_boolean (Parser *parser, Token *token)
     return token_has_text (token, parser->data, "true") || token_has_text (token, parser->data, "false");
 }
 
-static bool
-is_variable_definition_with_name (Parser *parser, Operation *operation, Token *token)
-{
-    if (operation->type != OPERATION_TYPE_VARIABLE_DEFINITION)
-        return false;
-
-    OperationVariableDefinition *op = (OperationVariableDefinition *) operation;
-    if (token_text_matches (parser, op->name, token))
-        return true;
-
-    return false;
-}
-
-static OperationVariableDefinition *
-find_parameter_with_name (Parser *parser, Operation *operation, Token *token)
-{
-    if (operation->type != OPERATION_TYPE_FUNCTION_DEFINITION)
-        return NULL;
-
-    OperationFunctionDefinition *function = (OperationFunctionDefinition *) operation;
-    for (int i = 0; function->parameters[i] != NULL; i++) {
-        if (is_variable_definition_with_name (parser, function->parameters[i], token))
-            return (OperationVariableDefinition *) function->parameters[i];
-    }
-
-    return NULL;
-}
-
 static OperationVariableDefinition *
 find_variable (Parser *parser, Token *token)
 {
@@ -364,18 +350,13 @@ find_variable (Parser *parser, Token *token)
         return NULL;
 
     for (size_t i = parser->stack_length; i > 0; i--) {
-        Operation *operation = parser->stack[i - 1]->operation;
+        StackFrame *frame = parser->stack[i - 1];
 
-        size_t n_children = operation_get_n_children (operation);
-        for (size_t j = 0; j < n_children; j++) {
-            Operation *child = operation_get_child (operation, j);
+        for (size_t j = 0; j < frame->variables_length; j++) {
+            OperationVariableDefinition *definition = frame->variables[j];
 
-            if (is_variable_definition_with_name (parser, child, token))
-                return (OperationVariableDefinition *) child;
-
-            OperationVariableDefinition *parameter = find_parameter_with_name (parser, child, token);
-            if (parameter != NULL)
-               return parameter;
+            if (token_text_matches (parser, definition->name, token))
+                return definition;
         }
     }
 
@@ -663,6 +644,7 @@ parse_sequence (Parser *parser)
             Token *assignment_token = current_token (parser);
             if (assignment_token == NULL) {
                 op = make_variable_definition (data_type, name, NULL);
+                add_stack_variable (parser, (OperationVariableDefinition *) op);
             } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
                 next_token (parser);
 
@@ -681,10 +663,11 @@ parse_sequence (Parser *parser)
                 }
 
                 op = make_variable_definition (data_type, name, value);
+                add_stack_variable (parser, (OperationVariableDefinition *) op);
             } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
                 next_token (parser);
 
-                Operation **parameters = malloc (sizeof (Operation *));
+                OperationVariableDefinition **parameters = malloc (sizeof (OperationVariableDefinition *));
                 size_t parameters_length = 0;
                 parameters[0] = NULL;
                 bool closed = false;
@@ -722,8 +705,8 @@ parse_sequence (Parser *parser)
                     Operation *parameter = make_variable_definition (data_type, name, NULL);
 
                     parameters_length++;
-                    parameters = realloc (parameters, sizeof (Operation *) * (parameters_length + 1));
-                    parameters[parameters_length - 1] = parameter;
+                    parameters = realloc (parameters, sizeof (OperationVariableDefinition *) * (parameters_length + 1));
+                    parameters[parameters_length - 1] = (OperationVariableDefinition *) parameter;
                     parameters[parameters_length] = NULL;
                 }
 
@@ -741,6 +724,10 @@ parse_sequence (Parser *parser)
 
                 op = make_function_definition (data_type, name, parameters);
                 push_stack (parser, op);
+
+                for (size_t i = 0; i < parameters_length; i++)
+                    add_stack_variable (parser, parameters[i]);
+
                 if (!parse_sequence (parser))
                     return false;
 
@@ -754,6 +741,7 @@ parse_sequence (Parser *parser)
                 pop_stack (parser);
             } else {
                 op = make_variable_definition (data_type, name, NULL);
+                add_stack_variable (parser, (OperationVariableDefinition *) op);
             }
         }
         else if (token_has_text (token, parser->data, "if")) {

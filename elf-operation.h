@@ -94,7 +94,7 @@ struct _OperationFunctionDefinition {
     OperationFunctionDefinition *parent;
     Token *data_type;
     Token *name;
-    Operation **parameters;
+    OperationVariableDefinition **parameters;
     Operation **body;
     size_t body_length;
 };
@@ -178,7 +178,7 @@ Operation *make_else (void);
 
 Operation *make_while (Operation *condition);
 
-Operation *make_function_definition (Token *data_type, Token *name, Operation **parameters);
+Operation *make_function_definition (Token *data_type, Token *name, OperationVariableDefinition **parameters);
 
 Operation *make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function);
 

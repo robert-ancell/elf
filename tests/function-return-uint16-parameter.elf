@@ -1,0 +1,4 @@
+uint16 foo (uint16 value) {
+   return value
+}
+print (foo (42))
