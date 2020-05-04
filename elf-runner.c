@@ -259,13 +259,19 @@ variable_free (Variable *variable)
     free (variable);
 }
 
+static void
+run_sequence (ProgramState *state, Operation **body, size_t body_length)
+{
+    for (size_t i = 0; i < body_length && state->return_value == NULL; i++) {
+        DataValue *value = run_operation (state, body[i]);
+        data_value_unref (value);
+    }
+}
+
 static DataValue *
 run_module (ProgramState *state, OperationModule *module)
 {
-    for (size_t i = 0; i < module->body_length; i++) {
-        DataValue *value = run_operation (state, module->body[i]);
-        data_value_unref (value);
-    }
+    run_sequence (state, module->body, module->body_length);
 
     return data_value_ref (state->none_value);
 }
@@ -273,10 +279,7 @@ run_module (ProgramState *state, OperationModule *module)
 static DataValue *
 run_function (ProgramState *state, OperationFunctionDefinition *function)
 {
-    for (size_t i = 0; i < function->body_length&& state->return_value == NULL; i++) {
-        DataValue *value = run_operation (state, function->body[i]);
-        data_value_unref (value);
-    }
+    run_sequence (state, function->body, function->body_length);
 
     DataValue *return_value = state->return_value;
     state->return_value = NULL;
@@ -380,10 +383,7 @@ run_if (ProgramState *state, OperationIf *operation)
         body_length = operation->else_operation->body_length;
     }
 
-    for (size_t i = 0; i < body_length && state->return_value == NULL; i++) {
-        DataValue *value = run_operation (state, body[i]);
-        data_value_unref (value);
-    }
+    run_sequence (state, body, body_length);
 
     return data_value_ref (state->none_value);
 }
@@ -403,10 +403,7 @@ run_while (ProgramState *state, OperationWhile *operation)
         if (!condition)
             return data_value_ref (state->none_value);
 
-        for (size_t i = 0; i < operation->body_length && state->return_value == NULL; i++) {
-            DataValue *value = run_operation (state, operation->body[i]);
-            data_value_unref (value);
-        }
+        run_sequence (state, operation->body, operation->body_length);
     }
 }
 
