@@ -830,6 +830,17 @@ parse_sequence (Parser *parser)
 
             op = make_return (value, get_current_function (parser));
         }
+        else if (token_has_text (token, parser->data, "assert")) {
+            next_token (parser);
+
+            Operation *expression = parse_expression (parser);
+            if (expression == NULL) {
+                print_token_error (parser, current_token (parser), "Not valid assertion expression");
+                return false;
+            }
+
+            op = make_assert (token, expression);
+        }
         else if ((v = find_variable (parser, token)) != NULL) {
             Token *name = token;
             next_token (parser);

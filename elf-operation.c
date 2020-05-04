@@ -111,6 +111,17 @@ make_return (Operation *value, OperationFunctionDefinition *function)
 }
 
 Operation *
+make_assert (Token *name, Operation *expression)
+{
+    OperationAssert *o = malloc (sizeof (OperationAssert));
+    memset (o, 0, sizeof (OperationAssert));
+    o->type = OPERATION_TYPE_ASSERT;
+    o->name = name;
+    o->expression = expression;
+    return (Operation *) o;
+}
+
+Operation *
 make_boolean_constant (Token *value)
 {
     OperationBooleanConstant *o = malloc (sizeof (OperationBooleanConstant));
@@ -196,6 +207,10 @@ operation_is_constant (Operation *operation)
         OperationReturn *op = (OperationReturn *) operation;
         return op->value == NULL || operation_is_constant (op->value);
     }
+    case OPERATION_TYPE_ASSERT: {
+        OperationReturn *op = (OperationReturn *) operation;
+        return op->value == NULL || operation_is_constant (op->value);
+    }
     case OPERATION_TYPE_BOOLEAN_CONSTANT:
     case OPERATION_TYPE_NUMBER_CONSTANT:
     case OPERATION_TYPE_TEXT_CONSTANT:
@@ -243,6 +258,10 @@ operation_get_data_type (Operation *operation, const char *data)
         return operation_get_data_type ((Operation *) op->function, data);
     }
     case OPERATION_TYPE_RETURN: {
+        OperationReturn *op = (OperationReturn *) operation;
+        return operation_get_data_type ((Operation *) op->function, data);
+    }
+    case OPERATION_TYPE_ASSERT: {
         OperationReturn *op = (OperationReturn *) operation;
         return operation_get_data_type ((Operation *) op->function, data);
     }
@@ -403,6 +422,11 @@ operation_to_string (Operation *operation)
         autofree_str value_string = operation_to_string (op->value);
         return str_printf ("RETURN(%s)", value_string);
     }
+    case OPERATION_TYPE_ASSERT: {
+        OperationAssert *op = (OperationAssert *) operation;
+        autofree_str expression_string = operation_to_string (op->expression);
+        return str_printf ("ASSERT(%s)", expression_string);
+    }
     case OPERATION_TYPE_BOOLEAN_CONSTANT: {
         OperationNumberConstant *op = (OperationNumberConstant *) operation;
         autofree_str value_string = token_to_string (op->value);
@@ -499,6 +523,11 @@ operation_free (Operation *operation)
     case OPERATION_TYPE_RETURN: {
         OperationReturn *op = (OperationReturn *) operation;
         operation_free (op->value);
+        break;
+    }
+    case OPERATION_TYPE_ASSERT: {
+        OperationAssert *op = (OperationAssert *) operation;
+        operation_free (op->expression);
         break;
     }
     case OPERATION_TYPE_MEMBER_VALUE: {

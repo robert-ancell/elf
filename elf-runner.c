@@ -9,6 +9,7 @@
 
 #include "elf-runner.h"
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -51,6 +52,8 @@ typedef struct {
     size_t variables_length;
 
     DataValue *return_value;
+
+    OperationAssert *failed_assertion;
 } ProgramState;
 
 static DataValue *run_operation (ProgramState *state, Operation *operation);
@@ -262,7 +265,7 @@ variable_free (Variable *variable)
 static void
 run_sequence (ProgramState *state, Operation **body, size_t body_length)
 {
-    for (size_t i = 0; i < body_length && state->return_value == NULL; i++) {
+    for (size_t i = 0; i < body_length && state->failed_assertion == NULL && state->return_value == NULL; i++) {
         DataValue *value = run_operation (state, body[i]);
         data_value_unref (value);
     }
@@ -484,6 +487,16 @@ run_return (ProgramState *state, OperationReturn *operation)
 }
 
 static DataValue *
+run_assert (ProgramState *state, OperationAssert *operation)
+{
+    DataValue *value = run_operation (state, operation->expression);
+    assert (value->type == DATA_TYPE_BOOL);
+    if (value->data[0] == 0)
+       state->failed_assertion = operation;
+    return value;
+}
+
+static DataValue *
 run_boolean_constant (ProgramState *state, OperationBooleanConstant *operation)
 {
     bool value = token_parse_boolean_constant (operation->value, state->data);
@@ -653,6 +666,8 @@ run_operation (ProgramState *state, Operation *operation)
         return run_function_call (state, (OperationFunctionCall *) operation);
     case OPERATION_TYPE_RETURN:
         return run_return (state, (OperationReturn *) operation);
+    case OPERATION_TYPE_ASSERT:
+        return run_assert (state, (OperationAssert *) operation);
     case OPERATION_TYPE_BOOLEAN_CONSTANT:
         return run_boolean_constant (state, (OperationBooleanConstant *) operation);
     case OPERATION_TYPE_NUMBER_CONSTANT:

@@ -20,6 +20,7 @@ statement
     if_statement
     while_statement
     return_statement
+    assertion
 
 comment
     '#' * nl
@@ -191,6 +192,9 @@ condition
 
 return_statement
     "return" ws expression
+
+assertion
+    "assert" expression
 
 nl
    '000A'

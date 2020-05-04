@@ -58,6 +58,8 @@ foreach test : [ 'empty-file',
                  'function-return-uint32',
                  'function-return-uint64',
                  'function-return-utf8',
+                 'assert-true',
+                 'assert-false',
                ]
   test (test, test_runner, args : [ elf.full_path (), '@0@/tests/@1@.elf'.format (meson.current_source_dir (), test) ])
 endforeach
