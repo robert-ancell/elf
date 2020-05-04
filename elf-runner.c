@@ -17,6 +17,7 @@
 #include "utils.h"
 
 typedef enum {
+    DATA_TYPE_NONE,
     DATA_TYPE_BOOL,
     DATA_TYPE_UINT8,
     DATA_TYPE_INT8,
@@ -44,10 +45,11 @@ typedef struct {
 typedef struct {
     const char *data;
 
+    DataValue *none_value;
+
     Variable **variables;
     size_t variables_length;
 
-    bool run_return;
     DataValue *return_value;
 } ProgramState;
 
@@ -62,6 +64,8 @@ data_value_new (DataType type)
     value->type = type;
 
     switch (type) {
+    case DATA_TYPE_NONE:
+        value->data_length = 0;
     case DATA_TYPE_BOOL:
     case DATA_TYPE_UINT8:
     case DATA_TYPE_INT8:
@@ -258,24 +262,23 @@ variable_free (Variable *variable)
 static DataValue *
 run_module (ProgramState *state, OperationModule *module)
 {
-    for (size_t i = 0; i < module->body_length && !state->run_return; i++) {
+    for (size_t i = 0; i < module->body_length; i++) {
         DataValue *value = run_operation (state, module->body[i]);
         data_value_unref (value);
     }
 
-    return NULL;
+    return data_value_ref (state->none_value);
 }
 
 static DataValue *
 run_function (ProgramState *state, OperationFunctionDefinition *function)
 {
-    for (size_t i = 0; i < function->body_length && !state->run_return; i++) {
+    for (size_t i = 0; i < function->body_length&& state->return_value == NULL; i++) {
         DataValue *value = run_operation (state, function->body[i]);
         data_value_unref (value);
     }
 
     DataValue *return_value = state->return_value;
-    state->run_return = false;
     state->return_value = NULL;
     return return_value;
 }
@@ -332,7 +335,7 @@ run_variable_definition (ProgramState *state, OperationVariableDefinition *opera
     free (variable_name);
     data_value_unref (value);
 
-    return NULL;
+    return data_value_ref (state->none_value);
 }
 
 static DataValue *
@@ -352,7 +355,7 @@ run_variable_assignment (ProgramState *state, OperationVariableAssignment *opera
 
     free (variable_name);
 
-    return NULL;
+    return data_value_ref (state->none_value);
 }
 
 static DataValue *
@@ -361,7 +364,7 @@ run_if (ProgramState *state, OperationIf *operation)
     DataValue *value = run_operation (state, operation->condition);
     if (value->type != DATA_TYPE_BOOL) {
         data_value_unref (value);
-        return NULL;
+        return data_value_ref (state->none_value);
     }
     bool condition = value->data[0] != 0;
     data_value_unref (value);
@@ -377,12 +380,12 @@ run_if (ProgramState *state, OperationIf *operation)
         body_length = operation->else_operation->body_length;
     }
 
-    for (size_t i = 0; i < body_length && !state->run_return; i++) {
+    for (size_t i = 0; i < body_length && state->return_value == NULL; i++) {
         DataValue *value = run_operation (state, body[i]);
         data_value_unref (value);
     }
 
-    return NULL;
+    return data_value_ref (state->none_value);
 }
 
 static DataValue *
@@ -392,15 +395,15 @@ run_while (ProgramState *state, OperationWhile *operation)
         DataValue *value = run_operation (state, operation->condition);
         if (value->type != DATA_TYPE_BOOL) {
             data_value_unref (value);
-            return NULL;
+            return data_value_ref (state->none_value);
         }
         bool condition = value->data[0] != 0;
         data_value_unref (value);
 
         if (!condition)
-            return NULL;
+            return data_value_ref (state->none_value);
 
-        for (size_t i = 0; i < operation->body_length && !state->run_return; i++) {
+        for (size_t i = 0; i < operation->body_length && state->return_value == NULL; i++) {
             DataValue *value = run_operation (state, operation->body[i]);
             data_value_unref (value);
         }
@@ -479,7 +482,6 @@ static DataValue *
 run_return (ProgramState *state, OperationReturn *operation)
 {
     DataValue *value = run_operation (state, operation->value);
-    state->run_return = true;
     state->return_value = data_value_ref (value);
     return value;
 }
@@ -528,7 +530,7 @@ run_variable_value (ProgramState *state, OperationVariableValue *operation)
     }
 
     printf ("variable value %s\n", variable_name);
-    return NULL;
+    return data_value_ref (state->none_value);
 }
 
 static DataValue *
@@ -560,7 +562,7 @@ run_binary_boolean (ProgramState *state, OperationBinary *operation, DataValue *
     case TOKEN_TYPE_NOT_EQUAL:
         return data_value_new_bool (a->data[0] != b->data[0]);
     default:
-        return NULL;
+        return data_value_ref (state->none_value);
     }
 }
 
@@ -568,7 +570,7 @@ static DataValue *
 run_binary_integer (ProgramState *state, OperationBinary *operation, DataValue *a, DataValue *b)
 {
     if (a->type != DATA_TYPE_UINT8 || b->type != DATA_TYPE_UINT8)
-        return NULL;
+        return data_value_ref (state->none_value);
 
     switch (operation->operator->type) {
     case TOKEN_TYPE_EQUAL:
@@ -592,7 +594,7 @@ run_binary_integer (ProgramState *state, OperationBinary *operation, DataValue *
     case TOKEN_TYPE_DIVIDE:
         return data_value_new_uint8 (a->data[0] / b->data[0]);
     default:
-        return NULL;
+        return data_value_ref (state->none_value);
     }
 }
 
@@ -607,7 +609,7 @@ run_binary_text (ProgramState *state, OperationBinary *operation, DataValue *a, 
     case TOKEN_TYPE_ADD:
         return data_value_new_utf8_join (a, b);
     default:
-        return NULL;
+        return data_value_ref (state->none_value);
     }
 }
 
@@ -645,11 +647,11 @@ run_operation (ProgramState *state, Operation *operation)
     case OPERATION_TYPE_IF:
         return run_if (state, (OperationIf *) operation);
     case OPERATION_TYPE_ELSE:
-        return NULL; // Resolved in IF
+        return data_value_ref (state->none_value); // Resolved in IF
     case OPERATION_TYPE_WHILE:
         return run_while (state, (OperationWhile *) operation);
     case OPERATION_TYPE_FUNCTION_DEFINITION:
-        return NULL; // Resolved at compile time
+        return data_value_ref (state->none_value); // Resolved at compile time
     case OPERATION_TYPE_FUNCTION_CALL:
         return run_function_call (state, (OperationFunctionCall *) operation);
     case OPERATION_TYPE_RETURN:
@@ -668,7 +670,7 @@ run_operation (ProgramState *state, Operation *operation)
         return run_binary (state, (OperationBinary *) operation);
     }
 
-    return NULL;
+    return data_value_ref (state->none_value);
 }
 
 void
@@ -677,10 +679,12 @@ elf_run (const char *data, OperationModule *module)
     ProgramState *state = malloc (sizeof (ProgramState));
     memset (state, 0, sizeof (ProgramState));
     state->data = data;
+    state->none_value = data_value_new (DATA_TYPE_NONE);
 
     DataValue *result = run_module (state, module);
     data_value_unref (result);
 
+    data_value_unref (state->none_value);
     for (size_t i = 0; i < state->variables_length; i++)
         variable_free (state->variables[i]);
     free (state->variables);
