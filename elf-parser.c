@@ -614,6 +614,26 @@ get_current_function (Parser *parser)
 }
 
 static bool
+can_assign (const char *variable_type, const char *value_type)
+{
+    if (str_equal (variable_type, value_type))
+        return true;
+
+    // Integers that can fit inside their parent type
+    if (str_equal (variable_type, "uint16"))
+        return str_equal (value_type, "uint8");
+    else if (str_equal (variable_type, "uint32"))
+        return str_equal (value_type, "uint16") ||
+               str_equal (value_type, "uint8");
+    else if (str_equal (variable_type, "uint64"))
+        return str_equal (value_type, "uint32") ||
+               str_equal (value_type, "uint16") ||
+               str_equal (value_type, "uint8");
+    else
+        return false;
+}
+
+static bool
 parse_sequence (Parser *parser)
 {
     Operation *parent = parser->stack[parser->stack_length - 1]->operation;
@@ -651,6 +671,15 @@ parse_sequence (Parser *parser)
                     print_token_error (parser, current_token (parser), "Invalid value for variable");
                     return false;
                 }
+
+                autofree_str variable_type = token_get_text (data_type, parser->data);
+                autofree_str value_type = operation_get_data_type (value, parser->data);
+                if (!can_assign (variable_type, value_type)) {
+                    autofree_str message = str_printf ("Variable is of type %s, but value is of type %s", variable_type, value_type);
+                    print_token_error (parser, name, message);
+                    return false;
+                }
+
                 op = make_variable_definition (data_type, name, value);
             } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
                 next_token (parser);
@@ -860,7 +889,7 @@ parse_sequence (Parser *parser)
 
             autofree_str variable_type = operation_get_data_type ((Operation *) v, parser->data);
             autofree_str value_type = operation_get_data_type (value, parser->data);
-            if (!str_equal (variable_type, value_type)) {
+            if (!can_assign (variable_type, value_type)) {
                  autofree_str message = str_printf ("Variable is of type %s, but value is of type %s", variable_type, value_type);
                  print_token_error (parser, name, message);
                  return false;
