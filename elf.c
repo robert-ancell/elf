@@ -340,6 +340,9 @@ main (int argc, char **argv)
         printf ("%s\n", VERSION);
         return 0;
     }
+    else if (str_equal (command, "zelda")) {
+        printf ("\033[32;93m ▲\n▲ ▲\n\033[0m");
+    }
     else if (str_equal (command, "help")) {
         printf ("Elf is a programming languge designed for teching how memory works.\n"
                 "\n"
