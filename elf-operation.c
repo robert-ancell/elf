@@ -35,8 +35,8 @@ Operation *
 make_variable_definition (Token *data_type, Token *name, Operation *value)
 {
     OperationVariableDefinition *o = (OperationVariableDefinition *) operation_new (OPERATION_TYPE_VARIABLE_DEFINITION, sizeof (OperationVariableDefinition));
-    o->data_type = data_type;
-    o->name = name;
+    o->data_type = token_ref (data_type);
+    o->name = token_ref(name);
     o->value = operation_ref (value);
     return (Operation *) o;
 }
@@ -45,7 +45,7 @@ Operation *
 make_variable_assignment (Token *name, Operation *value, OperationVariableDefinition *variable)
 {
     OperationVariableAssignment *o = (OperationVariableAssignment *) operation_new (OPERATION_TYPE_VARIABLE_ASSIGNMENT, sizeof (OperationVariableAssignment));
-    o->name = name;
+    o->name = token_ref(name);
     o->value = operation_ref (value);
     o->variable = variable;
     return (Operation *) o;
@@ -78,8 +78,8 @@ Operation *
 make_function_definition (Token *data_type, Token *name, OperationVariableDefinition **parameters)
 {
     OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation_new (OPERATION_TYPE_FUNCTION_DEFINITION, sizeof (OperationFunctionDefinition));
-    o->data_type = data_type;
-    o->name = name;
+    o->data_type = token_ref (data_type);
+    o->name = token_ref(name);
     o->parameters = parameters;
     return (Operation *) o;
 }
@@ -88,7 +88,7 @@ Operation *
 make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function)
 {
     OperationFunctionCall *o = (OperationFunctionCall *) operation_new (OPERATION_TYPE_FUNCTION_CALL, sizeof (OperationFunctionCall));
-    o->name = name;
+    o->name = token_ref(name);
     o->parameters = parameters;
     o->function = function;
     return (Operation *) o;
@@ -107,7 +107,7 @@ Operation *
 make_assert (Token *name, Operation *expression)
 {
     OperationAssert *o = (OperationAssert *) operation_new (OPERATION_TYPE_ASSERT, sizeof (OperationAssert));
-    o->name = name;
+    o->name = token_ref(name);
     o->expression = operation_ref (expression);
     return (Operation *) o;
 }
@@ -116,7 +116,7 @@ Operation *
 make_boolean_constant (Token *value)
 {
     OperationBooleanConstant *o = (OperationBooleanConstant *) operation_new (OPERATION_TYPE_BOOLEAN_CONSTANT, sizeof (OperationBooleanConstant));
-    o->value = value;
+    o->value = token_ref (value);
     return (Operation *) o;
 }
 
@@ -124,7 +124,7 @@ Operation *
 make_number_constant (Token *value)
 {
     OperationNumberConstant *o = (OperationNumberConstant *) operation_new (OPERATION_TYPE_NUMBER_CONSTANT, sizeof (OperationNumberConstant));
-    o->value = value;
+    o->value = token_ref (value);
     return (Operation *) o;
 }
 
@@ -132,7 +132,7 @@ Operation *
 make_text_constant (Token *value)
 {
     OperationTextConstant *o = (OperationTextConstant *) operation_new (OPERATION_TYPE_TEXT_CONSTANT, sizeof (OperationTextConstant));
-    o->value = value;
+    o->value = token_ref (value);
     return (Operation *) o;
 }
 
@@ -140,7 +140,7 @@ Operation *
 make_variable_value (Token *name, OperationVariableDefinition *variable)
 {
     OperationVariableValue *o = (OperationVariableValue *) operation_new (OPERATION_TYPE_VARIABLE_VALUE, sizeof (OperationVariableValue));
-    o->name = name;
+    o->name = token_ref(name);
     o->variable = variable;
     return (Operation *) o;
 }
@@ -150,7 +150,7 @@ make_member_value (Operation *object, Token *member, Operation **parameters)
 {
     OperationMemberValue *o = (OperationMemberValue *) operation_new (OPERATION_TYPE_MEMBER_VALUE, sizeof (OperationMemberValue));
     o->object = operation_ref (object);
-    o->member = member;
+    o->member = token_ref (member);
     o->parameters = parameters;
     return (Operation *) o;
 }
@@ -159,7 +159,7 @@ Operation *
 make_binary (Token *operator, Operation *a, Operation *b)
 {
     OperationBinary *o = (OperationBinary *) operation_new (OPERATION_TYPE_BINARY, sizeof (OperationBinary));
-    o->operator = operator;
+    o->operator = token_ref (operator);
     o->a = operation_ref (a);
     o->b = operation_ref (b);
     return (Operation *) o;
@@ -470,6 +470,7 @@ operation_unref (Operation *operation)
     }
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT: {
         OperationVariableAssignment *op = (OperationVariableAssignment *) operation;
+        token_unref (op->name);
         operation_unref (op->value);
         break;
     }
@@ -498,6 +499,8 @@ operation_unref (Operation *operation)
     }
     case OPERATION_TYPE_FUNCTION_DEFINITION: {
         OperationFunctionDefinition *op = (OperationFunctionDefinition *) operation;
+        token_unref (op->data_type);
+        token_unref (op->name);
         for (int i = 0; op->parameters[i] != NULL; i++)
             operation_unref ((Operation *) op->parameters[i]);
         free (op->parameters);
@@ -508,6 +511,7 @@ operation_unref (Operation *operation)
     }
     case OPERATION_TYPE_FUNCTION_CALL: {
         OperationFunctionCall *op = (OperationFunctionCall *) operation;
+        token_unref (op->name);
         for (int i = 0; op->parameters[i] != NULL; i++)
             operation_unref (op->parameters[i]);
         free (op->parameters);
@@ -515,17 +519,40 @@ operation_unref (Operation *operation)
     }
     case OPERATION_TYPE_RETURN: {
         OperationReturn *op = (OperationReturn *) operation;
+        token_unref (op->name);
         operation_unref (op->value);
         break;
     }
     case OPERATION_TYPE_ASSERT: {
         OperationAssert *op = (OperationAssert *) operation;
+        token_unref (op->name);
         operation_unref (op->expression);
+        break;
+    }
+    case OPERATION_TYPE_BOOLEAN_CONSTANT: {
+        OperationBooleanConstant *op = (OperationBooleanConstant *) operation;
+        token_unref (op->value);
+        break;
+    }
+    case OPERATION_TYPE_NUMBER_CONSTANT: {
+        OperationNumberConstant *op = (OperationNumberConstant *) operation;
+        token_unref (op->value);
+        break;
+    }
+    case OPERATION_TYPE_TEXT_CONSTANT: {
+        OperationTextConstant *op = (OperationTextConstant *) operation;
+        token_unref (op->value);
+        break;
+    }
+    case OPERATION_TYPE_VARIABLE_VALUE: {
+        OperationVariableValue *op = (OperationVariableValue *) operation;
+        token_unref (op->name);
         break;
     }
     case OPERATION_TYPE_MEMBER_VALUE: {
         OperationMemberValue *op = (OperationMemberValue *) operation;
         operation_unref (op->object);
+        token_unref (op->member);
         for (int i = 0; op->parameters[i] != NULL; i++)
             operation_unref (op->parameters[i]);
         free (op->parameters);
@@ -533,15 +560,11 @@ operation_unref (Operation *operation)
     }
     case OPERATION_TYPE_BINARY: {
         OperationBinary *op = (OperationBinary *) operation;
+        token_unref (op->operator);
         operation_unref (op->a);
         operation_unref (op->b);
         break;
     }
-    case OPERATION_TYPE_BOOLEAN_CONSTANT:
-    case OPERATION_TYPE_NUMBER_CONSTANT:
-    case OPERATION_TYPE_TEXT_CONSTANT:
-    case OPERATION_TYPE_VARIABLE_VALUE:
-        break;
     }
 
     free (operation);

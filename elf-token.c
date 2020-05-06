@@ -26,6 +26,17 @@ hex_digit (char c)
         return -1;
 }
 
+Token *
+token_new (TokenType type, size_t offset, size_t length)
+{
+    Token *token = malloc (sizeof (Token));
+    token->type = type;
+    token->offset = offset;
+    token->length = length;
+    token->ref_count = 1;
+    return token;
+}
+
 char *
 token_get_text (Token *token, const char *data)
 {
@@ -191,4 +202,27 @@ token_to_string (Token *token)
     }
 
     return str_printf ("UNKNOWN(%d)", token->type);
+}
+
+Token *
+token_ref (Token *token)
+{
+    if (token == NULL)
+        return NULL;
+
+    token->ref_count++;
+    return token;
+}
+
+void
+token_unref (Token *token)
+{
+    if (token == NULL)
+        return;
+
+    token->ref_count--;
+    if (token->ref_count != 0)
+        return;
+
+    free (token);
 }

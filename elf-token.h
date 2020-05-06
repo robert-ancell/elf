@@ -42,7 +42,10 @@ typedef struct {
     TokenType type;
     size_t offset;
     size_t length;
+    int ref_count;
 } Token;
+
+Token *token_new (TokenType type, size_t offset, size_t length);
 
 char *token_get_text (Token *token, const char *data);
 
@@ -55,3 +58,7 @@ uint64_t token_parse_number_constant (Token *token, const char *data);
 char *token_parse_text_constant (Token *token, const char *data);
 
 char *token_to_string (Token *token);
+
+Token *token_ref (Token *token);
+
+void token_unref (Token *token);

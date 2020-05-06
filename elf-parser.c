@@ -64,10 +64,9 @@ parser_new (const char *data, size_t data_length)
 static void
 parser_free (Parser *parser)
 {
-    // FIXME: Need to keep these - they are referred to by the operations
-    //for (int i = 0; parser->tokens[i] != NULL; i++)
-    //  free (parser->tokens[i]);
-    //free (parser->tokens);
+    for (int i = 0; parser->tokens[i] != NULL; i++)
+        token_unref (parser->tokens[i]);
+    free (parser->tokens);
 
     for (size_t i = 0; i < parser->stack_length; i++)
        stack_frame_free (parser->stack[i]);
@@ -231,10 +230,7 @@ elf_lex (const char *data, size_t data_length)
             tokens_length++;
             tokens = realloc (tokens, sizeof (Token *) * (tokens_length + 1)); // FIXME: Double size each time
             tokens[tokens_length] = NULL;
-            Token *token = tokens[tokens_length - 1] = malloc (sizeof (Token));
-            memset (token, 0, sizeof (Token));
-            token->offset = offset;
-            token->length = 1;
+            Token *token = tokens[tokens_length - 1] = token_new (0, offset, 1);
 
             if (c == '(')
                 token->type = TOKEN_TYPE_OPEN_PAREN;
