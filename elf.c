@@ -276,7 +276,7 @@ compile_elf_source (const char *filename)
     if (fd < 0)
         return 1;
 
-    OperationModule *module = elf_parse (data, data_length);
+    autofree_operation module = (Operation *) elf_parse (data, data_length);
     if (module == NULL) {
         munmap_file (fd, data, data_length);
         return 1;
@@ -300,8 +300,6 @@ compile_elf_source (const char *filename)
 
     printf ("%s compiled to '%s', run with:\n", filename, binary_name);
     printf ("$ ./%s\n", binary_name);
-
-    operation_free ((Operation *) module);
 
     munmap_file (fd, data, data_length);
 

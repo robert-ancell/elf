@@ -13,35 +13,40 @@
 
 #include "utils.h"
 
+static Operation *
+operation_new (OperationType type, size_t size)
+{
+    Operation *o = malloc (size);
+    memset (o, 0, size);
+    o->type = type;
+    o->ref_count = 1;
+
+    return o;
+}
+
 Operation *
 make_module (void)
 {
-    OperationModule *o = malloc (sizeof (OperationModule));
-    memset (o, 0, sizeof (OperationModule));
-    o->type = OPERATION_TYPE_MODULE;
+    OperationModule *o = (OperationModule *) operation_new (OPERATION_TYPE_MODULE, sizeof (OperationModule));
     return (Operation *) o;
 }
 
 Operation *
 make_variable_definition (Token *data_type, Token *name, Operation *value)
 {
-    OperationVariableDefinition *o = malloc (sizeof (OperationVariableDefinition));
-    memset (o, 0, sizeof (OperationVariableDefinition));
-    o->type = OPERATION_TYPE_VARIABLE_DEFINITION;
+    OperationVariableDefinition *o = (OperationVariableDefinition *) operation_new (OPERATION_TYPE_VARIABLE_DEFINITION, sizeof (OperationVariableDefinition));
     o->data_type = data_type;
     o->name = name;
-    o->value = value;
+    o->value = operation_ref (value);
     return (Operation *) o;
 }
 
 Operation *
 make_variable_assignment (Token *name, Operation *value, OperationVariableDefinition *variable)
 {
-    OperationVariableAssignment *o = malloc (sizeof (OperationVariableAssignment));
-    memset (o, 0, sizeof (OperationVariableAssignment));
-    o->type = OPERATION_TYPE_VARIABLE_ASSIGNMENT;
+    OperationVariableAssignment *o = (OperationVariableAssignment *) operation_new (OPERATION_TYPE_VARIABLE_ASSIGNMENT, sizeof (OperationVariableAssignment));
     o->name = name;
-    o->value = value;
+    o->value = operation_ref (value);
     o->variable = variable;
     return (Operation *) o;
 }
@@ -49,38 +54,30 @@ make_variable_assignment (Token *name, Operation *value, OperationVariableDefini
 Operation *
 make_if (Operation *condition)
 {
-    OperationIf *o = malloc (sizeof (OperationIf));
-    memset (o, 0, sizeof (OperationIf));
-    o->type = OPERATION_TYPE_IF;
-    o->condition = condition;
+    OperationIf *o = (OperationIf *) operation_new (OPERATION_TYPE_IF, sizeof (OperationIf));
+    o->condition = operation_ref (condition);
     return (Operation *) o;
 }
 
 Operation *
 make_else (void)
 {
-    OperationElse *o = malloc (sizeof (OperationElse));
-    memset (o, 0, sizeof (OperationElse));
-    o->type = OPERATION_TYPE_ELSE;
+    OperationElse *o = (OperationElse *) operation_new (OPERATION_TYPE_ELSE, sizeof (OperationElse));
     return (Operation *) o;
 }
 
 Operation *
 make_while (Operation *condition)
 {
-    OperationWhile *o = malloc (sizeof (OperationWhile));
-    memset (o, 0, sizeof (OperationWhile));
-    o->type = OPERATION_TYPE_WHILE;
-    o->condition = condition;
+    OperationWhile *o = (OperationWhile *) operation_new (OPERATION_TYPE_WHILE, sizeof (OperationWhile));
+    o->condition = operation_ref (condition);
     return (Operation *) o;
 }
 
 Operation *
 make_function_definition (Token *data_type, Token *name, OperationVariableDefinition **parameters)
 {
-    OperationFunctionDefinition *o = malloc (sizeof (OperationFunctionDefinition));
-    memset (o, 0, sizeof (OperationFunctionDefinition));
-    o->type = OPERATION_TYPE_FUNCTION_DEFINITION;
+    OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation_new (OPERATION_TYPE_FUNCTION_DEFINITION, sizeof (OperationFunctionDefinition));
     o->data_type = data_type;
     o->name = name;
     o->parameters = parameters;
@@ -90,9 +87,7 @@ make_function_definition (Token *data_type, Token *name, OperationVariableDefini
 Operation *
 make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function)
 {
-    OperationFunctionCall *o = malloc (sizeof (OperationFunctionCall));
-    memset (o, 0, sizeof (OperationFunctionCall));
-    o->type = OPERATION_TYPE_FUNCTION_CALL;
+    OperationFunctionCall *o = (OperationFunctionCall *) operation_new (OPERATION_TYPE_FUNCTION_CALL, sizeof (OperationFunctionCall));
     o->name = name;
     o->parameters = parameters;
     o->function = function;
@@ -102,9 +97,7 @@ make_function_call (Token *name, Operation **parameters, OperationFunctionDefini
 Operation *
 make_return (Operation *value, OperationFunctionDefinition *function)
 {
-    OperationReturn *o = malloc (sizeof (OperationReturn));
-    memset (o, 0, sizeof (OperationReturn));
-    o->type = OPERATION_TYPE_RETURN;
+    OperationReturn *o = (OperationReturn *) operation_new (OPERATION_TYPE_RETURN, sizeof (OperationReturn));
     o->value = value;
     o->function = function;
     return (Operation *) o;
@@ -113,20 +106,16 @@ make_return (Operation *value, OperationFunctionDefinition *function)
 Operation *
 make_assert (Token *name, Operation *expression)
 {
-    OperationAssert *o = malloc (sizeof (OperationAssert));
-    memset (o, 0, sizeof (OperationAssert));
-    o->type = OPERATION_TYPE_ASSERT;
+    OperationAssert *o = (OperationAssert *) operation_new (OPERATION_TYPE_ASSERT, sizeof (OperationAssert));
     o->name = name;
-    o->expression = expression;
+    o->expression = operation_ref (expression);
     return (Operation *) o;
 }
 
 Operation *
 make_boolean_constant (Token *value)
 {
-    OperationBooleanConstant *o = malloc (sizeof (OperationBooleanConstant));
-    memset (o, 0, sizeof (OperationBooleanConstant));
-    o->type = OPERATION_TYPE_BOOLEAN_CONSTANT;
+    OperationBooleanConstant *o = (OperationBooleanConstant *) operation_new (OPERATION_TYPE_BOOLEAN_CONSTANT, sizeof (OperationBooleanConstant));
     o->value = value;
     return (Operation *) o;
 }
@@ -134,9 +123,7 @@ make_boolean_constant (Token *value)
 Operation *
 make_number_constant (Token *value)
 {
-    OperationNumberConstant *o = malloc (sizeof (OperationNumberConstant));
-    memset (o, 0, sizeof (OperationNumberConstant));
-    o->type = OPERATION_TYPE_NUMBER_CONSTANT;
+    OperationNumberConstant *o = (OperationNumberConstant *) operation_new (OPERATION_TYPE_NUMBER_CONSTANT, sizeof (OperationNumberConstant));
     o->value = value;
     return (Operation *) o;
 }
@@ -144,9 +131,7 @@ make_number_constant (Token *value)
 Operation *
 make_text_constant (Token *value)
 {
-    OperationTextConstant *o = malloc (sizeof (OperationTextConstant));
-    memset (o, 0, sizeof (OperationTextConstant));
-    o->type = OPERATION_TYPE_TEXT_CONSTANT;
+    OperationTextConstant *o = (OperationTextConstant *) operation_new (OPERATION_TYPE_TEXT_CONSTANT, sizeof (OperationTextConstant));
     o->value = value;
     return (Operation *) o;
 }
@@ -154,9 +139,7 @@ make_text_constant (Token *value)
 Operation *
 make_variable_value (Token *name, OperationVariableDefinition *variable)
 {
-    OperationVariableValue *o = malloc (sizeof (OperationVariableValue));
-    memset (o, 0, sizeof (OperationVariableValue));
-    o->type = OPERATION_TYPE_VARIABLE_VALUE;
+    OperationVariableValue *o = (OperationVariableValue *) operation_new (OPERATION_TYPE_VARIABLE_VALUE, sizeof (OperationVariableValue));
     o->name = name;
     o->variable = variable;
     return (Operation *) o;
@@ -165,10 +148,8 @@ make_variable_value (Token *name, OperationVariableDefinition *variable)
 Operation *
 make_member_value (Operation *object, Token *member, Operation **parameters)
 {
-    OperationMemberValue *o = malloc (sizeof (OperationMemberValue));
-    memset (o, 0, sizeof (OperationMemberValue));
-    o->type = OPERATION_TYPE_MEMBER_VALUE;
-    o->object = object;
+    OperationMemberValue *o = (OperationMemberValue *) operation_new (OPERATION_TYPE_MEMBER_VALUE, sizeof (OperationMemberValue));
+    o->object = operation_ref (object);
     o->member = member;
     o->parameters = parameters;
     return (Operation *) o;
@@ -177,12 +158,10 @@ make_member_value (Operation *object, Token *member, Operation **parameters)
 Operation *
 make_binary (Token *operator, Operation *a, Operation *b)
 {
-    OperationBinary *o = malloc (sizeof (OperationBinary));
-    memset (o, 0, sizeof (OperationBinary));
-    o->type = OPERATION_TYPE_BINARY;
+    OperationBinary *o = (OperationBinary *) operation_new (OPERATION_TYPE_BINARY, sizeof (OperationBinary));
     o->operator = operator;
-    o->a = a;
-    o->b = b;
+    o->a = operation_ref (a);
+    o->b = operation_ref (b);
     return (Operation *) o;
 }
 
@@ -305,31 +284,31 @@ operation_add_child (Operation *operation, Operation *child)
         OperationModule *o = (OperationModule *) operation;
         o->body_length++;
         o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
-        o->body[o->body_length - 1] = child;
+        o->body[o->body_length - 1] = operation_ref (child);
     }
     else if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
         OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
         o->body_length++;
         o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
-        o->body[o->body_length - 1] = child;
+        o->body[o->body_length - 1] = operation_ref (child);
     }
     else if (operation->type == OPERATION_TYPE_IF) {
         OperationIf *o = (OperationIf *) operation;
         o->body_length++;
         o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
-        o->body[o->body_length - 1] = child;
+        o->body[o->body_length - 1] = operation_ref (child);
     }
     else if (operation->type == OPERATION_TYPE_ELSE) {
         OperationElse *o = (OperationElse *) operation;
         o->body_length++;
         o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
-        o->body[o->body_length - 1] = child;
+        o->body[o->body_length - 1] = operation_ref (child);
     }
     else if (operation->type == OPERATION_TYPE_WHILE) {
         OperationWhile *o = (OperationWhile *) operation;
         o->body_length++;
         o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
-        o->body[o->body_length - 1] = child;
+        o->body[o->body_length - 1] = operation_ref (child);
     }
 }
 
@@ -456,92 +435,106 @@ operation_to_string (Operation *operation)
     return str_printf ("UNKNOWN(%d)", operation->type);
 }
 
-void
-operation_free (Operation *operation)
+Operation *
+operation_ref (Operation *operation)
 {
     if (operation == NULL)
+        return NULL;
+
+    operation->ref_count++;
+    return operation;
+}
+
+void
+operation_unref (Operation *operation)
+{
+    if (operation == NULL)
+        return;
+
+    operation->ref_count--;
+    if (operation->ref_count != 0)
         return;
 
     switch (operation->type) {
     case OPERATION_TYPE_MODULE: {
         OperationModule *op = (OperationModule *) operation;
         for (size_t i = 0; i < op->body_length; i++)
-            operation_free (op->body[i]);
+            operation_unref (op->body[i]);
         free (op->body);
         break;
     }
     case OPERATION_TYPE_VARIABLE_DEFINITION: {
         OperationVariableDefinition *op = (OperationVariableDefinition *) operation;
-        operation_free (op->value);
+        operation_unref (op->value);
         break;
     }
     case OPERATION_TYPE_VARIABLE_ASSIGNMENT: {
         OperationVariableAssignment *op = (OperationVariableAssignment *) operation;
-        operation_free (op->value);
+        operation_unref (op->value);
         break;
     }
     case OPERATION_TYPE_IF: {
         OperationIf *op = (OperationIf *) operation;
-        operation_free (op->condition);
+        operation_unref (op->condition);
         for (size_t i = 0; i < op->body_length; i++)
-            operation_free (op->body[i]);
+            operation_unref (op->body[i]);
         free (op->body);
         break;
     }
     case OPERATION_TYPE_ELSE: {
         OperationElse *op = (OperationElse *) operation;
         for (size_t i = 0; i < op->body_length; i++)
-            operation_free (op->body[i]);
+            operation_unref (op->body[i]);
         free (op->body);
         break;
     }
     case OPERATION_TYPE_WHILE: {
         OperationWhile *op = (OperationWhile *) operation;
-        operation_free (op->condition);
+        operation_unref (op->condition);
         for (size_t i = 0; i < op->body_length; i++)
-            operation_free (op->body[i]);
+            operation_unref (op->body[i]);
         free (op->body);
         break;
     }
     case OPERATION_TYPE_FUNCTION_DEFINITION: {
         OperationFunctionDefinition *op = (OperationFunctionDefinition *) operation;
         for (int i = 0; op->parameters[i] != NULL; i++)
-            operation_free ((Operation *) op->parameters[i]);
+            operation_unref ((Operation *) op->parameters[i]);
         free (op->parameters);
         for (size_t i = 0; i < op->body_length; i++)
-            operation_free (op->body[i]);
+            operation_unref (op->body[i]);
         free (op->body);
         break;
     }
     case OPERATION_TYPE_FUNCTION_CALL: {
         OperationFunctionCall *op = (OperationFunctionCall *) operation;
         for (int i = 0; op->parameters[i] != NULL; i++)
-            operation_free (op->parameters[i]);
+            operation_unref (op->parameters[i]);
         free (op->parameters);
         break;
     }
     case OPERATION_TYPE_RETURN: {
         OperationReturn *op = (OperationReturn *) operation;
-        operation_free (op->value);
+        operation_unref (op->value);
         break;
     }
     case OPERATION_TYPE_ASSERT: {
         OperationAssert *op = (OperationAssert *) operation;
-        operation_free (op->expression);
+        operation_unref (op->expression);
         break;
     }
     case OPERATION_TYPE_MEMBER_VALUE: {
         OperationMemberValue *op = (OperationMemberValue *) operation;
-        operation_free (op->object);
+        operation_unref (op->object);
         for (int i = 0; op->parameters[i] != NULL; i++)
-            operation_free (op->parameters[i]);
+            operation_unref (op->parameters[i]);
         free (op->parameters);
         break;
     }
     case OPERATION_TYPE_BINARY: {
         OperationBinary *op = (OperationBinary *) operation;
-        operation_free (op->a);
-        operation_free (op->b);
+        operation_unref (op->a);
+        operation_unref (op->b);
         break;
     }
     case OPERATION_TYPE_BOOLEAN_CONSTANT:
@@ -552,4 +545,12 @@ operation_free (Operation *operation)
     }
 
     free (operation);
+}
+
+void operation_cleanup (Operation **operation)
+{
+    if (*operation == NULL)
+        return;
+    operation_unref (*operation);
+    *operation = NULL;
 }

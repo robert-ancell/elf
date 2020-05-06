@@ -493,7 +493,7 @@ parse_value (Parser *parser)
 
     OperationFunctionDefinition *f;
     OperationVariableDefinition *v;
-    Operation *value = NULL;
+    autofree_operation value = NULL;
     if (token->type == TOKEN_TYPE_NUMBER) {
         next_token (parser);
         value = make_number_constant (token);
@@ -540,7 +540,7 @@ parse_value (Parser *parser)
         token = current_token (parser);
     }
 
-    return value;
+    return operation_ref (value);
 }
 
 static bool
@@ -561,22 +561,21 @@ token_is_binary_operator (Token *token)
 static Operation *
 parse_expression (Parser *parser)
 {
-    Operation *a = parse_value (parser);
+    autofree_operation a = parse_value (parser);
     if (a == NULL)
         return NULL;
 
     Token *operator = current_token (parser);
     if (operator == NULL)
-        return a;
+        return operation_ref (a);
 
     if (!token_is_binary_operator (operator))
-        return a;
+        return operation_ref (a);
     next_token (parser);
 
-    Operation *b = parse_value (parser);
+    autofree_operation b = parse_value (parser);
     if (b == NULL) {
         print_token_error (parser, current_token (parser), "Missing second value in binary operation");
-        operation_free (a);
         return NULL;
     }
 
@@ -640,7 +639,7 @@ parse_sequence (Parser *parser)
             continue;
         }
 
-        Operation *op = NULL;
+        autofree_operation op = NULL;
         OperationVariableDefinition *v;
         if (is_data_type (parser, token)) {
             Token *data_type = token;
@@ -656,7 +655,7 @@ parse_sequence (Parser *parser)
             } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
                 next_token (parser);
 
-                Operation *value = parse_expression (parser);
+                autofree_operation value = parse_expression (parser);
                 if (value == NULL) {
                     print_token_error (parser, current_token (parser), "Invalid value for variable");
                     return false;
@@ -755,7 +754,7 @@ parse_sequence (Parser *parser)
         else if (token_has_text (token, parser->data, "if")) {
             next_token (parser);
 
-            Operation *condition = parse_expression (parser);
+            autofree_operation condition = parse_expression (parser);
             if (condition == NULL) {
                 print_token_error (parser, current_token (parser), "Not valid if condition");
                 return false;
@@ -817,7 +816,7 @@ parse_sequence (Parser *parser)
         else if (token_has_text (token, parser->data, "while")) {
             next_token (parser);
 
-            Operation *condition = parse_expression (parser);
+            autofree_operation condition = parse_expression (parser);
             if (condition == NULL) {
                 print_token_error (parser, current_token (parser), "Not valid while condition");
                 return false;
@@ -858,7 +857,7 @@ parse_sequence (Parser *parser)
         else if (token_has_text (token, parser->data, "assert")) {
             next_token (parser);
 
-            Operation *expression = parse_expression (parser);
+            autofree_operation expression = parse_expression (parser);
             if (expression == NULL) {
                 print_token_error (parser, current_token (parser), "Not valid assertion expression");
                 return false;
@@ -877,7 +876,7 @@ parse_sequence (Parser *parser)
             }
             next_token (parser);
 
-            Operation *value = parse_expression (parser);
+            autofree_operation value = parse_expression (parser);
             if (value == NULL) {
                  print_token_error (parser, current_token (parser), "Invalid value for variable");
                  return false;
@@ -914,11 +913,10 @@ elf_parse (const char *data, size_t data_length)
 
     parser->tokens = elf_lex (data, data_length);
 
-    Operation *module = make_module ();
+    autofree_operation module = make_module ();
     push_stack (parser, module);
 
     if (!parse_sequence (parser)) {
-        operation_free (module);
         parser_free (parser);
         return NULL;
     }
@@ -930,5 +928,5 @@ elf_parse (const char *data, size_t data_length)
 
     parser_free (parser);
 
-    return (OperationModule *) module;
+    return (OperationModule *) operation_ref (module);
 }

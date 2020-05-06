@@ -34,17 +34,18 @@ typedef enum {
 
 typedef struct {
     OperationType type;
+    int ref_count;
 } Operation;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_MODULE
+    Operation o; // type=OPERATION_TYPE_MODULE
 
     Operation **body;
     size_t body_length;
 } OperationModule;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_VARIABLE_DEFINITION
+    Operation o; // type=OPERATION_TYPE_VARIABLE_DEFINITION
 
     Token *data_type;
     Token *name;
@@ -52,7 +53,7 @@ typedef struct {
 } OperationVariableDefinition;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_VARIABLE_ASSIGNMENT
+    Operation o; // type=OPERATION_TYPE_VARIABLE_ASSIGNMENT
 
     Token *name;
     Operation *value;
@@ -63,7 +64,7 @@ typedef struct {
 typedef struct _OperationElse OperationElse;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_IF
+    Operation o; // type=OPERATION_TYPE_IF
 
     Operation *condition;
     Operation **body;
@@ -72,14 +73,14 @@ typedef struct {
 } OperationIf;
 
 struct _OperationElse {
-    OperationType type; // OPERATION_TYPE_ELSE
+    Operation o; // type=OPERATION_TYPE_ELSE
 
     Operation **body;
     size_t body_length;
 };
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_WHILE
+    Operation o; // type=OPERATION_TYPE_WHILE
 
     Operation *condition;
     Operation **body;
@@ -89,7 +90,7 @@ typedef struct {
 typedef struct _OperationFunctionDefinition OperationFunctionDefinition;
 
 struct _OperationFunctionDefinition {
-    OperationType type; // OPERATION_TYPE_FUNCTION_DEFINITION
+    Operation o; // type=OPERATION_TYPE_FUNCTION_DEFINITION
 
     OperationFunctionDefinition *parent;
     Token *data_type;
@@ -100,7 +101,7 @@ struct _OperationFunctionDefinition {
 };
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_FUNCTION_CALL
+    Operation o; // type=OPERATION_TYPE_FUNCTION_CALL
 
     Token *name;
     Operation **parameters;
@@ -109,7 +110,7 @@ typedef struct {
 } OperationFunctionCall;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_RETURN
+    Operation o; // type=OPERATION_TYPE_RETURN
 
     Token *name;
     Operation *value;
@@ -118,32 +119,32 @@ typedef struct {
 } OperationReturn;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_ASSERT
+    Operation o; // type=OPERATION_TYPE_ASSERT
 
     Token *name;
     Operation *expression;
 } OperationAssert;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_BOOLEAN_CONSTANT;
+    Operation o; // type=OPERATION_TYPE_BOOLEAN_CONSTANT;
 
     Token *value;
 } OperationBooleanConstant;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_NUMBER_CONSTANT;
+    Operation o; // type=OPERATION_TYPE_NUMBER_CONSTANT;
 
     Token *value;
 } OperationNumberConstant;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_TEXT_CONSTANT;
+    Operation o; // type=OPERATION_TYPE_TEXT_CONSTANT;
 
     Token *value;
 } OperationTextConstant;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_VARIABLE_VALUE;
+    Operation o; // type=OPERATION_TYPE_VARIABLE_VALUE;
 
     Token *name;
 
@@ -151,7 +152,7 @@ typedef struct {
 } OperationVariableValue;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_MEMBER_VALUE;
+    Operation o; // type=OPERATION_TYPE_MEMBER_VALUE;
 
     Operation *object;
     Token *member;
@@ -159,7 +160,7 @@ typedef struct {
 } OperationMemberValue;
 
 typedef struct {
-    OperationType type; // OPERATION_TYPE_BINARY
+    Operation o; // type=OPERATION_TYPE_BINARY
 
     Token *operator;
     Operation *a;
@@ -212,4 +213,10 @@ Operation *operation_get_last_child (Operation *operation);
 
 char *operation_to_string (Operation *operation);
 
-void operation_free (Operation *operation);
+Operation *operation_ref (Operation *operation);
+
+void operation_unref (Operation *operation);
+
+void operation_cleanup (Operation **operation);
+
+#define autofree_operation __attribute__((cleanup(operation_cleanup))) Operation*
