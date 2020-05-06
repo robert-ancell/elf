@@ -580,6 +580,14 @@ parse_expression (Parser *parser)
         return NULL;
     }
 
+    autofree_str a_type = operation_get_data_type (a, parser->data);
+    autofree_str b_type = operation_get_data_type (b, parser->data);
+    if (!str_equal (a_type, b_type)) {
+        autofree_str message = str_printf ("Can't combine %s and %s types", a_type, b_type);
+        print_token_error (parser, operator, message);
+        return NULL;
+    }
+
     return make_binary (operator, a, b);
 }
 
