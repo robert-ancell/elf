@@ -14,209 +14,216 @@
 #include "elf-token.h"
 
 typedef enum {
-    OPERATION_TYPE_MODULE,
-    OPERATION_TYPE_VARIABLE_DEFINITION,
-    OPERATION_TYPE_VARIABLE_ASSIGNMENT,
-    OPERATION_TYPE_IF,
-    OPERATION_TYPE_ELSE,
-    OPERATION_TYPE_WHILE,
-    OPERATION_TYPE_FUNCTION_DEFINITION,
-    OPERATION_TYPE_FUNCTION_CALL,
-    OPERATION_TYPE_RETURN,
-    OPERATION_TYPE_ASSERT,
-    OPERATION_TYPE_BOOLEAN_CONSTANT,
-    OPERATION_TYPE_NUMBER_CONSTANT,
-    OPERATION_TYPE_TEXT_CONSTANT,
-    OPERATION_TYPE_VARIABLE_VALUE,
-    OPERATION_TYPE_MEMBER_VALUE,
-    OPERATION_TYPE_BINARY,
+  OPERATION_TYPE_MODULE,
+  OPERATION_TYPE_VARIABLE_DEFINITION,
+  OPERATION_TYPE_VARIABLE_ASSIGNMENT,
+  OPERATION_TYPE_IF,
+  OPERATION_TYPE_ELSE,
+  OPERATION_TYPE_WHILE,
+  OPERATION_TYPE_FUNCTION_DEFINITION,
+  OPERATION_TYPE_FUNCTION_CALL,
+  OPERATION_TYPE_RETURN,
+  OPERATION_TYPE_ASSERT,
+  OPERATION_TYPE_BOOLEAN_CONSTANT,
+  OPERATION_TYPE_NUMBER_CONSTANT,
+  OPERATION_TYPE_TEXT_CONSTANT,
+  OPERATION_TYPE_VARIABLE_VALUE,
+  OPERATION_TYPE_MEMBER_VALUE,
+  OPERATION_TYPE_BINARY,
 } OperationType;
 
 typedef struct {
-    OperationType type;
-    int ref_count;
+  OperationType type;
+  int ref_count;
 } Operation;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_MODULE
+  Operation o; // type=OPERATION_TYPE_MODULE
 
-    Operation **body;
-    size_t body_length;
+  Operation **body;
+  size_t body_length;
 } OperationModule;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_VARIABLE_DEFINITION
+  Operation o; // type=OPERATION_TYPE_VARIABLE_DEFINITION
 
-    Token *data_type;
-    Token *name;
-    Operation *value;
+  Token *data_type;
+  Token *name;
+  Operation *value;
 } OperationVariableDefinition;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_VARIABLE_ASSIGNMENT
+  Operation o; // type=OPERATION_TYPE_VARIABLE_ASSIGNMENT
 
-    Token *name;
-    Operation *value;
+  Token *name;
+  Operation *value;
 
-    OperationVariableDefinition *variable;
+  OperationVariableDefinition *variable;
 } OperationVariableAssignment;
 
 typedef struct _OperationElse OperationElse;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_IF
+  Operation o; // type=OPERATION_TYPE_IF
 
-    Operation *condition;
-    Operation **body;
-    size_t body_length;
-    OperationElse *else_operation;
+  Operation *condition;
+  Operation **body;
+  size_t body_length;
+  OperationElse *else_operation;
 } OperationIf;
 
 struct _OperationElse {
-    Operation o; // type=OPERATION_TYPE_ELSE
+  Operation o; // type=OPERATION_TYPE_ELSE
 
-    Operation **body;
-    size_t body_length;
+  Operation **body;
+  size_t body_length;
 };
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_WHILE
+  Operation o; // type=OPERATION_TYPE_WHILE
 
-    Operation *condition;
-    Operation **body;
-    size_t body_length;
+  Operation *condition;
+  Operation **body;
+  size_t body_length;
 } OperationWhile;
 
 typedef struct _OperationFunctionDefinition OperationFunctionDefinition;
 
 struct _OperationFunctionDefinition {
-    Operation o; // type=OPERATION_TYPE_FUNCTION_DEFINITION
+  Operation o; // type=OPERATION_TYPE_FUNCTION_DEFINITION
 
-    OperationFunctionDefinition *parent;
-    Token *data_type;
-    Token *name;
-    OperationVariableDefinition **parameters;
-    Operation **body;
-    size_t body_length;
+  OperationFunctionDefinition *parent;
+  Token *data_type;
+  Token *name;
+  OperationVariableDefinition **parameters;
+  Operation **body;
+  size_t body_length;
 };
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_FUNCTION_CALL
+  Operation o; // type=OPERATION_TYPE_FUNCTION_CALL
 
-    Token *name;
-    Operation **parameters;
+  Token *name;
+  Operation **parameters;
 
-    OperationFunctionDefinition *function;
+  OperationFunctionDefinition *function;
 } OperationFunctionCall;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_RETURN
+  Operation o; // type=OPERATION_TYPE_RETURN
 
-    Token *name;
-    Operation *value;
+  Token *name;
+  Operation *value;
 
-    OperationFunctionDefinition *function;
+  OperationFunctionDefinition *function;
 } OperationReturn;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_ASSERT
+  Operation o; // type=OPERATION_TYPE_ASSERT
 
-    Token *name;
-    Operation *expression;
+  Token *name;
+  Operation *expression;
 } OperationAssert;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_BOOLEAN_CONSTANT;
+  Operation o; // type=OPERATION_TYPE_BOOLEAN_CONSTANT;
 
-    Token *value;
+  Token *value;
 } OperationBooleanConstant;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_NUMBER_CONSTANT;
+  Operation o; // type=OPERATION_TYPE_NUMBER_CONSTANT;
 
-    Token *value;
+  Token *value;
 } OperationNumberConstant;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_TEXT_CONSTANT;
+  Operation o; // type=OPERATION_TYPE_TEXT_CONSTANT;
 
-    Token *value;
+  Token *value;
 } OperationTextConstant;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_VARIABLE_VALUE;
+  Operation o; // type=OPERATION_TYPE_VARIABLE_VALUE;
 
-    Token *name;
+  Token *name;
 
-    OperationVariableDefinition *variable;
+  OperationVariableDefinition *variable;
 } OperationVariableValue;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_MEMBER_VALUE;
+  Operation o; // type=OPERATION_TYPE_MEMBER_VALUE;
 
-    Operation *object;
-    Token *member;
-    Operation **parameters;
+  Operation *object;
+  Token *member;
+  Operation **parameters;
 } OperationMemberValue;
 
 typedef struct {
-    Operation o; // type=OPERATION_TYPE_BINARY
+  Operation o; // type=OPERATION_TYPE_BINARY
 
-    Token *op;
-    Operation *a;
-    Operation *b;
+  Token *op;
+  Operation *a;
+  Operation *b;
 } OperationBinary;
 
-Operation *make_module (void);
+Operation *make_module(void);
 
-Operation *make_variable_definition (Token *data_type, Token *name, Operation *value);
+Operation *make_variable_definition(Token *data_type, Token *name,
+                                    Operation *value);
 
-Operation *make_variable_assignment (Token *name, Operation *value, OperationVariableDefinition *variable);
+Operation *make_variable_assignment(Token *name, Operation *value,
+                                    OperationVariableDefinition *variable);
 
-Operation *make_if (Operation *condition);
+Operation *make_if(Operation *condition);
 
-Operation *make_else (void);
+Operation *make_else(void);
 
-Operation *make_while (Operation *condition);
+Operation *make_while(Operation *condition);
 
-Operation *make_function_definition (Token *data_type, Token *name, OperationVariableDefinition **parameters);
+Operation *make_function_definition(Token *data_type, Token *name,
+                                    OperationVariableDefinition **parameters);
 
-Operation *make_function_call (Token *name, Operation **parameters, OperationFunctionDefinition *function);
+Operation *make_function_call(Token *name, Operation **parameters,
+                              OperationFunctionDefinition *function);
 
-Operation *make_return (Operation *value, OperationFunctionDefinition *function);
+Operation *make_return(Operation *value, OperationFunctionDefinition *function);
 
-Operation *make_assert (Token *name, Operation *expression);
+Operation *make_assert(Token *name, Operation *expression);
 
-Operation *make_boolean_constant (Token *value);
+Operation *make_boolean_constant(Token *value);
 
-Operation *make_number_constant (Token *value);
+Operation *make_number_constant(Token *value);
 
-Operation *make_text_constant (Token *value);
+Operation *make_text_constant(Token *value);
 
-Operation *make_member_value (Operation *object, Token *member, Operation **parameters);
+Operation *make_member_value(Operation *object, Token *member,
+                             Operation **parameters);
 
-Operation *make_variable_value (Token *name, OperationVariableDefinition *variable);
+Operation *make_variable_value(Token *name,
+                               OperationVariableDefinition *variable);
 
-Operation *make_binary (Token *op, Operation *a, Operation *b);
+Operation *make_binary(Token *op, Operation *a, Operation *b);
 
-bool operation_is_constant (Operation *operation);
+bool operation_is_constant(Operation *operation);
 
-char *operation_get_data_type (Operation *operation, const char *data);
+char *operation_get_data_type(Operation *operation, const char *data);
 
-void operation_add_child (Operation *operation, Operation *child);
+void operation_add_child(Operation *operation, Operation *child);
 
-size_t operation_get_n_children (Operation *operation);
+size_t operation_get_n_children(Operation *operation);
 
-Operation *operation_get_child (Operation *operation, size_t index);
+Operation *operation_get_child(Operation *operation, size_t index);
 
-Operation *operation_get_last_child (Operation *operation);
+Operation *operation_get_last_child(Operation *operation);
 
-char *operation_to_string (Operation *operation);
+char *operation_to_string(Operation *operation);
 
-Operation *operation_ref (Operation *operation);
+Operation *operation_ref(Operation *operation);
 
-void operation_unref (Operation *operation);
+void operation_unref(Operation *operation);
 
-void operation_cleanup (Operation **operation);
+void operation_cleanup(Operation **operation);
 
-#define autofree_operation __attribute__((cleanup(operation_cleanup))) Operation*
+#define autofree_operation                                                     \
+  __attribute__((cleanup(operation_cleanup))) Operation *

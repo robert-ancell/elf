@@ -11,7 +11,7 @@
 
 #include <stdlib.h>
 
-#include "elf-token.h"
 #include "elf-operation.h"
+#include "elf-token.h"
 
-OperationModule *elf_parse (const char *data, size_t data_length);
+OperationModule *elf_parse(const char *data, size_t data_length);

@@ -59,38 +59,38 @@
 #define X86_64_COND_LESS_EQUAL 14
 #define X86_64_COND_GREATER 15
 
-void x86_64_mov8_val (Bytes *buffer, int reg, uint8_t value);
+void x86_64_mov8_val(Bytes *buffer, int reg, uint8_t value);
 
-void x86_64_mov32_val (Bytes *buffer, int reg, uint32_t value);
+void x86_64_mov32_val(Bytes *buffer, int reg, uint32_t value);
 
-void x86_64_mov32_mem (Bytes *buffer, int reg, uint32_t offset);
+void x86_64_mov32_mem(Bytes *buffer, int reg, uint32_t offset);
 
-void x86_64_mov64_val (Bytes *buffer, int reg, uint64_t value);
+void x86_64_mov64_val(Bytes *buffer, int reg, uint64_t value);
 
-void x86_64_mov64_mem (Bytes *buffer, int reg, uint32_t offset);
+void x86_64_mov64_mem(Bytes *buffer, int reg, uint32_t offset);
 
-void x86_64_op32 (Bytes *buffer, int op, int reg1, int reg2);
+void x86_64_op32(Bytes *buffer, int op, int reg1, int reg2);
 
-void x86_64_op32_val (Bytes *buffer, int op, int reg, uint32_t value);
+void x86_64_op32_val(Bytes *buffer, int op, int reg, uint32_t value);
 
-void x86_64_op64 (Bytes *buffer, int op, int reg1, int reg2);
+void x86_64_op64(Bytes *buffer, int op, int reg1, int reg2);
 
-void x86_64_op64_val (Bytes *buffer, int op, int reg, uint64_t value);
+void x86_64_op64_val(Bytes *buffer, int op, int reg, uint64_t value);
 
-void x86_64_push64 (Bytes *buffer, int reg);
+void x86_64_push64(Bytes *buffer, int reg);
 
-void x86_64_push_val8 (Bytes *buffer, uint8_t value);
+void x86_64_push_val8(Bytes *buffer, uint8_t value);
 
-void x86_64_push_val32 (Bytes *buffer, uint32_t value);
+void x86_64_push_val32(Bytes *buffer, uint32_t value);
 
-void x86_64_pop64 (Bytes *buffer, int reg);
+void x86_64_pop64(Bytes *buffer, int reg);
 
-void x86_64_jmp8 (Bytes *buffer, uint8_t offset);
+void x86_64_jmp8(Bytes *buffer, uint8_t offset);
 
-void x86_64_jmp8_cond (Bytes *buffer, int cond, uint8_t offset);
+void x86_64_jmp8_cond(Bytes *buffer, int cond, uint8_t offset);
 
-void x86_64_jmp32 (Bytes *buffer, uint32_t offset);
+void x86_64_jmp32(Bytes *buffer, uint32_t offset);
 
-void x86_64_jmp32_cond (Bytes *buffer, int cond, uint32_t offset);
+void x86_64_jmp32_cond(Bytes *buffer, int cond, uint32_t offset);
 
-void x86_64_syscall (Bytes *buffer);
+void x86_64_syscall(Bytes *buffer);

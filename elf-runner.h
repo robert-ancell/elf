@@ -11,4 +11,4 @@
 
 #include "elf-operation.h"
 
-void elf_run (const char *data, OperationModule *module);
+void elf_run(const char *data, OperationModule *module);
