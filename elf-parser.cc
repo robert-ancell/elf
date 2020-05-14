@@ -25,7 +25,7 @@ typedef struct {
 static StackFrame *
 stack_frame_new (Operation *operation)
 {
-    StackFrame *frame = malloc (sizeof (StackFrame));
+    StackFrame *frame = new StackFrame;
     memset (frame, 0, sizeof (StackFrame));
     frame->operation = operation;
 
@@ -36,7 +36,7 @@ static void
 stack_frame_free (StackFrame *frame)
 {
     free (frame->variables);
-    free (frame);
+    delete frame;
 }
 
 typedef struct {
@@ -53,7 +53,7 @@ typedef struct {
 static Parser *
 parser_new (const char *data, size_t data_length)
 {
-    Parser *parser = malloc (sizeof (Parser));
+    Parser *parser = new Parser;
     memset (parser, 0, sizeof (Parser));
     parser->data = data;
     parser->data_length = data_length;
@@ -72,14 +72,14 @@ parser_free (Parser *parser)
        stack_frame_free (parser->stack[i]);
     free (parser->stack);
 
-    free (parser);
+    delete parser;
 }
 
 static void
 push_stack (Parser *parser, Operation *operation)
 {
     parser->stack_length++;
-    parser->stack = realloc (parser->stack, sizeof (StackFrame *) * parser->stack_length);
+    parser->stack = static_cast<StackFrame**>(realloc (parser->stack, sizeof (StackFrame *) * parser->stack_length));
     parser->stack[parser->stack_length - 1] = stack_frame_new (operation);
 }
 
@@ -89,7 +89,7 @@ add_stack_variable (Parser *parser, OperationVariableDefinition *definition)
     StackFrame *frame = parser->stack[parser->stack_length - 1];
 
     frame->variables_length++;
-    frame->variables = realloc (frame->variables, sizeof (OperationVariableDefinition *) * frame->variables_length);
+    frame->variables = static_cast<OperationVariableDefinition**>(realloc (frame->variables, sizeof (OperationVariableDefinition *) * frame->variables_length));
     frame->variables[frame->variables_length - 1] = definition;
 }
 
@@ -98,7 +98,7 @@ pop_stack (Parser *parser)
 {
     stack_frame_free (parser->stack[parser->stack_length - 1]);
     parser->stack_length--;
-    parser->stack = realloc (parser->stack, sizeof (StackFrame *) * parser->stack_length);
+    parser->stack = static_cast<StackFrame**>(realloc (parser->stack, sizeof (StackFrame *) * parser->stack_length));
 }
 
 static void
@@ -213,7 +213,7 @@ elf_lex (const char *data, size_t data_length)
     size_t tokens_length = 0;
     Token *current_token = NULL;
 
-    tokens = malloc (sizeof (Token *));
+    tokens = static_cast<Token**>(malloc (sizeof (Token *)));
     tokens[0] = NULL;
     for (size_t offset = 0; offset < data_length; offset++) {
         // FIXME: Support UTF-8
@@ -228,44 +228,46 @@ elf_lex (const char *data, size_t data_length)
                 continue;
 
             tokens_length++;
-            tokens = realloc (tokens, sizeof (Token *) * (tokens_length + 1)); // FIXME: Double size each time
+            tokens = static_cast<Token**>(realloc (tokens, sizeof (Token *) * (tokens_length + 1))); // FIXME: Double size each time
             tokens[tokens_length] = NULL;
-            Token *token = tokens[tokens_length - 1] = token_new (0, offset, 1);
 
+            TokenType type;
             if (c == '(')
-                token->type = TOKEN_TYPE_OPEN_PAREN;
+                type = TOKEN_TYPE_OPEN_PAREN;
             else if (c == ')')
-                token->type = TOKEN_TYPE_CLOSE_PAREN;
+                type = TOKEN_TYPE_CLOSE_PAREN;
             else if (c == ',')
-                token->type = TOKEN_TYPE_COMMA;
+                type = TOKEN_TYPE_COMMA;
             else if (c == '{')
-                token->type = TOKEN_TYPE_OPEN_BRACE;
+                type = TOKEN_TYPE_OPEN_BRACE;
             else if (c == '}')
-                token->type = TOKEN_TYPE_CLOSE_BRACE;
+                type = TOKEN_TYPE_CLOSE_BRACE;
             else if (c == '=')
-                token->type = TOKEN_TYPE_ASSIGN;
+                type = TOKEN_TYPE_ASSIGN;
             else if (c == '!')
-                token->type = TOKEN_TYPE_NOT;
+                type = TOKEN_TYPE_NOT;
             else if (c == '<')
-                token->type = TOKEN_TYPE_LESS;
+                type = TOKEN_TYPE_LESS;
             else if (c == '>')
-                token->type = TOKEN_TYPE_GREATER;
+                type = TOKEN_TYPE_GREATER;
             else if (c == '+')
-                token->type = TOKEN_TYPE_ADD;
+                type = TOKEN_TYPE_ADD;
             else if (c == '-')
-                token->type = TOKEN_TYPE_SUBTRACT;
+                type = TOKEN_TYPE_SUBTRACT;
             else if (c == '*')
-                token->type = TOKEN_TYPE_MULTIPLY;
+                type = TOKEN_TYPE_MULTIPLY;
             else if (c == '/')
-                token->type = TOKEN_TYPE_DIVIDE;
+                type = TOKEN_TYPE_DIVIDE;
             else if (is_number_char (c))
-                token->type = TOKEN_TYPE_NUMBER;
+                type = TOKEN_TYPE_NUMBER;
             else if (c == '"' || c == '\'')
-                token->type = TOKEN_TYPE_TEXT;
+                type = TOKEN_TYPE_TEXT;
             else if (c == '.') // FIXME: Don't allow whitespace before it?
-                token->type = TOKEN_TYPE_MEMBER;
+                type = TOKEN_TYPE_MEMBER;
             else if (is_symbol_char (c))
-                token->type = TOKEN_TYPE_WORD;
+                type = TOKEN_TYPE_WORD;
+
+            Token *token = tokens[tokens_length - 1] = token_new (type, offset, 1);
 
             current_token = token;
         }
@@ -433,7 +435,7 @@ static Operation *parse_expression (Parser *parser);
 static Operation **
 parse_parameters (Parser *parser)
 {
-    Operation **parameters = malloc (sizeof (Operation *));
+    Operation **parameters = static_cast<Operation**>(malloc (sizeof (Operation *)));
     size_t parameters_length = 0;
     parameters[0] = NULL;
 
@@ -467,7 +469,7 @@ parse_parameters (Parser *parser)
         }
 
         parameters_length++;
-        parameters = realloc (parameters, sizeof (Operation *) * (parameters_length + 1));
+        parameters = static_cast<Operation**>(realloc (parameters, sizeof (Operation *) * (parameters_length + 1)));
         parameters[parameters_length - 1] = value;
         parameters[parameters_length] = NULL;
     }
@@ -561,11 +563,11 @@ parse_expression (Parser *parser)
     if (a == NULL)
         return NULL;
 
-    Token *operator = current_token (parser);
-    if (operator == NULL)
+    Token *op = current_token (parser);
+    if (op == NULL)
         return operation_ref (a);
 
-    if (!token_is_binary_operator (operator))
+    if (!token_is_binary_operator (op))
         return operation_ref (a);
     next_token (parser);
 
@@ -579,11 +581,11 @@ parse_expression (Parser *parser)
     autofree_str b_type = operation_get_data_type (b, parser->data);
     if (!str_equal (a_type, b_type)) {
         autofree_str message = str_printf ("Can't combine %s and %s types", a_type, b_type);
-        print_token_error (parser, operator, message);
+        print_token_error (parser, op, message);
         return NULL;
     }
 
-    return make_binary (operator, a, b);
+    return make_binary (op, a, b);
 }
 
 static OperationFunctionDefinition *
@@ -670,7 +672,7 @@ parse_sequence (Parser *parser)
             } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
                 next_token (parser);
 
-                OperationVariableDefinition **parameters = malloc (sizeof (OperationVariableDefinition *));
+                OperationVariableDefinition **parameters = static_cast<OperationVariableDefinition**>(malloc (sizeof (OperationVariableDefinition *)));
                 size_t parameters_length = 0;
                 parameters[0] = NULL;
                 bool closed = false;
@@ -708,7 +710,7 @@ parse_sequence (Parser *parser)
                     Operation *parameter = make_variable_definition (data_type, name, NULL);
 
                     parameters_length++;
-                    parameters = realloc (parameters, sizeof (OperationVariableDefinition *) * (parameters_length + 1));
+                    parameters = static_cast<OperationVariableDefinition**>(realloc (parameters, sizeof (OperationVariableDefinition *) * (parameters_length + 1)));
                     parameters[parameters_length - 1] = (OperationVariableDefinition *) parameter;
                     parameters[parameters_length] = NULL;
                 }

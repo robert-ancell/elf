@@ -49,7 +49,7 @@ str_has_suffix (const char *value, const char *suffix)
 }
 
 char *
-str_slice (const char *value, int start, int end)
+str_slice (const char *value, size_t start, size_t end)
 {
     size_t value_length = strlen (value);
     if (start < 0)
@@ -68,8 +68,8 @@ str_slice (const char *value, int start, int end)
         end = start;
 
     size_t result_length = end - start;
-    char *result = malloc (sizeof (char) * (result_length + 1));
-    for (int i = 0; i < result_length; i++)
+    char *result = static_cast<char*>(malloc (sizeof (char) * (result_length + 1)));
+    for (size_t i = 0; i < result_length; i++)
         result[i] = value[start + i];
     result[result_length] = '\0';
 
@@ -80,7 +80,7 @@ char *
 str_new (const char *value)
 {
     size_t value_length = strlen (value) + 1;
-    char *output = malloc (sizeof (char) * value_length);
+    char *output = static_cast<char*>(malloc (sizeof (char) * value_length));
     memcpy (output, value, value_length);
     return output;
 }
@@ -95,7 +95,7 @@ str_printf (const char *format, ...)
     int length = vsnprintf (&c, 1, format, ap);
     va_end (ap);
 
-    char *output = malloc (sizeof (char) * (length + 1));
+    char *output = static_cast<char*>(malloc (sizeof (char) * (length + 1)));
 
     va_start (ap, format);
     vsprintf (output, format, ap);
@@ -111,17 +111,17 @@ bytes_free (Bytes **value)
         return;
 
     free ((*value)->data);
-    free (*value);
+    delete *value;
     *value = NULL;
 }
 
 Bytes *
 bytes_new (size_t size)
 {
-    Bytes *bytes = malloc (sizeof (Bytes));
+    Bytes *bytes = new Bytes;
     bytes->allocated = size;
     bytes->length = 0;
-    bytes->data = malloc (sizeof (uint8_t) * size);
+    bytes->data = static_cast<uint8_t*>(malloc (sizeof (uint8_t) * size));
 
     return bytes;
 }
@@ -130,7 +130,7 @@ void
 bytes_resize (Bytes *bytes, size_t size)
 {
     bytes->allocated = size;
-    bytes->data = realloc (bytes->data, bytes->allocated);
+    bytes->data = static_cast<uint8_t*>(realloc (bytes->data, bytes->allocated));
     if (bytes->length > bytes->allocated)
         bytes->length = bytes->allocated;
 }
@@ -150,7 +150,7 @@ bytes_trim (Bytes *bytes)
     if (bytes->length >= bytes->allocated)
         return;
 
-    bytes->data = realloc (bytes->data, bytes->length);
+    bytes->data = static_cast<uint8_t*>(realloc (bytes->data, bytes->length));
     bytes->allocated = bytes->length;
 }
 
@@ -207,8 +207,10 @@ Bytes *
 file_readall (const char *pathname)
 {
     int fd = open (pathname, O_RDONLY);
-    if (fd < 0)
+    if (fd < 0) {
+        printf ("Failed to open %s", pathname);
         return NULL;
+    }
 
     Bytes *data = readall (fd);
     close (fd);

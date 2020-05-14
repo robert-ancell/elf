@@ -21,7 +21,7 @@ bool str_equal (const char *a, const char *b);
 
 bool str_has_suffix (const char *value, const char *suffix);
 
-char *str_slice (const char *value, int start, int end);
+char *str_slice (const char *value, size_t start, size_t end);
 
 char *str_new (const char *value);
 

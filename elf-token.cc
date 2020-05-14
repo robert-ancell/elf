@@ -29,7 +29,7 @@ hex_digit (char c)
 Token *
 token_new (TokenType type, size_t offset, size_t length)
 {
-    Token *token = malloc (sizeof (Token));
+    Token *token = new Token;
     token->type = type;
     token->offset = offset;
     token->length = length;
@@ -40,7 +40,7 @@ token_new (TokenType type, size_t offset, size_t length)
 char *
 token_get_text (Token *token, const char *data)
 {
-    char *result = malloc (sizeof (char) * (token->length + 1));
+    char *result = static_cast<char*>(malloc (sizeof (char) * (token->length + 1)));
     for (size_t i = 0; i < token->length; i++)
         result[i] = data[token->offset + i];
     result[token->length] = '\0';
@@ -50,7 +50,7 @@ token_get_text (Token *token, const char *data)
 bool
 token_has_text (Token *token, const char *data, const char *value)
 {
-    for (int i = 0; i < token->length; i++) {
+    for (size_t i = 0; i < token->length; i++) {
         if (value[i] == '\0' || data[token->offset + i] != value[i])
             return false;
     }
@@ -127,7 +127,7 @@ token_parse_text_constant (Token *token, const char *data)
 
                 uint32_t unichar = 0;
                 bool valid = true;
-                for (int j = 0; j < length; j++) {
+                for (size_t j = 0; j < length; j++) {
                     int digit = hex_digit(data[token->offset + i + 1 + j]);
                     if (digit < 0)
                         valid = false;
@@ -224,5 +224,5 @@ token_unref (Token *token)
     if (token->ref_count != 0)
         return;
 
-    free (token);
+    delete token;
 }

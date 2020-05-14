@@ -16,7 +16,7 @@
 static Operation *
 operation_new (OperationType type, size_t size)
 {
-    Operation *o = malloc (size);
+    Operation *o = static_cast<Operation*>(malloc (size));
     memset (o, 0, size);
     o->type = type;
     o->ref_count = 1;
@@ -156,10 +156,10 @@ make_member_value (Operation *object, Token *member, Operation **parameters)
 }
 
 Operation *
-make_binary (Token *operator, Operation *a, Operation *b)
+make_binary (Token *op, Operation *a, Operation *b)
 {
     OperationBinary *o = (OperationBinary *) operation_new (OPERATION_TYPE_BINARY, sizeof (OperationBinary));
-    o->operator = token_ref (operator);
+    o->op = token_ref (op);
     o->a = operation_ref (a);
     o->b = operation_ref (b);
     return (Operation *) o;
@@ -283,31 +283,31 @@ operation_add_child (Operation *operation, Operation *child)
     if (operation->type == OPERATION_TYPE_MODULE) {
         OperationModule *o = (OperationModule *) operation;
         o->body_length++;
-        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body = static_cast<Operation**>(realloc (o->body, sizeof (Operation *) * o->body_length));
         o->body[o->body_length - 1] = operation_ref (child);
     }
     else if (operation->type == OPERATION_TYPE_FUNCTION_DEFINITION) {
         OperationFunctionDefinition *o = (OperationFunctionDefinition *) operation;
         o->body_length++;
-        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body = static_cast<Operation**>(realloc (o->body, sizeof (Operation *) * o->body_length));
         o->body[o->body_length - 1] = operation_ref (child);
     }
     else if (operation->type == OPERATION_TYPE_IF) {
         OperationIf *o = (OperationIf *) operation;
         o->body_length++;
-        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body = static_cast<Operation**>(realloc (o->body, sizeof (Operation *) * o->body_length));
         o->body[o->body_length - 1] = operation_ref (child);
     }
     else if (operation->type == OPERATION_TYPE_ELSE) {
         OperationElse *o = (OperationElse *) operation;
         o->body_length++;
-        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body = static_cast<Operation**>(realloc (o->body, sizeof (Operation *) * o->body_length));
         o->body[o->body_length - 1] = operation_ref (child);
     }
     else if (operation->type == OPERATION_TYPE_WHILE) {
         OperationWhile *o = (OperationWhile *) operation;
         o->body_length++;
-        o->body = realloc (o->body, sizeof (Operation *) * o->body_length);
+        o->body = static_cast<Operation**>(realloc (o->body, sizeof (Operation *) * o->body_length));
         o->body[o->body_length - 1] = operation_ref (child);
     }
 }
@@ -560,7 +560,7 @@ operation_unref (Operation *operation)
     }
     case OPERATION_TYPE_BINARY: {
         OperationBinary *op = (OperationBinary *) operation;
-        token_unref (op->operator);
+        token_unref (op->op);
         operation_unref (op->a);
         operation_unref (op->b);
         break;

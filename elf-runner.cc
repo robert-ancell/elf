@@ -61,7 +61,7 @@ static DataValue *run_operation (ProgramState *state, Operation *operation);
 static DataValue *
 data_value_new (DataType type)
 {
-    DataValue *value = malloc (sizeof (DataValue));
+    DataValue *value = new DataValue;
     memset (value, 0, sizeof (DataValue));
     value->ref_count = 1;
     value->type = type;
@@ -90,7 +90,7 @@ data_value_new (DataType type)
         value->data_length = 1;
         break;
     }
-    value->data = malloc (value->data_length);
+    value->data = static_cast <uint8_t*>(malloc (value->data_length));
     memset (value->data, 0, value->data_length);
 
     return value;
@@ -150,13 +150,13 @@ data_value_new_uint64 (uint64_t int_value)
 static DataValue *
 data_value_new_utf8_sized (size_t length)
 {
-    DataValue *value = malloc (sizeof (DataValue));
+    DataValue *value = new DataValue;
     memset (value, 0, sizeof (DataValue));
     value->ref_count = 1;
     value->type = DATA_TYPE_UTF8;
 
     value->data_length = length;
-    value->data = malloc (sizeof (char) * value->data_length);
+    value->data = static_cast<uint8_t*>(malloc (sizeof (char) * value->data_length));
     value->data[0] = '\0';
 
     return value;
@@ -177,7 +177,7 @@ static DataValue *
 data_value_new_utf8_join (DataValue *a, DataValue *b)
 {
     DataValue *value = data_value_new_utf8_sized ((a->data_length - 1) + (b->data_length - 1) + 1);
-    value->data = malloc (sizeof (char) * value->data_length);
+    value->data = static_cast<uint8_t*>(malloc (sizeof (char) * value->data_length));
     for (size_t i = 0; i < a->data_length; i++)
         value->data[i] = a->data[i];
     for (size_t i = 0; i < b->data_length; i++)
@@ -237,13 +237,13 @@ data_value_unref (DataValue *value)
         return;
 
     free (value->data);
-    free (value);
+    delete value;
 }
 
 static Variable *
 variable_new (const char *name, DataValue *value)
 {
-    Variable *variable = malloc (sizeof (Variable));
+    Variable *variable = new Variable;
     memset (variable, 0, sizeof (Variable));
     variable->name = str_printf ("%s", name);
     variable->value = data_value_ref (value);
@@ -259,7 +259,7 @@ variable_free (Variable *variable)
 
     free (variable->name);
     data_value_unref (variable->value);
-    free (variable);
+    delete variable;
 }
 
 static void
@@ -320,7 +320,7 @@ static void
 add_variable (ProgramState *state, const char *name, DataValue *value)
 {
     state->variables_length++;
-    state->variables = realloc (state->variables, sizeof (Variable *) * state->variables_length);
+    state->variables = static_cast<Variable**>(realloc (state->variables, sizeof (Variable *) * state->variables_length));
     state->variables[state->variables_length - 1] = variable_new (name, value);
 }
 
@@ -566,7 +566,7 @@ run_member_value (ProgramState *state, OperationMemberValue *operation)
 static DataValue *
 run_binary_boolean (ProgramState *state, OperationBinary *operation, DataValue *a, DataValue *b)
 {
-    switch (operation->operator->type) {
+    switch (operation->op->type) {
     case TOKEN_TYPE_EQUAL:
         return data_value_new_bool (a->data[0] == b->data[0]);
     case TOKEN_TYPE_NOT_EQUAL:
@@ -582,7 +582,7 @@ run_binary_integer (ProgramState *state, OperationBinary *operation, DataValue *
     if (a->type != DATA_TYPE_UINT8 || b->type != DATA_TYPE_UINT8)
         return data_value_ref (state->none_value);
 
-    switch (operation->operator->type) {
+    switch (operation->op->type) {
     case TOKEN_TYPE_EQUAL:
         return data_value_new_bool (a->data[0] == b->data[0]);
     case TOKEN_TYPE_NOT_EQUAL:
@@ -611,7 +611,7 @@ run_binary_integer (ProgramState *state, OperationBinary *operation, DataValue *
 static DataValue *
 run_binary_text (ProgramState *state, OperationBinary *operation, DataValue *a, DataValue *b)
 {
-    switch (operation->operator->type) {
+    switch (operation->op->type) {
     case TOKEN_TYPE_EQUAL:
         return data_value_new_bool (data_value_equal (a, b));
     case TOKEN_TYPE_NOT_EQUAL:
@@ -688,7 +688,7 @@ run_operation (ProgramState *state, Operation *operation)
 void
 elf_run (const char *data, OperationModule *module)
 {
-    ProgramState *state = malloc (sizeof (ProgramState));
+    ProgramState *state = new ProgramState;
     memset (state, 0, sizeof (ProgramState));
     state->data = data;
     state->none_value = data_value_new (DATA_TYPE_NONE);
@@ -700,5 +700,5 @@ elf_run (const char *data, OperationModule *module)
     for (size_t i = 0; i < state->variables_length; i++)
         variable_free (state->variables[i]);
     free (state->variables);
-    free (state);
+    delete state;
 }

@@ -41,7 +41,7 @@ mmap_file (const char *filename, char **data, size_t *data_length)
 
     char *data_ = NULL;
     if (data_length_ > 0) {
-        data_ = mmap (NULL, data_length_, PROT_READ, MAP_PRIVATE, fd, 0);
+        data_ = static_cast<char*> (mmap (NULL, data_length_, PROT_READ, MAP_PRIVATE, fd, 0));
         if (data_ == MAP_FAILED) {
             close (fd);
             printf ("Failed to map file: %s\n", strerror (errno));

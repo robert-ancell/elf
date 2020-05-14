@@ -162,7 +162,7 @@ typedef struct {
 typedef struct {
     Operation o; // type=OPERATION_TYPE_BINARY
 
-    Token *operator;
+    Token *op;
     Operation *a;
     Operation *b;
 } OperationBinary;
@@ -197,7 +197,7 @@ Operation *make_member_value (Operation *object, Token *member, Operation **para
 
 Operation *make_variable_value (Token *name, OperationVariableDefinition *variable);
 
-Operation *make_binary (Token *operator, Operation *a, Operation *b);
+Operation *make_binary (Token *op, Operation *a, Operation *b);
 
 bool operation_is_constant (Operation *operation);
 
