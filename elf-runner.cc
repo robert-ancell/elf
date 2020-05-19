@@ -593,42 +593,78 @@ static DataValue *run_binary(ProgramState *state, OperationBinary *operation) {
 }
 
 static DataValue *run_operation(ProgramState *state, Operation *operation) {
-  switch (operation->type) {
-  case OPERATION_TYPE_MODULE:
-    return run_module(state, (OperationModule *)operation);
-  case OPERATION_TYPE_VARIABLE_DEFINITION:
-    return run_variable_definition(state,
-                                   (OperationVariableDefinition *)operation);
-  case OPERATION_TYPE_VARIABLE_ASSIGNMENT:
-    return run_variable_assignment(state,
-                                   (OperationVariableAssignment *)operation);
-  case OPERATION_TYPE_IF:
-    return run_if(state, (OperationIf *)operation);
-  case OPERATION_TYPE_ELSE:
+  OperationModule *op_module = dynamic_cast<OperationModule *>(operation);
+  if (op_module != nullptr)
+    return run_module(state, op_module);
+
+  OperationVariableDefinition *op_variable_definition =
+      dynamic_cast<OperationVariableDefinition *>(operation);
+  if (op_variable_definition != nullptr)
+    return run_variable_definition(state, op_variable_definition);
+
+  OperationVariableAssignment *op_variable_assignment =
+      dynamic_cast<OperationVariableAssignment *>(operation);
+  if (op_variable_assignment != nullptr)
+    return run_variable_assignment(state, op_variable_assignment);
+
+  OperationIf *op_if = dynamic_cast<OperationIf *>(operation);
+  if (op_if != nullptr)
+    return run_if(state, op_if);
+
+  OperationElse *op_else = dynamic_cast<OperationElse *>(operation);
+  if (op_else != nullptr)
     return data_value_ref(state->none_value); // Resolved in IF
-  case OPERATION_TYPE_WHILE:
-    return run_while(state, (OperationWhile *)operation);
-  case OPERATION_TYPE_FUNCTION_DEFINITION:
+
+  OperationWhile *op_while = dynamic_cast<OperationWhile *>(operation);
+  if (op_while != nullptr)
+    return run_while(state, op_while);
+
+  OperationFunctionDefinition *op_function_definition =
+      dynamic_cast<OperationFunctionDefinition *>(operation);
+  if (op_function_definition != nullptr)
     return data_value_ref(state->none_value); // Resolved at compile time
-  case OPERATION_TYPE_FUNCTION_CALL:
-    return run_function_call(state, (OperationFunctionCall *)operation);
-  case OPERATION_TYPE_RETURN:
-    return run_return(state, (OperationReturn *)operation);
-  case OPERATION_TYPE_ASSERT:
-    return run_assert(state, (OperationAssert *)operation);
-  case OPERATION_TYPE_BOOLEAN_CONSTANT:
-    return run_boolean_constant(state, (OperationBooleanConstant *)operation);
-  case OPERATION_TYPE_NUMBER_CONSTANT:
-    return run_number_constant(state, (OperationNumberConstant *)operation);
-  case OPERATION_TYPE_TEXT_CONSTANT:
-    return run_text_constant(state, (OperationTextConstant *)operation);
-  case OPERATION_TYPE_VARIABLE_VALUE:
-    return run_variable_value(state, (OperationVariableValue *)operation);
-  case OPERATION_TYPE_MEMBER_VALUE:
-    return run_member_value(state, (OperationMemberValue *)operation);
-  case OPERATION_TYPE_BINARY:
-    return run_binary(state, (OperationBinary *)operation);
-  }
+
+  OperationFunctionCall *op_function_call =
+      dynamic_cast<OperationFunctionCall *>(operation);
+  if (op_function_call != nullptr)
+    return run_function_call(state, op_function_call);
+
+  OperationReturn *op_return = dynamic_cast<OperationReturn *>(operation);
+  if (op_return != nullptr)
+    return run_return(state, op_return);
+
+  OperationAssert *op_assert = dynamic_cast<OperationAssert *>(operation);
+  if (op_assert != nullptr)
+    return run_assert(state, op_assert);
+
+  OperationBooleanConstant *op_boolean_constant =
+      dynamic_cast<OperationBooleanConstant *>(operation);
+  if (op_boolean_constant != nullptr)
+    return run_boolean_constant(state, op_boolean_constant);
+
+  OperationNumberConstant *op_number_constant =
+      dynamic_cast<OperationNumberConstant *>(operation);
+  if (op_number_constant != nullptr)
+    return run_number_constant(state, op_number_constant);
+
+  OperationTextConstant *op_text_constant =
+      dynamic_cast<OperationTextConstant *>(operation);
+  if (op_text_constant != nullptr)
+    return run_text_constant(state, op_text_constant);
+
+  OperationVariableValue *op_variable_value =
+      dynamic_cast<OperationVariableValue *>(operation);
+  if (op_variable_value != nullptr)
+    return run_variable_value(state, op_variable_value);
+
+  OperationMemberValue *op_member_value =
+      dynamic_cast<OperationMemberValue *>(operation);
+  if (op_member_value != nullptr)
+    return run_member_value(state, op_member_value);
+
+  OperationBinary *op_binary = dynamic_cast<OperationBinary *>(operation);
+  if (op_binary != nullptr)
+    return run_binary(state, op_binary);
 
   return data_value_ref(state->none_value);
 }

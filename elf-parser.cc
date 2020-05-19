@@ -56,7 +56,7 @@ static Parser *parser_new(const char *data, size_t data_length) {
 }
 
 static void parser_free(Parser *parser) {
-  for (int i = 0; parser->tokens[i] != NULL; i++)
+  for (int i = 0; parser->tokens[i] != nullptr; i++)
     parser->tokens[i]->unref();
   free(parser->tokens);
 
@@ -189,20 +189,20 @@ static bool token_is_complete(const char *data, Token *token, char next_c) {
 }
 
 static Token **elf_lex(const char *data, size_t data_length) {
-  Token **tokens = NULL;
+  Token **tokens = nullptr;
   size_t tokens_length = 0;
-  Token *current_token = NULL;
+  Token *current_token = nullptr;
 
   tokens = static_cast<Token **>(malloc(sizeof(Token *)));
-  tokens[0] = NULL;
+  tokens[0] = nullptr;
   for (size_t offset = 0; offset < data_length; offset++) {
     // FIXME: Support UTF-8
     char c = data[offset];
 
-    if (current_token != NULL && token_is_complete(data, current_token, c))
-      current_token = NULL;
+    if (current_token != nullptr && token_is_complete(data, current_token, c))
+      current_token = nullptr;
 
-    if (current_token == NULL) {
+    if (current_token == nullptr) {
       // Skip whitespace
       if (c == ' ' || c == '\r' || c == '\n')
         continue;
@@ -211,7 +211,7 @@ static Token **elf_lex(const char *data, size_t data_length) {
       tokens = static_cast<Token **>(realloc(
           tokens, sizeof(Token *) *
                       (tokens_length + 1))); // FIXME: Double size each time
-      tokens[tokens_length] = NULL;
+      tokens[tokens_length] = nullptr;
 
       TokenType type;
       if (c == '(')
@@ -274,12 +274,12 @@ static Token **elf_lex(const char *data, size_t data_length) {
 static bool is_data_type(Parser *parser, Token *token) {
   const char *builtin_types[] = {"bool",  "uint8",  "int8",  "uint16",
                                  "int16", "uint32", "int32", "uint64",
-                                 "int64", "utf8",   NULL};
+                                 "int64", "utf8",   nullptr};
 
   if (token->type != TOKEN_TYPE_WORD)
     return false;
 
-  for (int i = 0; builtin_types[i] != NULL; i++)
+  for (int i = 0; builtin_types[i] != nullptr; i++)
     if (token->has_text(parser->data, builtin_types[i]))
       return true;
 
@@ -314,7 +314,7 @@ static bool is_boolean(Parser *parser, Token *token) {
 static OperationVariableDefinition *find_variable(Parser *parser,
                                                   Token *token) {
   if (token->type != TOKEN_TYPE_WORD)
-    return NULL;
+    return nullptr;
 
   for (size_t i = parser->stack_length; i > 0; i--) {
     StackFrame *frame = parser->stack[i - 1];
@@ -327,40 +327,38 @@ static OperationVariableDefinition *find_variable(Parser *parser,
     }
   }
 
-  return NULL;
+  return nullptr;
 }
 
 static OperationFunctionDefinition *find_function(Parser *parser,
                                                   Token *token) {
   if (token->type != TOKEN_TYPE_WORD)
-    return NULL;
+    return nullptr;
 
   for (size_t i = parser->stack_length; i > 0; i--) {
     Operation *operation = parser->stack[i - 1]->operation;
 
-    size_t n_children = operation_get_n_children(operation);
+    size_t n_children = operation->get_n_children();
     for (size_t j = 0; j < n_children; j++) {
-      Operation *child = operation_get_child(operation, j);
+      Operation *child = operation->get_child(j);
 
-      if (child->type != OPERATION_TYPE_FUNCTION_DEFINITION)
-        continue;
-
-      OperationFunctionDefinition *op = (OperationFunctionDefinition *)child;
-      if (token_text_matches(parser, op->name, token))
+      OperationFunctionDefinition *op =
+          dynamic_cast<OperationFunctionDefinition *>(child);
+      if (op != nullptr && token_text_matches(parser, op->name, token))
         return op;
     }
   }
 
-  return NULL;
+  return nullptr;
 }
 
 static bool is_builtin_function(Parser *parser, Token *token) {
-  const char *builtin_functions[] = {"print", NULL};
+  const char *builtin_functions[] = {"print", nullptr};
 
   if (token->type != TOKEN_TYPE_WORD)
     return false;
 
-  for (int i = 0; builtin_functions[i] != NULL; i++)
+  for (int i = 0; builtin_functions[i] != nullptr; i++)
     if (token->has_text(parser->data, builtin_functions[i]))
       return true;
 
@@ -368,11 +366,11 @@ static bool is_builtin_function(Parser *parser, Token *token) {
 }
 
 static bool has_member(Parser *parser, Operation *value, Token *member) {
-  autofree_str data_type = operation_get_data_type(value, parser->data);
+  autofree_str data_type = value->get_data_type(parser->data);
 
-  // FIXME: Super hacky. The NULL is because Elf can't determine the return
+  // FIXME: Super hacky. The nullptr is because Elf can't determine the return
   // value of a member yet i.e. "foo".upper.length
-  if (data_type == NULL || str_equal(data_type, "utf8")) {
+  if (data_type == nullptr || str_equal(data_type, "utf8")) {
     return member->has_text(parser->data, ".length") ||
            member->has_text(parser->data, ".upper") ||
            member->has_text(parser->data, ".lower");
@@ -393,16 +391,16 @@ static Operation **parse_parameters(Parser *parser) {
   Operation **parameters =
       static_cast<Operation **>(malloc(sizeof(Operation *)));
   size_t parameters_length = 0;
-  parameters[0] = NULL;
+  parameters[0] = nullptr;
 
   Token *open_paren_token = current_token(parser);
-  if (open_paren_token == NULL ||
+  if (open_paren_token == nullptr ||
       open_paren_token->type != TOKEN_TYPE_OPEN_PAREN)
     return parameters;
   next_token(parser);
 
   bool closed = false;
-  while (current_token(parser) != NULL) {
+  while (current_token(parser) != nullptr) {
     Token *t = current_token(parser);
     if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
       next_token(parser);
@@ -413,28 +411,28 @@ static Operation **parse_parameters(Parser *parser) {
     if (parameters_length > 0) {
       if (t->type != TOKEN_TYPE_COMMA) {
         print_token_error(parser, current_token(parser), "Missing comma");
-        return NULL;
+        return nullptr;
       }
       next_token(parser);
       t = current_token(parser);
     }
 
     Operation *value = parse_expression(parser);
-    if (value == NULL) {
+    if (value == nullptr) {
       print_token_error(parser, current_token(parser), "Invalid parameter");
-      return NULL;
+      return nullptr;
     }
 
     parameters_length++;
     parameters = static_cast<Operation **>(
         realloc(parameters, sizeof(Operation *) * (parameters_length + 1)));
     parameters[parameters_length - 1] = value;
-    parameters[parameters_length] = NULL;
+    parameters[parameters_length] = nullptr;
   }
 
   if (!closed) {
     print_token_error(parser, current_token(parser), "Unclosed paren");
-    return NULL;
+    return nullptr;
   }
 
   return parameters;
@@ -442,56 +440,56 @@ static Operation **parse_parameters(Parser *parser) {
 
 static Operation *parse_value(Parser *parser) {
   Token *token = current_token(parser);
-  if (token == NULL)
-    return NULL;
+  if (token == nullptr)
+    return nullptr;
 
   OperationFunctionDefinition *f;
   OperationVariableDefinition *v;
-  autofree_operation value = NULL;
+  autofree_operation value = nullptr;
   if (token->type == TOKEN_TYPE_NUMBER) {
     next_token(parser);
-    value = make_number_constant(token);
+    value = new OperationNumberConstant(token);
   } else if (token->type == TOKEN_TYPE_TEXT) {
     next_token(parser);
-    value = make_text_constant(token);
+    value = new OperationTextConstant(token);
   } else if (is_boolean(parser, token)) {
     next_token(parser);
-    value = make_boolean_constant(token);
-  } else if ((v = find_variable(parser, token)) != NULL) {
+    value = new OperationBooleanConstant(token);
+  } else if ((v = find_variable(parser, token)) != nullptr) {
     next_token(parser);
-    value = make_variable_value(token, v);
-  } else if ((f = find_function(parser, token)) != NULL ||
+    value = new OperationVariableValue(token, v);
+  } else if ((f = find_function(parser, token)) != nullptr ||
              is_builtin_function(parser, token)) {
     Token *name = token;
     next_token(parser);
 
     Operation **parameters = parse_parameters(parser);
-    if (parameters == NULL)
-      return NULL;
+    if (parameters == nullptr)
+      return nullptr;
 
-    value = make_function_call(name, parameters, f);
+    value = new OperationFunctionCall(name, parameters, f);
   }
 
-  if (value == NULL)
-    return NULL;
+  if (value == nullptr)
+    return nullptr;
 
   token = current_token(parser);
-  while (token != NULL && token->type == TOKEN_TYPE_MEMBER) {
+  while (token != nullptr && token->type == TOKEN_TYPE_MEMBER) {
     if (!has_member(parser, value, token)) {
       print_token_error(parser, token, "Member not available");
-      return NULL;
+      return nullptr;
     }
     next_token(parser);
 
     Operation **parameters = parse_parameters(parser);
-    if (parameters == NULL)
-      return NULL;
+    if (parameters == nullptr)
+      return nullptr;
 
-    value = make_member_value(value, token, parameters);
+    value = new OperationMemberValue(value, token, parameters);
     token = current_token(parser);
   }
 
-  return operation_ref(value);
+  return value->ref();
 }
 
 static bool token_is_binary_operator(Token *token) {
@@ -507,44 +505,46 @@ static bool token_is_binary_operator(Token *token) {
 
 static Operation *parse_expression(Parser *parser) {
   autofree_operation a = parse_value(parser);
-  if (a == NULL)
-    return NULL;
+  if (a == nullptr)
+    return nullptr;
 
   Token *op = current_token(parser);
-  if (op == NULL)
-    return operation_ref(a);
+  if (op == nullptr)
+    return a->ref();
 
   if (!token_is_binary_operator(op))
-    return operation_ref(a);
+    return a->ref();
   next_token(parser);
 
   autofree_operation b = parse_value(parser);
-  if (b == NULL) {
+  if (b == nullptr) {
     print_token_error(parser, current_token(parser),
                       "Missing second value in binary operation");
-    return NULL;
+    return nullptr;
   }
 
-  autofree_str a_type = operation_get_data_type(a, parser->data);
-  autofree_str b_type = operation_get_data_type(b, parser->data);
+  autofree_str a_type = a->get_data_type(parser->data);
+  autofree_str b_type = b->get_data_type(parser->data);
   if (!str_equal(a_type, b_type)) {
     autofree_str message =
         str_printf("Can't combine %s and %s types", a_type, b_type);
     print_token_error(parser, op, message);
-    return NULL;
+    return nullptr;
   }
 
-  return make_binary(op, a, b);
+  return new OperationBinary(op, a, b);
 }
 
 static OperationFunctionDefinition *get_current_function(Parser *parser) {
   for (size_t i = parser->stack_length; i > 0; i--) {
-    if (parser->stack[i - 1]->operation->type ==
-        OPERATION_TYPE_FUNCTION_DEFINITION)
-      return (OperationFunctionDefinition *)parser->stack[i - 1]->operation;
+    OperationFunctionDefinition *op =
+        dynamic_cast<OperationFunctionDefinition *>(
+            parser->stack[i - 1]->operation);
+    if (op != nullptr)
+      return op;
   }
 
-  return NULL;
+  return nullptr;
 }
 
 static bool can_assign(const char *variable_type, const char *value_type) {
@@ -566,7 +566,7 @@ static bool can_assign(const char *variable_type, const char *value_type) {
 static bool parse_sequence(Parser *parser) {
   Operation *parent = parser->stack[parser->stack_length - 1]->operation;
 
-  while (current_token(parser) != NULL) {
+  while (current_token(parser) != nullptr) {
     Token *token = current_token(parser);
 
     // Stop when sequence ends
@@ -579,7 +579,7 @@ static bool parse_sequence(Parser *parser) {
       continue;
     }
 
-    autofree_operation op = NULL;
+    autofree_operation op = nullptr;
     OperationVariableDefinition *v;
     if (is_data_type(parser, token)) {
       Token *data_type = token;
@@ -589,21 +589,21 @@ static bool parse_sequence(Parser *parser) {
       next_token(parser);
 
       Token *assignment_token = current_token(parser);
-      if (assignment_token == NULL) {
-        op = make_variable_definition(data_type, name, NULL);
+      if (assignment_token == nullptr) {
+        op = new OperationVariableDefinition(data_type, name, nullptr);
         add_stack_variable(parser, (OperationVariableDefinition *)op);
       } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
         next_token(parser);
 
         autofree_operation value = parse_expression(parser);
-        if (value == NULL) {
+        if (value == nullptr) {
           print_token_error(parser, current_token(parser),
                             "Invalid value for variable");
           return false;
         }
 
         autofree_str variable_type = data_type->get_text(parser->data);
-        autofree_str value_type = operation_get_data_type(value, parser->data);
+        autofree_str value_type = value->get_data_type(parser->data);
         if (!can_assign(variable_type, value_type)) {
           autofree_str message =
               str_printf("Variable is of type %s, but value is of type %s",
@@ -612,7 +612,7 @@ static bool parse_sequence(Parser *parser) {
           return false;
         }
 
-        op = make_variable_definition(data_type, name, value);
+        op = new OperationVariableDefinition(data_type, name, value);
         add_stack_variable(parser, (OperationVariableDefinition *)op);
       } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
         next_token(parser);
@@ -621,9 +621,9 @@ static bool parse_sequence(Parser *parser) {
             static_cast<OperationVariableDefinition **>(
                 malloc(sizeof(OperationVariableDefinition *)));
         size_t parameters_length = 0;
-        parameters[0] = NULL;
+        parameters[0] = nullptr;
         bool closed = false;
-        while (current_token(parser) != NULL) {
+        while (current_token(parser) != nullptr) {
           Token *t = current_token(parser);
           if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
             next_token(parser);
@@ -657,7 +657,7 @@ static bool parse_sequence(Parser *parser) {
           next_token(parser);
 
           Operation *parameter =
-              make_variable_definition(data_type, name, NULL);
+              new OperationVariableDefinition(data_type, name, nullptr);
 
           parameters_length++;
           parameters = static_cast<OperationVariableDefinition **>(
@@ -665,7 +665,7 @@ static bool parse_sequence(Parser *parser) {
                                       (parameters_length + 1)));
           parameters[parameters_length - 1] =
               (OperationVariableDefinition *)parameter;
-          parameters[parameters_length] = NULL;
+          parameters[parameters_length] = nullptr;
         }
 
         if (!closed) {
@@ -681,7 +681,7 @@ static bool parse_sequence(Parser *parser) {
         }
         next_token(parser);
 
-        op = make_function_definition(data_type, name, parameters);
+        op = new OperationFunctionDefinition(data_type, name, parameters);
         push_stack(parser, op);
 
         for (size_t i = 0; i < parameters_length; i++)
@@ -700,14 +700,14 @@ static bool parse_sequence(Parser *parser) {
 
         pop_stack(parser);
       } else {
-        op = make_variable_definition(data_type, name, NULL);
+        op = new OperationVariableDefinition(data_type, name, nullptr);
         add_stack_variable(parser, (OperationVariableDefinition *)op);
       }
     } else if (token->has_text(parser->data, "if")) {
       next_token(parser);
 
       autofree_operation condition = parse_expression(parser);
-      if (condition == NULL) {
+      if (condition == nullptr) {
         print_token_error(parser, current_token(parser),
                           "Not valid if condition");
         return false;
@@ -721,7 +721,7 @@ static bool parse_sequence(Parser *parser) {
       }
       next_token(parser);
 
-      op = make_if(condition);
+      op = new OperationIf(token, condition);
       push_stack(parser, op);
       if (!parse_sequence(parser))
         return false;
@@ -736,12 +736,12 @@ static bool parse_sequence(Parser *parser) {
 
       pop_stack(parser);
     } else if (token->has_text(parser->data, "else")) {
-      Operation *last_operation = operation_get_last_child(parent);
-      if (last_operation == NULL || last_operation->type != OPERATION_TYPE_IF) {
+      Operation *last_operation = parent->get_last_child();
+      OperationIf *if_operation = dynamic_cast<OperationIf *>(last_operation);
+      if (if_operation == nullptr) {
         print_token_error(parser, current_token(parser), "else must follow if");
         return false;
       }
-      OperationIf *if_operation = (OperationIf *)last_operation;
 
       next_token(parser);
 
@@ -753,7 +753,7 @@ static bool parse_sequence(Parser *parser) {
       }
       next_token(parser);
 
-      op = make_else();
+      op = new OperationElse(token);
       if_operation->else_operation = (OperationElse *)op;
       push_stack(parser, op);
       if (!parse_sequence(parser))
@@ -772,7 +772,7 @@ static bool parse_sequence(Parser *parser) {
       next_token(parser);
 
       autofree_operation condition = parse_expression(parser);
-      if (condition == NULL) {
+      if (condition == nullptr) {
         print_token_error(parser, current_token(parser),
                           "Not valid while condition");
         return false;
@@ -786,7 +786,7 @@ static bool parse_sequence(Parser *parser) {
       }
       next_token(parser);
 
-      op = make_while(condition);
+      op = new OperationWhile(condition);
       push_stack(parser, op);
       if (!parse_sequence(parser))
         return false;
@@ -804,25 +804,25 @@ static bool parse_sequence(Parser *parser) {
       next_token(parser);
 
       Operation *value = parse_expression(parser);
-      if (value == NULL) {
+      if (value == nullptr) {
         print_token_error(parser, current_token(parser),
                           "Not valid return value");
         return false;
       }
 
-      op = make_return(value, get_current_function(parser));
+      op = new OperationReturn(value, get_current_function(parser));
     } else if (token->has_text(parser->data, "assert")) {
       next_token(parser);
 
       autofree_operation expression = parse_expression(parser);
-      if (expression == NULL) {
+      if (expression == nullptr) {
         print_token_error(parser, current_token(parser),
                           "Not valid assertion expression");
         return false;
       }
 
-      op = make_assert(token, expression);
-    } else if ((v = find_variable(parser, token)) != NULL) {
+      op = new OperationAssert(token, expression);
+    } else if ((v = find_variable(parser, token)) != nullptr) {
       Token *name = token;
       next_token(parser);
 
@@ -835,15 +835,14 @@ static bool parse_sequence(Parser *parser) {
       next_token(parser);
 
       autofree_operation value = parse_expression(parser);
-      if (value == NULL) {
+      if (value == nullptr) {
         print_token_error(parser, current_token(parser),
                           "Invalid value for variable");
         return false;
       }
 
-      autofree_str variable_type =
-          operation_get_data_type((Operation *)v, parser->data);
-      autofree_str value_type = operation_get_data_type(value, parser->data);
+      autofree_str variable_type = v->get_data_type(parser->data);
+      autofree_str value_type = value->get_data_type(parser->data);
       if (!can_assign(variable_type, value_type)) {
         autofree_str message =
             str_printf("Variable is of type %s, but value is of type %s",
@@ -852,15 +851,15 @@ static bool parse_sequence(Parser *parser) {
         return false;
       }
 
-      op = make_variable_assignment(name, value, v);
-    } else if ((op = parse_value(parser)) != NULL) {
+      op = new OperationVariableAssignment(name, value, v);
+    } else if ((op = parse_value(parser)) != nullptr) {
       // FIXME: Only allow functions and variable values
     } else {
       print_token_error(parser, current_token(parser), "Unexpected token");
       return false;
     }
 
-    operation_add_child(parent, op);
+    parent->add_child(op);
   }
 
   return true;
@@ -871,20 +870,20 @@ OperationModule *elf_parse(const char *data, size_t data_length) {
 
   parser->tokens = elf_lex(data, data_length);
 
-  autofree_operation module = make_module();
+  autofree_operation module = new OperationModule();
   push_stack(parser, module);
 
   if (!parse_sequence(parser)) {
     parser_free(parser);
-    return NULL;
+    return nullptr;
   }
 
-  if (current_token(parser) != NULL) {
+  if (current_token(parser) != nullptr) {
     printf("Expected end of input\n");
-    return NULL;
+    return nullptr;
   }
 
   parser_free(parser);
 
-  return (OperationModule *)operation_ref(module);
+  return static_cast<OperationModule *>(module->ref());
 }

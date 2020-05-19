@@ -13,215 +13,283 @@
 
 #include "elf-token.h"
 
-typedef enum {
-  OPERATION_TYPE_MODULE,
-  OPERATION_TYPE_VARIABLE_DEFINITION,
-  OPERATION_TYPE_VARIABLE_ASSIGNMENT,
-  OPERATION_TYPE_IF,
-  OPERATION_TYPE_ELSE,
-  OPERATION_TYPE_WHILE,
-  OPERATION_TYPE_FUNCTION_DEFINITION,
-  OPERATION_TYPE_FUNCTION_CALL,
-  OPERATION_TYPE_RETURN,
-  OPERATION_TYPE_ASSERT,
-  OPERATION_TYPE_BOOLEAN_CONSTANT,
-  OPERATION_TYPE_NUMBER_CONSTANT,
-  OPERATION_TYPE_TEXT_CONSTANT,
-  OPERATION_TYPE_VARIABLE_VALUE,
-  OPERATION_TYPE_MEMBER_VALUE,
-  OPERATION_TYPE_BINARY,
-} OperationType;
+// FIXME: temp for str_new
+#include "utils.h"
 
-typedef struct {
-  OperationType type;
+struct Operation {
   int ref_count;
-} Operation;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_MODULE
+  Operation() : ref_count(1) {}
+  virtual ~Operation() {}
+  virtual bool is_constant() { return false; }
+  virtual char *get_data_type(const char *data) { return nullptr; }
+  virtual void add_child(Operation *child) {}
+  virtual size_t get_n_children() { return 0; }
+  virtual Operation *get_child(size_t index) { return nullptr; }
+  Operation *get_last_child();
+  virtual char *to_string() = 0;
+  Operation *ref() {
+    ref_count++;
+    return this;
+  }
+  void unref() {
+    ref_count--;
+    if (ref_count == 0)
+      delete this;
+  }
+};
 
+struct OperationModule : Operation {
   Operation **body;
   size_t body_length;
-} OperationModule;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_VARIABLE_DEFINITION
+  OperationModule() : body(nullptr), body_length(0) {}
+  ~OperationModule();
+  bool is_constant() { return true; };
+  void add_child(Operation *child);
+  size_t get_n_children() { return body_length; }
+  Operation *get_child(size_t index) { return body[index]; }
+  char *to_string() { return str_printf("MODULE"); }
+};
 
+struct OperationVariableDefinition : Operation {
   Token *data_type;
   Token *name;
   Operation *value;
-} OperationVariableDefinition;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_VARIABLE_ASSIGNMENT
+  OperationVariableDefinition(Token *data_type, Token *name, Operation *value)
+      : data_type(data_type->ref()), name(name->ref()),
+        value(value ? value->ref() : nullptr) {}
+  ~OperationVariableDefinition() { value->unref(); }
+  bool is_constant() { return value == nullptr || value->is_constant(); }
+  char *get_data_type(const char *data) { return data_type->get_text(data); }
+  char *to_string() { return str_printf("VARIABLE_DEFINITION"); }
+};
 
+struct OperationVariableAssignment : Operation {
   Token *name;
   Operation *value;
-
   OperationVariableDefinition *variable;
-} OperationVariableAssignment;
 
-typedef struct _OperationElse OperationElse;
+  OperationVariableAssignment(Token *name, Operation *value,
+                              OperationVariableDefinition *variable)
+      : name(name->ref()), value(value->ref()), variable(variable) {}
+  ~OperationVariableAssignment() {
+    name->unref();
+    value->unref();
+  }
+  bool is_constant() { return value->is_constant(); }
+  char *get_data_type(const char *data) {
+    return variable->get_data_type(data);
+  }
+  char *to_string() { return str_printf("VARIABLE_ASSIGNMENT"); }
+};
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_IF
+struct OperationElse;
 
+struct OperationIf : Operation {
+  Token *keyword;
   Operation *condition;
   Operation **body;
   size_t body_length;
   OperationElse *else_operation;
-} OperationIf;
 
-struct _OperationElse {
-  Operation o; // type=OPERATION_TYPE_ELSE
-
-  Operation **body;
-  size_t body_length;
+  OperationIf(Token *keyword, Operation *condition)
+      : keyword(keyword->ref()), condition(condition->ref()), body(nullptr),
+        body_length(0) {}
+  ~OperationIf();
+  void add_child(Operation *child);
+  size_t get_n_children() { return body_length; }
+  Operation *get_child(size_t index) { return body[index]; }
+  char *to_string() { return str_printf("IF"); }
 };
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_WHILE
+struct OperationElse : Operation {
+  Token *keyword;
+  Operation **body;
+  size_t body_length;
 
+  OperationElse(Token *keyword)
+      : keyword(keyword->ref()), body(nullptr), body_length(0){};
+  ~OperationElse();
+  void add_child(Operation *child);
+  size_t get_n_children() { return body_length; }
+  Operation *get_child(size_t index) { return body[index]; }
+  char *to_string() { return str_printf("ELSE"); }
+};
+
+struct OperationWhile : Operation {
   Operation *condition;
   Operation **body;
   size_t body_length;
-} OperationWhile;
 
-typedef struct _OperationFunctionDefinition OperationFunctionDefinition;
+  OperationWhile(Operation *condition)
+      : condition(condition->ref()), body(nullptr), body_length(0) {}
+  ~OperationWhile();
+  void add_child(Operation *child);
+  size_t get_n_children() { return body_length; }
+  Operation *get_child(size_t index) { return body[index]; }
+  char *to_string() { return str_printf("WHILE"); }
+};
 
-struct _OperationFunctionDefinition {
-  Operation o; // type=OPERATION_TYPE_FUNCTION_DEFINITION
-
+struct OperationFunctionDefinition : Operation {
   OperationFunctionDefinition *parent;
   Token *data_type;
   Token *name;
   OperationVariableDefinition **parameters;
   Operation **body;
   size_t body_length;
+
+  OperationFunctionDefinition(Token *data_type, Token *name,
+                              OperationVariableDefinition **parameters)
+      : data_type(data_type->ref()), name(name->ref()), parameters(parameters),
+        body(nullptr), body_length(0) {}
+  ~OperationFunctionDefinition();
+  bool is_constant();
+  char *get_data_type(const char *data) { return data_type->get_text(data); }
+  void add_child(Operation *child);
+  size_t get_n_children() { return body_length; }
+  Operation *get_child(size_t index) { return body[index]; }
+  char *to_string() { return str_printf("FUNCTION_DEFINITION"); }
 };
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_FUNCTION_CALL
-
+struct OperationFunctionCall : Operation {
   Token *name;
   Operation **parameters;
-
   OperationFunctionDefinition *function;
-} OperationFunctionCall;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_RETURN
+  OperationFunctionCall(Token *name, Operation **parameters,
+                        OperationFunctionDefinition *function)
+      : name(name->ref()), parameters(parameters), function(function) {}
+  ~OperationFunctionCall();
+  bool is_constant();
+  char *get_data_type(const char *data) {
+    return function->get_data_type(data);
+  }
+  char *to_string() { return str_printf("FUNCTION_CALL"); }
+};
 
-  Token *name;
+struct OperationReturn : Operation {
   Operation *value;
-
   OperationFunctionDefinition *function;
-} OperationReturn;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_ASSERT
+  OperationReturn(Operation *value, OperationFunctionDefinition *function)
+      : value(value->ref()), function(function) {}
+  ~OperationReturn() { value->unref(); }
+  bool is_constant() { return value == nullptr || value->is_constant(); }
+  char *get_data_type(const char *data) {
+    return function->get_data_type(data);
+  }
+  char *to_string() {
+    autofree_str value_string = value->to_string();
+    return str_printf("RETURN(%s)", value_string);
+  }
+};
 
+struct OperationAssert : Operation {
   Token *name;
   Operation *expression;
-} OperationAssert;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_BOOLEAN_CONSTANT;
+  OperationAssert(Token *name, Operation *expression)
+      : name(name->ref()), expression(expression->ref()) {}
+  ~OperationAssert() {
+    name->unref();
+    expression->unref();
+  }
+  bool is_constant() {
+    return expression == nullptr || expression->is_constant();
+  }
+  char *to_string() {
+    autofree_str expression_string = expression->to_string();
+    return str_printf("ASSERT(%s)", expression_string);
+  }
+};
 
+struct OperationBooleanConstant : Operation {
   Token *value;
-} OperationBooleanConstant;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_NUMBER_CONSTANT;
+  OperationBooleanConstant(Token *value) : value(value->ref()) {}
+  ~OperationBooleanConstant() { value->unref(); }
+  bool is_constant() { return true; }
+  char *get_data_type(const char *data) { return str_new("bool"); }
+  char *to_string() {
+    autofree_str value_string = value->to_string();
+    return str_printf("BOOLEAN_CONSTANT(%s)", value_string);
+  }
+};
 
+struct OperationNumberConstant : Operation {
   Token *value;
-} OperationNumberConstant;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_TEXT_CONSTANT;
+  OperationNumberConstant(Token *value) : value(value->ref()) {}
+  ~OperationNumberConstant() { value->unref(); }
+  bool is_constant() { return true; }
+  char *get_data_type(const char *data);
+  char *to_string() {
+    autofree_str value_string = value->to_string();
+    return str_printf("NUMBER_CONSTANT(%s)", value_string);
+  }
+};
 
+struct OperationTextConstant : Operation {
   Token *value;
-} OperationTextConstant;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_VARIABLE_VALUE;
+  OperationTextConstant(Token *value) : value(value->ref()) {}
+  ~OperationTextConstant() { value->unref(); }
+  bool is_constant() { return true; }
+  char *get_data_type(const char *data) { return str_new("utf8"); }
+  char *to_string() {
+    autofree_str value_string = value->to_string();
+    return str_printf("TEXT_CONSTANT(%s)", value_string);
+  }
+};
 
+struct OperationVariableValue : Operation {
   Token *name;
-
   OperationVariableDefinition *variable;
-} OperationVariableValue;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_MEMBER_VALUE;
+  OperationVariableValue(Token *name, OperationVariableDefinition *variable)
+      : name(name->ref()), variable(variable) {}
+  ~OperationVariableValue() { name->unref(); }
+  bool is_constant();
+  char *get_data_type(const char *data) {
+    return variable->get_data_type(data);
+  }
+  char *to_string() { return str_printf("VARIABLE_VALUE"); }
+};
 
+struct OperationMemberValue : Operation {
   Operation *object;
   Token *member;
   Operation **parameters;
-} OperationMemberValue;
 
-typedef struct {
-  Operation o; // type=OPERATION_TYPE_BINARY
+  OperationMemberValue(Operation *object, Token *member, Operation **parameters)
+      : object(object->ref()), member(member->ref()), parameters(parameters) {}
+  ~OperationMemberValue();
+  bool is_constant();
+  char *get_data_type(const char *data);
+  char *to_string() {
+    char *member_string = member->to_string();
+    return str_printf("MEMBER_VALUE(%s)", member_string);
+  }
+};
 
+struct OperationBinary : Operation {
   Token *op;
   Operation *a;
   Operation *b;
-} OperationBinary;
 
-Operation *make_module(void);
-
-Operation *make_variable_definition(Token *data_type, Token *name,
-                                    Operation *value);
-
-Operation *make_variable_assignment(Token *name, Operation *value,
-                                    OperationVariableDefinition *variable);
-
-Operation *make_if(Operation *condition);
-
-Operation *make_else(void);
-
-Operation *make_while(Operation *condition);
-
-Operation *make_function_definition(Token *data_type, Token *name,
-                                    OperationVariableDefinition **parameters);
-
-Operation *make_function_call(Token *name, Operation **parameters,
-                              OperationFunctionDefinition *function);
-
-Operation *make_return(Operation *value, OperationFunctionDefinition *function);
-
-Operation *make_assert(Token *name, Operation *expression);
-
-Operation *make_boolean_constant(Token *value);
-
-Operation *make_number_constant(Token *value);
-
-Operation *make_text_constant(Token *value);
-
-Operation *make_member_value(Operation *object, Token *member,
-                             Operation **parameters);
-
-Operation *make_variable_value(Token *name,
-                               OperationVariableDefinition *variable);
-
-Operation *make_binary(Token *op, Operation *a, Operation *b);
-
-bool operation_is_constant(Operation *operation);
-
-char *operation_get_data_type(Operation *operation, const char *data);
-
-void operation_add_child(Operation *operation, Operation *child);
-
-size_t operation_get_n_children(Operation *operation);
-
-Operation *operation_get_child(Operation *operation, size_t index);
-
-Operation *operation_get_last_child(Operation *operation);
-
-char *operation_to_string(Operation *operation);
-
-Operation *operation_ref(Operation *operation);
-
-void operation_unref(Operation *operation);
+  OperationBinary(Token *op, Operation *a, Operation *b)
+      : op(op->ref()), a(a->ref()), b(b->ref()) {}
+  ~OperationBinary() {
+    op->unref();
+    a->unref();
+    b->unref();
+  }
+  bool is_constant() { return a->is_constant() && b->is_constant(); }
+  char *get_data_type(const char *data);
+  char *to_string() { return str_printf("BINARY"); }
+};
 
 void operation_cleanup(Operation **operation);
 
