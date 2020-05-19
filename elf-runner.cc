@@ -257,7 +257,7 @@ static DataValue *run_function(ProgramState *state,
 }
 
 static DataValue *make_default_value(ProgramState *state, Token *data_type) {
-  char *type_name = token_get_text(data_type, state->data);
+  char *type_name = data_type->get_text(state->data);
 
   DataValue *result = NULL;
   if (str_equal(type_name, "bool"))
@@ -292,7 +292,7 @@ static void add_variable(ProgramState *state, const char *name,
 static DataValue *
 run_variable_definition(ProgramState *state,
                         OperationVariableDefinition *operation) {
-  char *variable_name = token_get_text(operation->name, state->data);
+  char *variable_name = operation->name->get_text(state->data);
 
   DataValue *value = NULL;
   if (operation->value != NULL)
@@ -312,7 +312,7 @@ run_variable_definition(ProgramState *state,
 static DataValue *
 run_variable_assignment(ProgramState *state,
                         OperationVariableAssignment *operation) {
-  char *variable_name = token_get_text(operation->name, state->data);
+  char *variable_name = operation->name->get_text(state->data);
 
   DataValue *value = run_operation(state, operation->value);
 
@@ -378,8 +378,7 @@ static DataValue *run_function_call(ProgramState *state,
       DataValue *value = run_operation(state, operation->parameters[i]);
       OperationVariableDefinition *parameter_definition =
           (OperationVariableDefinition *)operation->function->parameters[i];
-      char *variable_name =
-          token_get_text(parameter_definition->name, state->data);
+      char *variable_name = parameter_definition->name->get_text(state->data);
       add_variable(state, variable_name, value);
       free(variable_name);
     }
@@ -387,7 +386,7 @@ static DataValue *run_function_call(ProgramState *state,
     return run_function(state, operation->function);
   }
 
-  char *function_name = token_get_text(operation->name, state->data);
+  char *function_name = operation->name->get_text(state->data);
 
   DataValue *result = NULL;
   if (str_equal(function_name, "print")) {
@@ -453,13 +452,13 @@ static DataValue *run_assert(ProgramState *state, OperationAssert *operation) {
 
 static DataValue *run_boolean_constant(ProgramState *state,
                                        OperationBooleanConstant *operation) {
-  bool value = token_parse_boolean_constant(operation->value, state->data);
+  bool value = operation->value->parse_boolean_constant(state->data);
   return data_value_new_bool(value);
 }
 
 static DataValue *run_number_constant(ProgramState *state,
                                       OperationNumberConstant *operation) {
-  uint64_t value = token_parse_number_constant(operation->value, state->data);
+  uint64_t value = operation->value->parse_number_constant(state->data);
   // FIXME: Catch overflow (numbers > 64 bit not supported)
 
   if (value <= UINT8_MAX)
@@ -474,7 +473,7 @@ static DataValue *run_number_constant(ProgramState *state,
 
 static DataValue *run_text_constant(ProgramState *state,
                                     OperationTextConstant *operation) {
-  char *value = token_parse_text_constant(operation->value, state->data);
+  char *value = operation->value->parse_text_constant(state->data);
   DataValue *result = data_value_new_utf8(value);
   free(value);
   return result;
@@ -482,7 +481,7 @@ static DataValue *run_text_constant(ProgramState *state,
 
 static DataValue *run_variable_value(ProgramState *state,
                                      OperationVariableValue *operation) {
-  char *variable_name = token_get_text(operation->name, state->data);
+  char *variable_name = operation->name->get_text(state->data);
 
   for (size_t i = 0; i < state->variables_length; i++) {
     Variable *variable = state->variables[i];
@@ -500,12 +499,12 @@ static DataValue *run_member_value(ProgramState *state,
 
   DataValue *result = NULL;
   if (object->type == DATA_TYPE_UTF8) {
-    if (token_has_text(operation->member, state->data, ".length"))
+    if (operation->member->has_text(state->data, ".length"))
       result =
           data_value_new_uint8(object->data_length - 1); // FIXME: Total hack
-    else if (token_has_text(operation->member, state->data, ".upper"))
+    else if (operation->member->has_text(state->data, ".upper"))
       result = data_value_new_utf8("FOO"); // FIXME: Total hack
-    else if (token_has_text(operation->member, state->data, ".lower"))
+    else if (operation->member->has_text(state->data, ".lower"))
       result = data_value_new_utf8("foo"); // FIXME: Total hack
   }
 

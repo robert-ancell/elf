@@ -57,7 +57,7 @@ static Parser *parser_new(const char *data, size_t data_length) {
 
 static void parser_free(Parser *parser) {
   for (int i = 0; parser->tokens[i] != NULL; i++)
-    token_unref(parser->tokens[i]);
+    parser->tokens[i]->unref();
   free(parser->tokens);
 
   for (size_t i = 0; i < parser->stack_length; i++)
@@ -249,7 +249,7 @@ static Token **elf_lex(const char *data, size_t data_length) {
       else if (is_symbol_char(c))
         type = TOKEN_TYPE_WORD;
 
-      Token *token = tokens[tokens_length - 1] = token_new(type, offset, 1);
+      Token *token = tokens[tokens_length - 1] = new Token(type, offset, 1);
 
       current_token = token;
     } else {
@@ -280,7 +280,7 @@ static bool is_data_type(Parser *parser, Token *token) {
     return false;
 
   for (int i = 0; builtin_types[i] != NULL; i++)
-    if (token_has_text(token, parser->data, builtin_types[i]))
+    if (token->has_text(parser->data, builtin_types[i]))
       return true;
 
   return false;
@@ -307,8 +307,8 @@ static bool token_text_matches(Parser *parser, Token *a, Token *b) {
 }
 
 static bool is_boolean(Parser *parser, Token *token) {
-  return token_has_text(token, parser->data, "true") ||
-         token_has_text(token, parser->data, "false");
+  return token->has_text(parser->data, "true") ||
+         token->has_text(parser->data, "false");
 }
 
 static OperationVariableDefinition *find_variable(Parser *parser,
@@ -361,7 +361,7 @@ static bool is_builtin_function(Parser *parser, Token *token) {
     return false;
 
   for (int i = 0; builtin_functions[i] != NULL; i++)
-    if (token_has_text(token, parser->data, builtin_functions[i]))
+    if (token->has_text(parser->data, builtin_functions[i]))
       return true;
 
   return false;
@@ -373,9 +373,9 @@ static bool has_member(Parser *parser, Operation *value, Token *member) {
   // FIXME: Super hacky. The NULL is because Elf can't determine the return
   // value of a member yet i.e. "foo".upper.length
   if (data_type == NULL || str_equal(data_type, "utf8")) {
-    return token_has_text(member, parser->data, ".length") ||
-           token_has_text(member, parser->data, ".upper") ||
-           token_has_text(member, parser->data, ".lower");
+    return member->has_text(parser->data, ".length") ||
+           member->has_text(parser->data, ".upper") ||
+           member->has_text(parser->data, ".lower");
   }
 
   return false;
@@ -602,7 +602,7 @@ static bool parse_sequence(Parser *parser) {
           return false;
         }
 
-        autofree_str variable_type = token_get_text(data_type, parser->data);
+        autofree_str variable_type = data_type->get_text(parser->data);
         autofree_str value_type = operation_get_data_type(value, parser->data);
         if (!can_assign(variable_type, value_type)) {
           autofree_str message =
@@ -703,7 +703,7 @@ static bool parse_sequence(Parser *parser) {
         op = make_variable_definition(data_type, name, NULL);
         add_stack_variable(parser, (OperationVariableDefinition *)op);
       }
-    } else if (token_has_text(token, parser->data, "if")) {
+    } else if (token->has_text(parser->data, "if")) {
       next_token(parser);
 
       autofree_operation condition = parse_expression(parser);
@@ -735,7 +735,7 @@ static bool parse_sequence(Parser *parser) {
       next_token(parser);
 
       pop_stack(parser);
-    } else if (token_has_text(token, parser->data, "else")) {
+    } else if (token->has_text(parser->data, "else")) {
       Operation *last_operation = operation_get_last_child(parent);
       if (last_operation == NULL || last_operation->type != OPERATION_TYPE_IF) {
         print_token_error(parser, current_token(parser), "else must follow if");
@@ -768,7 +768,7 @@ static bool parse_sequence(Parser *parser) {
       next_token(parser);
 
       pop_stack(parser);
-    } else if (token_has_text(token, parser->data, "while")) {
+    } else if (token->has_text(parser->data, "while")) {
       next_token(parser);
 
       autofree_operation condition = parse_expression(parser);
@@ -800,7 +800,7 @@ static bool parse_sequence(Parser *parser) {
       next_token(parser);
 
       pop_stack(parser);
-    } else if (token_has_text(token, parser->data, "return")) {
+    } else if (token->has_text(parser->data, "return")) {
       next_token(parser);
 
       Operation *value = parse_expression(parser);
@@ -811,7 +811,7 @@ static bool parse_sequence(Parser *parser) {
       }
 
       op = make_return(value, get_current_function(parser));
-    } else if (token_has_text(token, parser->data, "assert")) {
+    } else if (token->has_text(parser->data, "assert")) {
       next_token(parser);
 
       autofree_operation expression = parse_expression(parser);

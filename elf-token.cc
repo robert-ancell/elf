@@ -24,55 +24,48 @@ static int hex_digit(char c) {
     return -1;
 }
 
-Token *token_new(TokenType type, size_t offset, size_t length) {
-  Token *token = new Token;
-  token->type = type;
-  token->offset = offset;
-  token->length = length;
-  token->ref_count = 1;
-  return token;
-}
+Token::Token(TokenType type, size_t offset, size_t length)
+    : type(type), offset(offset), length(length), ref_count(1) {}
 
-char *token_get_text(Token *token, const char *data) {
-  char *result =
-      static_cast<char *>(malloc(sizeof(char) * (token->length + 1)));
-  for (size_t i = 0; i < token->length; i++)
-    result[i] = data[token->offset + i];
-  result[token->length] = '\0';
+char *Token::get_text(const char *data) {
+  char *result = static_cast<char *>(malloc(sizeof(char) * (length + 1)));
+  for (size_t i = 0; i < length; i++)
+    result[i] = data[offset + i];
+  result[length] = '\0';
   return result;
 }
 
-bool token_has_text(Token *token, const char *data, const char *value) {
-  for (size_t i = 0; i < token->length; i++) {
-    if (value[i] == '\0' || data[token->offset + i] != value[i])
+bool Token::has_text(const char *data, const char *value) {
+  for (size_t i = 0; i < length; i++) {
+    if (value[i] == '\0' || data[offset + i] != value[i])
       return false;
   }
 
-  return value[token->length] == '\0';
+  return value[length] == '\0';
 }
 
-bool token_parse_boolean_constant(Token *token, const char *data) {
-  autofree_str text = token_get_text(token, data);
+bool Token::parse_boolean_constant(const char *data) {
+  autofree_str text = get_text(data);
   return str_equal(text, "true");
 }
 
-uint64_t token_parse_number_constant(Token *token, const char *data) {
+uint64_t Token::parse_number_constant(const char *data) {
   uint64_t value = 0;
 
-  for (size_t i = 0; i < token->length; i++)
-    value = value * 10 + data[token->offset + i] - '0';
+  for (size_t i = 0; i < length; i++)
+    value = value * 10 + data[offset + i] - '0';
 
   return value;
 }
 
-char *token_parse_text_constant(Token *token, const char *data) {
-  autofree_bytes buffer = bytes_new(token->length);
+char *Token::parse_text_constant(const char *data) {
+  autofree_bytes buffer = bytes_new(length);
 
   // Iterate over the characters inside the quotes
   bool in_escape = false;
-  for (size_t i = 1; i < (token->length - 1); i++) {
-    char c = data[token->offset + i];
-    size_t n_remaining = token->length - 1;
+  for (size_t i = 1; i < (length - 1); i++) {
+    char c = data[offset + i];
+    size_t n_remaining = length - 1;
 
     if (!in_escape && c == '\\') {
       in_escape = true;
@@ -97,8 +90,8 @@ char *token_parse_text_constant(Token *token, const char *data) {
         if (n_remaining < 3)
           break;
 
-        int digit0 = hex_digit(data[token->offset + i + 1]);
-        int digit1 = hex_digit(data[token->offset + i + 2]);
+        int digit0 = hex_digit(data[offset + i + 1]);
+        int digit1 = hex_digit(data[offset + i + 2]);
         i += 2;
         if (digit0 >= 0 && digit1 >= 0)
           bytes_add(buffer, digit0 << 4 | digit1);
@@ -114,7 +107,7 @@ char *token_parse_text_constant(Token *token, const char *data) {
         uint32_t unichar = 0;
         bool valid = true;
         for (size_t j = 0; j < length; j++) {
-          int digit = hex_digit(data[token->offset + i + 1 + j]);
+          int digit = hex_digit(data[offset + i + 1 + j]);
           if (digit < 0)
             valid = false;
           else
@@ -137,8 +130,8 @@ char *token_parse_text_constant(Token *token, const char *data) {
   return (char *)bytes_steal(buffer);
 }
 
-char *token_to_string(Token *token) {
-  switch (token->type) {
+char *Token::to_string() {
+  switch (type) {
   case TOKEN_TYPE_COMMENT:
     return str_printf("COMMENT");
   case TOKEN_TYPE_WORD:
@@ -185,24 +178,16 @@ char *token_to_string(Token *token) {
     return str_printf("CLOSE_BRACE");
   }
 
-  return str_printf("UNKNOWN(%d)", token->type);
+  return str_printf("UNKNOWN(%d)", type);
 }
 
-Token *token_ref(Token *token) {
-  if (token == NULL)
-    return NULL;
-
-  token->ref_count++;
-  return token;
+Token *Token::ref() {
+  ref_count++;
+  return this;
 }
 
-void token_unref(Token *token) {
-  if (token == NULL)
-    return;
-
-  token->ref_count--;
-  if (token->ref_count != 0)
-    return;
-
-  delete token;
+void Token::unref() {
+  ref_count--;
+  if (ref_count == 0)
+    delete this;
 }

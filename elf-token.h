@@ -38,27 +38,27 @@ typedef enum {
   TOKEN_TYPE_CLOSE_BRACE,
 } TokenType;
 
-typedef struct {
+struct Token {
   TokenType type;
   size_t offset;
   size_t length;
   int ref_count;
-} Token;
 
-Token *token_new(TokenType type, size_t offset, size_t length);
+  Token(TokenType type, size_t offset, size_t length);
 
-char *token_get_text(Token *token, const char *data);
+  char *get_text(const char *data);
 
-bool token_has_text(Token *token, const char *data, const char *value);
+  bool has_text(const char *data, const char *value);
 
-bool token_parse_boolean_constant(Token *token, const char *data);
+  bool parse_boolean_constant(const char *data);
 
-uint64_t token_parse_number_constant(Token *token, const char *data);
+  uint64_t parse_number_constant(const char *data);
 
-char *token_parse_text_constant(Token *token, const char *data);
+  char *parse_text_constant(const char *data);
 
-char *token_to_string(Token *token);
+  char *to_string();
 
-Token *token_ref(Token *token);
+  Token *ref();
 
-void token_unref(Token *token);
+  void unref();
+};
