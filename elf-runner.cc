@@ -63,7 +63,7 @@ struct Variable {
   ~Variable() { value->unref(); }
 };
 
-typedef struct {
+struct ProgramState {
   const char *data;
 
   DataValue *none_value;
@@ -74,7 +74,7 @@ typedef struct {
   DataValue *return_value;
 
   OperationAssert *failed_assertion;
-} ProgramState;
+};
 
 static DataValue *run_operation(ProgramState *state, Operation *operation);
 

@@ -15,27 +15,19 @@
 
 #include "utils.h"
 
-typedef struct {
+struct StackFrame {
   Operation *operation;
 
   OperationVariableDefinition **variables;
   size_t variables_length;
-} StackFrame;
 
-static StackFrame *stack_frame_new(Operation *operation) {
-  StackFrame *frame = new StackFrame;
-  memset(frame, 0, sizeof(StackFrame));
-  frame->operation = operation;
+  StackFrame(Operation *operation)
+      : operation(operation), variables(nullptr), variables_length(0) {}
 
-  return frame;
-}
+  ~StackFrame() { free(variables); }
+};
 
-static void stack_frame_free(StackFrame *frame) {
-  free(frame->variables);
-  delete frame;
-}
-
-typedef struct {
+struct Parser {
   const char *data;
   size_t data_length;
 
@@ -44,34 +36,27 @@ typedef struct {
 
   StackFrame **stack;
   size_t stack_length;
-} Parser;
 
-static Parser *parser_new(const char *data, size_t data_length) {
-  Parser *parser = new Parser;
-  memset(parser, 0, sizeof(Parser));
-  parser->data = data;
-  parser->data_length = data_length;
+  Parser(const char *data, size_t data_length)
+      : data(data), data_length(data_length), tokens(nullptr), offset(0),
+        stack(nullptr), stack_length(0) {}
 
-  return parser;
-}
+  ~Parser() {
+    for (int i = 0; tokens[i] != nullptr; i++)
+      tokens[i]->unref();
+    free(tokens);
 
-static void parser_free(Parser *parser) {
-  for (int i = 0; parser->tokens[i] != nullptr; i++)
-    parser->tokens[i]->unref();
-  free(parser->tokens);
-
-  for (size_t i = 0; i < parser->stack_length; i++)
-    stack_frame_free(parser->stack[i]);
-  free(parser->stack);
-
-  delete parser;
-}
+    for (size_t i = 0; i < stack_length; i++)
+      delete stack[i];
+    free(stack);
+  }
+};
 
 static void push_stack(Parser *parser, Operation *operation) {
   parser->stack_length++;
   parser->stack = static_cast<StackFrame **>(
       realloc(parser->stack, sizeof(StackFrame *) * parser->stack_length));
-  parser->stack[parser->stack_length - 1] = stack_frame_new(operation);
+  parser->stack[parser->stack_length - 1] = new StackFrame(operation);
 }
 
 static void add_stack_variable(Parser *parser,
@@ -86,7 +71,7 @@ static void add_stack_variable(Parser *parser,
 }
 
 static void pop_stack(Parser *parser) {
-  stack_frame_free(parser->stack[parser->stack_length - 1]);
+  delete parser->stack[parser->stack_length - 1];
   parser->stack_length--;
   parser->stack = static_cast<StackFrame **>(
       realloc(parser->stack, sizeof(StackFrame *) * parser->stack_length));
@@ -863,7 +848,7 @@ static bool parse_sequence(Parser *parser) {
 }
 
 OperationModule *elf_parse(const char *data, size_t data_length) {
-  Parser *parser = parser_new(data, data_length);
+  auto parser = new Parser(data, data_length);
 
   parser->tokens = elf_lex(data, data_length);
 
@@ -871,7 +856,7 @@ OperationModule *elf_parse(const char *data, size_t data_length) {
   push_stack(parser, module);
 
   if (!parse_sequence(parser)) {
-    parser_free(parser);
+    delete parser;
     return nullptr;
   }
 
@@ -880,7 +865,7 @@ OperationModule *elf_parse(const char *data, size_t data_length) {
     return nullptr;
   }
 
-  parser_free(parser);
+  delete parser;
 
   return static_cast<OperationModule *>(module->ref());
 }
