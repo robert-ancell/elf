@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include <string>
+#include <vector>
 
 #include "elf-token.h"
 
@@ -38,14 +39,12 @@ struct Operation {
 };
 
 struct OperationModule : Operation {
-  Operation **body;
-  size_t body_length;
+  std::vector<Operation *> body;
 
-  OperationModule() : body(nullptr), body_length(0) {}
   ~OperationModule();
   bool is_constant() { return true; };
-  void add_child(Operation *child);
-  size_t get_n_children() { return body_length; }
+  void add_child(Operation *child) { body.push_back(child->ref()); }
+  size_t get_n_children() { return body.size(); }
   Operation *get_child(size_t index) { return body[index]; }
   std::string to_string() { return "MODULE"; }
 };
@@ -90,44 +89,39 @@ struct OperationElse;
 struct OperationIf : Operation {
   Token *keyword;
   Operation *condition;
-  Operation **body;
-  size_t body_length;
+  std::vector<Operation *> body;
   OperationElse *else_operation;
 
   OperationIf(Token *keyword, Operation *condition)
-      : keyword(keyword->ref()), condition(condition->ref()), body(nullptr),
-        body_length(0), else_operation(nullptr) {}
+      : keyword(keyword->ref()), condition(condition->ref()),
+        else_operation(nullptr) {}
   ~OperationIf();
-  void add_child(Operation *child);
-  size_t get_n_children() { return body_length; }
+  void add_child(Operation *child) { body.push_back(child->ref()); }
+  size_t get_n_children() { return body.size(); }
   Operation *get_child(size_t index) { return body[index]; }
   std::string to_string() { return "IF"; }
 };
 
 struct OperationElse : Operation {
   Token *keyword;
-  Operation **body;
-  size_t body_length;
+  std::vector<Operation *> body;
 
-  OperationElse(Token *keyword)
-      : keyword(keyword->ref()), body(nullptr), body_length(0){};
+  OperationElse(Token *keyword) : keyword(keyword->ref()){};
   ~OperationElse();
-  void add_child(Operation *child);
-  size_t get_n_children() { return body_length; }
+  void add_child(Operation *child) { body.push_back(child->ref()); }
+  size_t get_n_children() { return body.size(); }
   Operation *get_child(size_t index) { return body[index]; }
   std::string to_string() { return "ELSE"; }
 };
 
 struct OperationWhile : Operation {
   Operation *condition;
-  Operation **body;
-  size_t body_length;
+  std::vector<Operation *> body;
 
-  OperationWhile(Operation *condition)
-      : condition(condition->ref()), body(nullptr), body_length(0) {}
+  OperationWhile(Operation *condition) : condition(condition->ref()) {}
   ~OperationWhile();
-  void add_child(Operation *child);
-  size_t get_n_children() { return body_length; }
+  void add_child(Operation *child) { body.push_back(child->ref()); }
+  size_t get_n_children() { return body.size(); }
   Operation *get_child(size_t index) { return body[index]; }
   std::string to_string() { return "WHILE"; }
 };
@@ -136,31 +130,31 @@ struct OperationFunctionDefinition : Operation {
   OperationFunctionDefinition *parent;
   Token *data_type;
   Token *name;
-  OperationVariableDefinition **parameters;
-  Operation **body;
-  size_t body_length;
+  std::vector<OperationVariableDefinition *> parameters;
+  std::vector<Operation *> body;
 
-  OperationFunctionDefinition(Token *data_type, Token *name,
-                              OperationVariableDefinition **parameters)
-      : data_type(data_type->ref()), name(name->ref()), parameters(parameters),
-        body(nullptr), body_length(0) {}
+  OperationFunctionDefinition(
+      Token *data_type, Token *name,
+      std::vector<OperationVariableDefinition *> parameters)
+      : data_type(data_type->ref()), name(name->ref()), parameters(parameters) {
+  }
   ~OperationFunctionDefinition();
   bool is_constant();
   std::string get_data_type(const char *data) {
     return data_type->get_text(data);
   }
-  void add_child(Operation *child);
-  size_t get_n_children() { return body_length; }
+  void add_child(Operation *child) { body.push_back(child->ref()); }
+  size_t get_n_children() { return body.size(); }
   Operation *get_child(size_t index) { return body[index]; }
   std::string to_string() { return "FUNCTION_DEFINITION"; }
 };
 
 struct OperationFunctionCall : Operation {
   Token *name;
-  Operation **parameters;
+  std::vector<Operation *> parameters;
   OperationFunctionDefinition *function;
 
-  OperationFunctionCall(Token *name, Operation **parameters,
+  OperationFunctionCall(Token *name, std::vector<Operation *> parameters,
                         OperationFunctionDefinition *function)
       : name(name->ref()), parameters(parameters), function(function) {}
   ~OperationFunctionCall();
@@ -254,9 +248,10 @@ struct OperationVariableValue : Operation {
 struct OperationMemberValue : Operation {
   Operation *object;
   Token *member;
-  Operation **parameters;
+  std::vector<Operation *> parameters;
 
-  OperationMemberValue(Operation *object, Token *member, Operation **parameters)
+  OperationMemberValue(Operation *object, Token *member,
+                       std::vector<Operation *> parameters)
       : object(object->ref()), member(member->ref()), parameters(parameters) {}
   ~OperationMemberValue();
   bool is_constant();

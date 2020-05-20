@@ -14,9 +14,8 @@
 #include "utils.h"
 
 OperationModule::~OperationModule() {
-  for (size_t i = 0; i < body_length; i++)
-    body[i]->unref();
-  free(body);
+  for (auto i = body.begin(); i != body.end(); i++)
+    (*i)->unref();
 }
 
 bool OperationFunctionCall::is_constant() {
@@ -26,9 +25,8 @@ bool OperationFunctionCall::is_constant() {
 
 OperationFunctionCall::~OperationFunctionCall() {
   name->unref();
-  for (int i = 0; parameters[i] != nullptr; i++)
-    parameters[i]->unref();
-  free(parameters);
+  for (auto i = parameters.begin(); i != parameters.end(); i++)
+    (*i)->unref();
 }
 
 bool OperationVariableValue::is_constant() {
@@ -49,9 +47,8 @@ bool OperationMemberValue::is_constant() {
 OperationMemberValue::~OperationMemberValue() {
   object->unref();
   member->unref();
-  for (int i = 0; parameters[i] != nullptr; i++)
-    parameters[i]->unref();
-  free(parameters);
+  for (auto i = parameters.begin(); i != parameters.end(); i++)
+    (*i)->unref();
 }
 
 bool OperationFunctionDefinition::is_constant() {
@@ -59,22 +56,13 @@ bool OperationFunctionDefinition::is_constant() {
   return false;
 }
 
-void OperationFunctionDefinition::add_child(Operation *child) {
-  body_length++;
-  body = static_cast<Operation **>(
-      realloc(body, sizeof(Operation *) * body_length));
-  body[body_length - 1] = child->ref();
-}
-
 OperationFunctionDefinition::~OperationFunctionDefinition() {
   data_type->unref();
   name->unref();
-  for (int i = 0; parameters[i] != nullptr; i++)
-    parameters[i]->unref();
-  free(parameters);
-  for (size_t i = 0; i < body_length; i++)
-    body[i]->unref();
-  free(body);
+  for (auto i = parameters.begin(); i != parameters.end(); i++)
+    (*i)->unref();
+  for (auto i = body.begin(); i != body.end(); i++)
+    (*i)->unref();
 }
 
 std::string OperationNumberConstant::get_data_type(const char *data) {
@@ -84,34 +72,6 @@ std::string OperationNumberConstant::get_data_type(const char *data) {
 std::string OperationBinary::get_data_type(const char *data) {
   // FIXME: Need to combine data type
   return a->get_data_type(data);
-}
-
-void OperationModule::add_child(Operation *child) {
-  body_length++;
-  body = static_cast<Operation **>(
-      realloc(body, sizeof(Operation *) * body_length));
-  body[body_length - 1] = child->ref();
-}
-
-void OperationIf::add_child(Operation *child) {
-  body_length++;
-  body = static_cast<Operation **>(
-      realloc(body, sizeof(Operation *) * body_length));
-  body[body_length - 1] = child->ref();
-}
-
-void OperationElse::add_child(Operation *child) {
-  body_length++;
-  body = static_cast<Operation **>(
-      realloc(body, sizeof(Operation *) * body_length));
-  body[body_length - 1] = child->ref();
-}
-
-void OperationWhile::add_child(Operation *child) {
-  body_length++;
-  body = static_cast<Operation **>(
-      realloc(body, sizeof(Operation *) * body_length));
-  body[body_length - 1] = child->ref();
 }
 
 Operation *Operation::get_last_child() {
@@ -125,23 +85,20 @@ Operation *Operation::get_last_child() {
 OperationIf::~OperationIf() {
   keyword->unref();
   condition->unref();
-  for (size_t i = 0; i < body_length; i++)
-    body[i]->unref();
-  free(body);
+  for (auto i = body.begin(); i != body.end(); i++)
+    (*i)->unref();
 }
 
 OperationElse::~OperationElse() {
   keyword->unref();
-  for (size_t i = 0; i < body_length; i++)
-    body[i]->unref();
-  free(body);
+  for (auto i = body.begin(); i != body.end(); i++)
+    (*i)->unref();
 }
 
 OperationWhile::~OperationWhile() {
   condition->unref();
-  for (size_t i = 0; i < body_length; i++)
-    body[i]->unref();
-  free(body);
+  for (auto i = body.begin(); i != body.end(); i++)
+    (*i)->unref();
 }
 
 void operation_cleanup(Operation **operation) {

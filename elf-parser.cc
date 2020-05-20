@@ -50,7 +50,7 @@ struct Parser {
   bool has_member(Operation *value, Token *member);
   Token *current_token();
   void next_token();
-  Operation **parse_parameters();
+  bool parse_parameters(std::vector<Operation *> &parameters);
   Operation *parse_value();
   Operation *parse_expression();
   OperationFunctionDefinition *get_current_function();
@@ -347,16 +347,12 @@ Token *Parser::current_token() {
 
 void Parser::next_token() { offset++; }
 
-Operation **Parser::parse_parameters() {
-  Operation **parameters =
-      static_cast<Operation **>(malloc(sizeof(Operation *)));
-  size_t parameters_length = 0;
-  parameters[0] = nullptr;
+bool Parser::parse_parameters(std::vector<Operation *> &parameters) {
 
   Token *open_paren_token = current_token();
   if (open_paren_token == nullptr ||
       open_paren_token->type != TOKEN_TYPE_OPEN_PAREN)
-    return parameters;
+    return true;
   next_token();
 
   bool closed = false;
@@ -368,10 +364,10 @@ Operation **Parser::parse_parameters() {
       break;
     }
 
-    if (parameters_length > 0) {
+    if (parameters.size() > 0) {
       if (t->type != TOKEN_TYPE_COMMA) {
         print_token_error(current_token(), "Missing comma");
-        return nullptr;
+        return false;
       }
       next_token();
       t = current_token();
@@ -380,22 +376,18 @@ Operation **Parser::parse_parameters() {
     Operation *value = parse_expression();
     if (value == nullptr) {
       print_token_error(current_token(), "Invalid parameter");
-      return nullptr;
+      return false;
     }
 
-    parameters_length++;
-    parameters = static_cast<Operation **>(
-        realloc(parameters, sizeof(Operation *) * (parameters_length + 1)));
-    parameters[parameters_length - 1] = value;
-    parameters[parameters_length] = nullptr;
+    parameters.push_back(value);
   }
 
   if (!closed) {
     print_token_error(current_token(), "Unclosed paren");
-    return nullptr;
+    return false;
   }
 
-  return parameters;
+  return true;
 }
 
 Operation *Parser::parse_value() {
@@ -423,8 +415,8 @@ Operation *Parser::parse_value() {
     Token *name = token;
     next_token();
 
-    Operation **parameters = parse_parameters();
-    if (parameters == nullptr)
+    std::vector<Operation *> parameters;
+    if (!parse_parameters(parameters))
       return nullptr;
 
     value = new OperationFunctionCall(name, parameters, f);
@@ -441,8 +433,8 @@ Operation *Parser::parse_value() {
     }
     next_token();
 
-    Operation **parameters = parse_parameters();
-    if (parameters == nullptr)
+    std::vector<Operation *> parameters;
+    if (!parse_parameters(parameters))
       return nullptr;
 
     value = new OperationMemberValue(value, token, parameters);
@@ -573,11 +565,7 @@ bool Parser::parse_sequence() {
       } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
         next_token();
 
-        OperationVariableDefinition **parameters =
-            static_cast<OperationVariableDefinition **>(
-                malloc(sizeof(OperationVariableDefinition *)));
-        size_t parameters_length = 0;
-        parameters[0] = nullptr;
+        std::vector<OperationVariableDefinition *> parameters;
         bool closed = false;
         while (current_token() != nullptr) {
           Token *t = current_token();
@@ -587,7 +575,7 @@ bool Parser::parse_sequence() {
             break;
           }
 
-          if (parameters_length > 0) {
+          if (parameters.size() > 0) {
             if (t->type != TOKEN_TYPE_COMMA) {
               print_token_error(current_token(), "Missing comma");
               return false;
@@ -610,16 +598,8 @@ bool Parser::parse_sequence() {
           }
           next_token();
 
-          Operation *parameter =
-              new OperationVariableDefinition(data_type, name, nullptr);
-
-          parameters_length++;
-          parameters = static_cast<OperationVariableDefinition **>(
-              realloc(parameters, sizeof(OperationVariableDefinition *) *
-                                      (parameters_length + 1)));
-          parameters[parameters_length - 1] =
-              (OperationVariableDefinition *)parameter;
-          parameters[parameters_length] = nullptr;
+          parameters.push_back(
+              new OperationVariableDefinition(data_type, name, nullptr));
         }
 
         if (!closed) {
@@ -637,8 +617,8 @@ bool Parser::parse_sequence() {
         op = new OperationFunctionDefinition(data_type, name, parameters);
         push_stack(op);
 
-        for (size_t i = 0; i < parameters_length; i++)
-          add_stack_variable(parameters[i]);
+        for (auto i = parameters.begin(); i != parameters.end(); i++)
+          add_stack_variable(*i);
 
         if (!parse_sequence())
           return false;

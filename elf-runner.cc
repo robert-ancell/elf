@@ -207,25 +207,25 @@ static bool data_value_equal(DataValue *a, DataValue *b) {
   return true;
 }
 
-static void run_sequence(ProgramState *state, Operation **body,
-                         size_t body_length) {
-  for (size_t i = 0; i < body_length && state->failed_assertion == NULL &&
-                     state->return_value == NULL;
+static void run_sequence(ProgramState *state, std::vector<Operation *> &body) {
+  for (auto i = body.begin();
+       i != body.end() && state->failed_assertion == NULL &&
+       state->return_value == NULL;
        i++) {
-    DataValue *value = run_operation(state, body[i]);
+    DataValue *value = run_operation(state, *i);
     value->unref();
   }
 }
 
 static DataValue *run_module(ProgramState *state, OperationModule *module) {
-  run_sequence(state, module->body, module->body_length);
+  run_sequence(state, module->body);
 
   return state->none_value->ref();
 }
 
 static DataValue *run_function(ProgramState *state,
                                OperationFunctionDefinition *function) {
-  run_sequence(state, function->body, function->body_length);
+  run_sequence(state, function->body);
 
   DataValue *return_value = state->return_value;
   state->return_value = nullptr;
@@ -313,17 +313,11 @@ static DataValue *run_if(ProgramState *state, OperationIf *operation) {
   bool condition = value->data[0] != 0;
   value->unref();
 
-  Operation **body = NULL;
-  size_t body_length = 0;
   if (condition) {
-    body = operation->body;
-    body_length = operation->body_length;
+    run_sequence(state, operation->body);
   } else if (operation->else_operation != NULL) {
-    body = operation->else_operation->body;
-    body_length = operation->else_operation->body_length;
+    run_sequence(state, operation->else_operation->body);
   }
-
-  run_sequence(state, body, body_length);
 
   return state->none_value->ref();
 }
@@ -341,7 +335,7 @@ static DataValue *run_while(ProgramState *state, OperationWhile *operation) {
     if (!condition)
       return state->none_value->ref();
 
-    run_sequence(state, operation->body, operation->body_length);
+    run_sequence(state, operation->body);
   }
 }
 
@@ -349,10 +343,12 @@ static DataValue *run_function_call(ProgramState *state,
                                     OperationFunctionCall *operation) {
   if (operation->function != NULL) {
     // FIXME: Use a stack, these variables shouldn't remain after the call
-    for (int i = 0; operation->parameters[i] != NULL; i++) {
-      DataValue *value = run_operation(state, operation->parameters[i]);
+    for (auto i = operation->parameters.begin();
+         i != operation->parameters.end(); i++) {
+      DataValue *value = run_operation(state, *i);
       OperationVariableDefinition *parameter_definition =
-          (OperationVariableDefinition *)operation->function->parameters[i];
+          (OperationVariableDefinition *)operation->function
+              ->parameters[i - operation->parameters.begin()];
       auto variable_name = parameter_definition->name->get_text(state->data);
       add_variable(state, variable_name, value);
     }
