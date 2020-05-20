@@ -10,11 +10,9 @@
 #pragma once
 
 #include <stdbool.h>
+#include <string>
 
 #include "elf-token.h"
-
-// FIXME: temp for str_new
-#include "utils.h"
 
 struct Operation {
   int ref_count;
@@ -22,12 +20,12 @@ struct Operation {
   Operation() : ref_count(1) {}
   virtual ~Operation() {}
   virtual bool is_constant() { return false; }
-  virtual char *get_data_type(const char *data) { return nullptr; }
+  virtual std::string get_data_type(const char *data) { return nullptr; }
   virtual void add_child(Operation *child) {}
   virtual size_t get_n_children() { return 0; }
   virtual Operation *get_child(size_t index) { return nullptr; }
   Operation *get_last_child();
-  virtual char *to_string() = 0;
+  virtual std::string to_string() = 0;
   Operation *ref() {
     ref_count++;
     return this;
@@ -49,7 +47,7 @@ struct OperationModule : Operation {
   void add_child(Operation *child);
   size_t get_n_children() { return body_length; }
   Operation *get_child(size_t index) { return body[index]; }
-  char *to_string() { return str_printf("MODULE"); }
+  std::string to_string() { return "MODULE"; }
 };
 
 struct OperationVariableDefinition : Operation {
@@ -62,8 +60,10 @@ struct OperationVariableDefinition : Operation {
         value(value ? value->ref() : nullptr) {}
   ~OperationVariableDefinition() { value->unref(); }
   bool is_constant() { return value == nullptr || value->is_constant(); }
-  char *get_data_type(const char *data) { return data_type->get_text(data); }
-  char *to_string() { return str_printf("VARIABLE_DEFINITION"); }
+  std::string get_data_type(const char *data) {
+    return data_type->get_text(data);
+  }
+  std::string to_string() { return "VARIABLE_DEFINITION"; }
 };
 
 struct OperationVariableAssignment : Operation {
@@ -79,10 +79,10 @@ struct OperationVariableAssignment : Operation {
     value->unref();
   }
   bool is_constant() { return value->is_constant(); }
-  char *get_data_type(const char *data) {
+  std::string get_data_type(const char *data) {
     return variable->get_data_type(data);
   }
-  char *to_string() { return str_printf("VARIABLE_ASSIGNMENT"); }
+  std::string to_string() { return "VARIABLE_ASSIGNMENT"; }
 };
 
 struct OperationElse;
@@ -101,7 +101,7 @@ struct OperationIf : Operation {
   void add_child(Operation *child);
   size_t get_n_children() { return body_length; }
   Operation *get_child(size_t index) { return body[index]; }
-  char *to_string() { return str_printf("IF"); }
+  std::string to_string() { return "IF"; }
 };
 
 struct OperationElse : Operation {
@@ -115,7 +115,7 @@ struct OperationElse : Operation {
   void add_child(Operation *child);
   size_t get_n_children() { return body_length; }
   Operation *get_child(size_t index) { return body[index]; }
-  char *to_string() { return str_printf("ELSE"); }
+  std::string to_string() { return "ELSE"; }
 };
 
 struct OperationWhile : Operation {
@@ -129,7 +129,7 @@ struct OperationWhile : Operation {
   void add_child(Operation *child);
   size_t get_n_children() { return body_length; }
   Operation *get_child(size_t index) { return body[index]; }
-  char *to_string() { return str_printf("WHILE"); }
+  std::string to_string() { return "WHILE"; }
 };
 
 struct OperationFunctionDefinition : Operation {
@@ -146,11 +146,13 @@ struct OperationFunctionDefinition : Operation {
         body(nullptr), body_length(0) {}
   ~OperationFunctionDefinition();
   bool is_constant();
-  char *get_data_type(const char *data) { return data_type->get_text(data); }
+  std::string get_data_type(const char *data) {
+    return data_type->get_text(data);
+  }
   void add_child(Operation *child);
   size_t get_n_children() { return body_length; }
   Operation *get_child(size_t index) { return body[index]; }
-  char *to_string() { return str_printf("FUNCTION_DEFINITION"); }
+  std::string to_string() { return "FUNCTION_DEFINITION"; }
 };
 
 struct OperationFunctionCall : Operation {
@@ -163,10 +165,10 @@ struct OperationFunctionCall : Operation {
       : name(name->ref()), parameters(parameters), function(function) {}
   ~OperationFunctionCall();
   bool is_constant();
-  char *get_data_type(const char *data) {
+  std::string get_data_type(const char *data) {
     return function->get_data_type(data);
   }
-  char *to_string() { return str_printf("FUNCTION_CALL"); }
+  std::string to_string() { return "FUNCTION_CALL"; }
 };
 
 struct OperationReturn : Operation {
@@ -177,13 +179,10 @@ struct OperationReturn : Operation {
       : value(value->ref()), function(function) {}
   ~OperationReturn() { value->unref(); }
   bool is_constant() { return value == nullptr || value->is_constant(); }
-  char *get_data_type(const char *data) {
+  std::string get_data_type(const char *data) {
     return function->get_data_type(data);
   }
-  char *to_string() {
-    autofree_str value_string = value->to_string();
-    return str_printf("RETURN(%s)", value_string);
-  }
+  std::string to_string() { return "RETURN(" + value->to_string() + ")"; }
 };
 
 struct OperationAssert : Operation {
@@ -199,10 +198,7 @@ struct OperationAssert : Operation {
   bool is_constant() {
     return expression == nullptr || expression->is_constant();
   }
-  char *to_string() {
-    autofree_str expression_string = expression->to_string();
-    return str_printf("ASSERT(%s)", expression_string);
-  }
+  std::string to_string() { return "ASSERT(" + expression->to_string() + ")"; }
 };
 
 struct OperationBooleanConstant : Operation {
@@ -211,10 +207,9 @@ struct OperationBooleanConstant : Operation {
   OperationBooleanConstant(Token *value) : value(value->ref()) {}
   ~OperationBooleanConstant() { value->unref(); }
   bool is_constant() { return true; }
-  char *get_data_type(const char *data) { return str_new("bool"); }
-  char *to_string() {
-    autofree_str value_string = value->to_string();
-    return str_printf("BOOLEAN_CONSTANT(%s)", value_string);
+  std::string get_data_type(const char *data) { return "bool"; }
+  std::string to_string() {
+    return "BOOLEAN_CONSTANT(" + value->to_string() + ")";
   }
 };
 
@@ -224,10 +219,9 @@ struct OperationNumberConstant : Operation {
   OperationNumberConstant(Token *value) : value(value->ref()) {}
   ~OperationNumberConstant() { value->unref(); }
   bool is_constant() { return true; }
-  char *get_data_type(const char *data);
-  char *to_string() {
-    autofree_str value_string = value->to_string();
-    return str_printf("NUMBER_CONSTANT(%s)", value_string);
+  std::string get_data_type(const char *data);
+  std::string to_string() {
+    return "NUMBER_CONSTANT(" + value->to_string() + ")";
   }
 };
 
@@ -237,10 +231,9 @@ struct OperationTextConstant : Operation {
   OperationTextConstant(Token *value) : value(value->ref()) {}
   ~OperationTextConstant() { value->unref(); }
   bool is_constant() { return true; }
-  char *get_data_type(const char *data) { return str_new("utf8"); }
-  char *to_string() {
-    autofree_str value_string = value->to_string();
-    return str_printf("TEXT_CONSTANT(%s)", value_string);
+  std::string get_data_type(const char *data) { return "utf8"; }
+  std::string to_string() {
+    return "TEXT_CONSTANT(" + value->to_string() + ")";
   }
 };
 
@@ -252,10 +245,10 @@ struct OperationVariableValue : Operation {
       : name(name->ref()), variable(variable) {}
   ~OperationVariableValue() { name->unref(); }
   bool is_constant();
-  char *get_data_type(const char *data) {
+  std::string get_data_type(const char *data) {
     return variable->get_data_type(data);
   }
-  char *to_string() { return str_printf("VARIABLE_VALUE"); }
+  std::string to_string() { return "VARIABLE_VALUE"; }
 };
 
 struct OperationMemberValue : Operation {
@@ -267,10 +260,9 @@ struct OperationMemberValue : Operation {
       : object(object->ref()), member(member->ref()), parameters(parameters) {}
   ~OperationMemberValue();
   bool is_constant();
-  char *get_data_type(const char *data);
-  char *to_string() {
-    char *member_string = member->to_string();
-    return str_printf("MEMBER_VALUE(%s)", member_string);
+  std::string get_data_type(const char *data);
+  std::string to_string() {
+    return "MEMBER_VALUE(" + member->to_string() + ")";
   }
 };
 
@@ -287,8 +279,8 @@ struct OperationBinary : Operation {
     b->unref();
   }
   bool is_constant() { return a->is_constant() && b->is_constant(); }
-  char *get_data_type(const char *data);
-  char *to_string() { return str_printf("BINARY"); }
+  std::string get_data_type(const char *data);
+  std::string to_string() { return "BINARY"; }
 };
 
 void operation_cleanup(Operation **operation);

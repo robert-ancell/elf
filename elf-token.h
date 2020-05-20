@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string>
 
 typedef enum {
   TOKEN_TYPE_COMMENT,
@@ -46,17 +47,17 @@ struct Token {
 
   Token(TokenType type, size_t offset, size_t length);
 
-  char *get_text(const char *data);
+  std::string get_text(const char *data);
 
-  bool has_text(const char *data, const char *value);
+  bool has_text(const char *data, std::string value);
 
   bool parse_boolean_constant(const char *data);
 
   uint64_t parse_number_constant(const char *data);
 
-  char *parse_text_constant(const char *data);
+  std::string parse_text_constant(const char *data);
 
-  char *to_string();
+  std::string to_string();
 
   Token *ref();
 

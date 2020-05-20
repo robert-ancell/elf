@@ -36,7 +36,7 @@ bool OperationVariableValue::is_constant() {
   return false;
 }
 
-char *OperationMemberValue::get_data_type(const char *data) {
+std::string OperationMemberValue::get_data_type(const char *data) {
   // FIXME
   return nullptr;
 }
@@ -77,11 +77,11 @@ OperationFunctionDefinition::~OperationFunctionDefinition() {
   free(body);
 }
 
-char *OperationNumberConstant::get_data_type(const char *data) {
-  return str_new("uint8"); // FIXME: Find minimum size
+std::string OperationNumberConstant::get_data_type(const char *data) {
+  return "uint8"; // FIXME: Find minimum size
 }
 
-char *OperationBinary::get_data_type(const char *data) {
+std::string OperationBinary::get_data_type(const char *data) {
   // FIXME: Need to combine data type
   return a->get_data_type(data);
 }

@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -23,7 +24,7 @@ int main(int argc, char **argv) {
   }
   const char *elf_path = argv[1];
   const char *source_path = argv[2];
-  autofree_str expected_stdout_path = str_printf("%s.stdout", source_path);
+  auto expected_stdout_path = std::string(source_path) + ".stdout";
 
   // Make pipe to capture stdout
   int stdout_pipe[2];
@@ -69,7 +70,8 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
 
   // Get expected result
-  autofree_bytes expected_stdout_data = file_readall(expected_stdout_path);
+  autofree_bytes expected_stdout_data =
+      file_readall(expected_stdout_path.c_str());
 
   if (!bytes_equal(stdout_data, expected_stdout_data)) {
     printf("stdout does not match expected\n");

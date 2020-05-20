@@ -22,10 +22,11 @@
 #include "utils.h"
 #include "x86_64.h"
 
-static int mmap_file(const char *filename, char **data, size_t *data_length) {
-  int fd = open(filename, O_RDONLY);
+static int mmap_file(std::string filename, char **data, size_t *data_length) {
+  int fd = open(filename.c_str(), O_RDONLY);
   if (fd < 0) {
-    printf("Failed to open file \"%s\": %s\n", filename, strerror(errno));
+    printf("Failed to open file \"%s\": %s\n", filename.c_str(),
+           strerror(errno));
     return -1;
   }
 
@@ -60,23 +61,22 @@ static void munmap_file(int fd, char *data, size_t data_length) {
 }
 
 static int run_tutorial(void) {
-  autofree_str source_name = str_new("tutorial.elf");
+  std::string source_name = "tutorial.elf";
   int index = 0;
   int fd = 0;
   while (true) {
-    fd = open(source_name, O_WRONLY | O_CREAT | O_EXCL,
+    fd = open(source_name.c_str(), O_WRONLY | O_CREAT | O_EXCL,
               S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd > 0)
       break;
 
     if (errno != EEXIST) {
-      printf("Failed to make %s: %s", source_name, strerror(errno));
+      printf("Failed to make %s: %s", source_name.c_str(), strerror(errno));
       return 1;
     }
 
-    str_free(&source_name);
     index++;
-    source_name = str_printf("tutorial-%d.elf", index);
+    source_name = "tutorial-" + std::to_string(index) + ".elf";
   }
 
   printf("Welcome to Elf. Elf is a language designed to help you learn how "
@@ -103,7 +103,8 @@ static int run_tutorial(void) {
          "    $ elf compile %s\n"
          "\n"
          "Have fun!\n",
-         source_name, source_name, source_name, source_name);
+         source_name.c_str(), source_name.c_str(), source_name.c_str(),
+         source_name.c_str());
 
   const char *hello_world =
       "# Write something to the outside world\n"
@@ -138,7 +139,7 @@ static int run_tutorial(void) {
   return 0;
 }
 
-static int run_elf_source(const char *filename) {
+static int run_elf_source(std::string filename) {
   char *data;
   size_t data_length;
   int fd = mmap_file(filename, &data, &data_length);
@@ -267,13 +268,14 @@ static void write_binary(int fd, uint8_t *text, size_t text_length,
       write(fd, &shrtrtab_section_header, sizeof(shrtrtab_section_header));
 }
 
-static int compile_elf_source(const char *filename) {
-  if (!str_has_suffix(filename, ".elf")) {
+static int compile_elf_source(std::string filename) {
+  if (filename.length() < 5 &&
+      filename.compare(0, filename.size() - 4, ".elf") != 0) {
     printf("Elf program doesn't have standard extension, can't determine name "
            "of binary to write\n");
     return 1;
   }
-  autofree_str binary_name = str_slice(filename, 0, -4);
+  auto binary_name = filename.substr(0, filename.size() - 4);
 
   char *data;
   size_t data_length;
@@ -287,10 +289,10 @@ static int compile_elf_source(const char *filename) {
     return 1;
   }
 
-  int binary_fd = open(binary_name, O_WRONLY | O_CREAT,
+  int binary_fd = open(binary_name.c_str(), O_WRONLY | O_CREAT,
                        S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
   if (binary_fd < 0) {
-    printf("Failed to open '%s' to write program to\n", binary_name);
+    printf("Failed to open '%s' to write program to\n", binary_name.c_str());
     return 1;
   }
 
@@ -305,8 +307,9 @@ static int compile_elf_source(const char *filename) {
 
   close(binary_fd);
 
-  printf("%s compiled to '%s', run with:\n", filename, binary_name);
-  printf("$ ./%s\n", binary_name);
+  printf("%s compiled to '%s', run with:\n", filename.c_str(),
+         binary_name.c_str());
+  printf("$ ./%s\n", binary_name.c_str());
 
   munmap_file(fd, data, data_length);
 
@@ -314,13 +317,13 @@ static int compile_elf_source(const char *filename) {
 }
 
 int main(int argc, char **argv) {
-  const char *command = "help";
+  std::string command = "help";
   if (argc > 1)
     command = argv[1];
 
-  if (str_equal(command, "tutorial")) {
+  if (command == "tutorial") {
     return run_tutorial();
-  } else if (str_equal(command, "run")) {
+  } else if (command == "run") {
     if (argc < 3) {
       printf("Need file to run, run elf help for more information\n");
       return 1;
@@ -328,7 +331,7 @@ int main(int argc, char **argv) {
     const char *filename = argv[2];
 
     return run_elf_source(filename);
-  } else if (str_equal(command, "compile")) {
+  } else if (command == "compile") {
     if (argc < 3) {
       printf("Need file to compile, run elf help for more information\n");
       return 1;
@@ -336,12 +339,12 @@ int main(int argc, char **argv) {
     const char *filename = argv[2];
 
     return compile_elf_source(filename);
-  } else if (str_equal(command, "version")) {
+  } else if (command == "version") {
     printf("%s\n", VERSION);
     return 0;
-  } else if (str_equal(command, "zelda")) {
+  } else if (command == "zelda") {
     printf("\033[32;93m ▲\n▲ ▲\n\033[0m");
-  } else if (str_equal(command, "help")) {
+  } else if (command == "help") {
     printf(
         "Elf is a programming languge designed for teching how memory works.\n"
         "\n"
@@ -354,7 +357,7 @@ int main(int argc, char **argv) {
     return 0;
   } else {
     printf("Unknown command \"%s\", run elf to see supported commands.\n",
-           command);
+           command.c_str());
     return 1;
   }
 

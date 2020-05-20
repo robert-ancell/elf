@@ -93,7 +93,7 @@ static void pop_stack(Parser *parser) {
 }
 
 static void print_token_error(Parser *parser, Token *token,
-                              const char *message) {
+                              std::string message) {
   size_t line_offset = 0;
   size_t line_number = 1;
   for (size_t i = 0; i < token->offset; i++) {
@@ -113,7 +113,7 @@ static void print_token_error(Parser *parser, Token *token,
   for (size_t i = 0; i < token->length; i++)
     printf("^");
   printf("\n");
-  printf("%s\n", message);
+  printf("%s\n", message.c_str());
 }
 
 static bool is_number_char(char c) { return c >= '0' && c <= '9'; }
@@ -366,11 +366,11 @@ static bool is_builtin_function(Parser *parser, Token *token) {
 }
 
 static bool has_member(Parser *parser, Operation *value, Token *member) {
-  autofree_str data_type = value->get_data_type(parser->data);
+  auto data_type = value->get_data_type(parser->data);
 
   // FIXME: Super hacky. The nullptr is because Elf can't determine the return
   // value of a member yet i.e. "foo".upper.length
-  if (data_type == nullptr || str_equal(data_type, "utf8")) {
+  if (data_type == "" || data_type == "utf8") {
     return member->has_text(parser->data, ".length") ||
            member->has_text(parser->data, ".upper") ||
            member->has_text(parser->data, ".lower");
@@ -523,12 +523,11 @@ static Operation *parse_expression(Parser *parser) {
     return nullptr;
   }
 
-  autofree_str a_type = a->get_data_type(parser->data);
-  autofree_str b_type = b->get_data_type(parser->data);
-  if (!str_equal(a_type, b_type)) {
-    autofree_str message =
-        str_printf("Can't combine %s and %s types", a_type, b_type);
-    print_token_error(parser, op, message);
+  auto a_type = a->get_data_type(parser->data);
+  auto b_type = b->get_data_type(parser->data);
+  if (a_type != b_type) {
+    print_token_error(parser, op,
+                      "Can't combine " + a_type + " and " + b_type + " types");
     return nullptr;
   }
 
@@ -547,18 +546,18 @@ static OperationFunctionDefinition *get_current_function(Parser *parser) {
   return nullptr;
 }
 
-static bool can_assign(const char *variable_type, const char *value_type) {
-  if (str_equal(variable_type, value_type))
+static bool can_assign(std::string variable_type, std::string value_type) {
+  if (variable_type == value_type)
     return true;
 
   // Integers that can fit inside their parent type
-  if (str_equal(variable_type, "uint16"))
-    return str_equal(value_type, "uint8");
-  else if (str_equal(variable_type, "uint32"))
-    return str_equal(value_type, "uint16") || str_equal(value_type, "uint8");
-  else if (str_equal(variable_type, "uint64"))
-    return str_equal(value_type, "uint32") || str_equal(value_type, "uint16") ||
-           str_equal(value_type, "uint8");
+  if (variable_type == "uint16")
+    return value_type == "uint8";
+  else if (variable_type == "uint32")
+    return value_type == "uint16" || value_type == "uint8";
+  else if (variable_type == "uint64")
+    return value_type == "uint32" || value_type == "uint16" ||
+           value_type == "uint8";
   else
     return false;
 }
@@ -602,12 +601,11 @@ static bool parse_sequence(Parser *parser) {
           return false;
         }
 
-        autofree_str variable_type = data_type->get_text(parser->data);
-        autofree_str value_type = value->get_data_type(parser->data);
+        auto variable_type = data_type->get_text(parser->data);
+        auto value_type = value->get_data_type(parser->data);
         if (!can_assign(variable_type, value_type)) {
-          autofree_str message =
-              str_printf("Variable is of type %s, but value is of type %s",
-                         variable_type, value_type);
+          auto message = "Variable is of type " + variable_type +
+                         ", but value is of type " + value_type;
           print_token_error(parser, name, message);
           return false;
         }
@@ -841,13 +839,12 @@ static bool parse_sequence(Parser *parser) {
         return false;
       }
 
-      autofree_str variable_type = v->get_data_type(parser->data);
-      autofree_str value_type = value->get_data_type(parser->data);
+      auto variable_type = v->get_data_type(parser->data);
+      auto value_type = value->get_data_type(parser->data);
       if (!can_assign(variable_type, value_type)) {
-        autofree_str message =
-            str_printf("Variable is of type %s, but value is of type %s",
-                       variable_type, value_type);
-        print_token_error(parser, name, message);
+        print_token_error(parser, name,
+                          "Variable is of type " + variable_type +
+                              ", but value is of type " + value_type.c_str());
         return false;
       }
 
