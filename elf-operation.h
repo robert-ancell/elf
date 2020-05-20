@@ -96,7 +96,7 @@ struct OperationIf : Operation {
 
   OperationIf(Token *keyword, Operation *condition)
       : keyword(keyword->ref()), condition(condition->ref()), body(nullptr),
-        body_length(0) {}
+        body_length(0), else_operation(nullptr) {}
   ~OperationIf();
   void add_child(Operation *child);
   size_t get_n_children() { return body_length; }
