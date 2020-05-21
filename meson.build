@@ -9,7 +9,6 @@ elf = executable ('elf',
                     'elf-parser.cc',
                     'elf-runner.cc',
                     'elf-token.cc',
-                    'utils.cc',
                     'x86_64.cc',
                   ],
                   cpp_args: [ '-DVERSION="@0@"'.format (version.stdout ().strip ()) ],
@@ -17,7 +16,6 @@ elf = executable ('elf',
 
 test_runner = executable ('test-runner',
                           [ 'test-runner.cc',
-                            'utils.cc',
                           ])
 
 tests = [ 'empty-file',

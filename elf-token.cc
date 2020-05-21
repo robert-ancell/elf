@@ -11,8 +11,6 @@
 
 #include <stdbool.h>
 
-#include "utils.h"
-
 static int hex_digit(char c) {
   if (c >= '0' && c <= '9')
     return c - '0';

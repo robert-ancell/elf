@@ -11,8 +11,6 @@
 
 #include <string.h>
 
-#include "utils.h"
-
 OperationModule::~OperationModule() {
   for (auto i = body.begin(); i != body.end(); i++)
     (*i)->unref();

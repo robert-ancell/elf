@@ -19,7 +19,6 @@
 
 #include "elf-parser.h"
 #include "elf-runner.h"
-#include "utils.h"
 #include "x86_64.h"
 
 static int mmap_file(std::string filename, char **data, size_t *data_length) {
@@ -159,18 +158,18 @@ static int run_elf_source(std::string filename) {
   return 0;
 }
 
-static void write_binary(int fd, uint8_t *text, size_t text_length,
-                         uint8_t *rodata, size_t rodata_length) {
+static void write_binary(int fd, std::vector<uint8_t> &text,
+                         std::vector<uint8_t> &rodata) {
   const char *section_names[] = {"", ".shrtrtab", ".text", ".rodata", NULL};
   size_t shrtrtab_length = 0;
   for (int i = 0; section_names[i] != NULL; i++)
     shrtrtab_length += strlen(section_names[i]) + 1;
 
   char padding[16] = {0};
-  size_t text_padding_length = text_length % 16;
+  size_t text_padding_length = text.size() % 16;
   if (text_padding_length > 0)
     text_padding_length = 16 - text_padding_length;
-  size_t rodata_padding_length = rodata_length % 16;
+  size_t rodata_padding_length = rodata.size() % 16;
   if (rodata_padding_length > 0)
     rodata_padding_length = 16 - rodata_padding_length;
   size_t shrtrtab_padding_length = shrtrtab_length % 16;
@@ -190,8 +189,8 @@ static void write_binary(int fd, uint8_t *text, size_t text_length,
   elf_header.e_version = EV_CURRENT;
   elf_header.e_entry = 0x8000000 + sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr);
   elf_header.e_phoff = sizeof(elf_header);
-  elf_header.e_shoff = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr) + text_length +
-                       text_padding_length + rodata_length +
+  elf_header.e_shoff = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr) + text.size() +
+                       text_padding_length + rodata.size() +
                        rodata_padding_length + shrtrtab_length +
                        shrtrtab_padding_length;
   elf_header.e_ehsize = sizeof(Elf64_Ehdr);
@@ -211,18 +210,18 @@ static void write_binary(int fd, uint8_t *text, size_t text_length,
   program_header.p_vaddr = 0x8000000;
   program_header.p_paddr = 0x8000000;
   program_header.p_filesz = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr) +
-                            text_length + text_padding_length + rodata_length +
+                            text.size() + text_padding_length + rodata.size() +
                             rodata_padding_length;
   program_header.p_memsz = program_header.p_filesz;
 
   n_written += write(fd, &program_header, sizeof(program_header));
 
   ssize_t text_offset = n_written;
-  n_written += write(fd, text, text_length);
+  n_written += write(fd, text.data(), text.size());
   n_written += write(fd, padding, text_padding_length);
 
   ssize_t rodata_offset = n_written;
-  n_written += write(fd, rodata, rodata_length);
+  n_written += write(fd, rodata.data(), rodata.size());
   n_written += write(fd, padding, rodata_padding_length);
 
   ssize_t shrtrtab_offset = n_written;
@@ -247,7 +246,7 @@ static void write_binary(int fd, uint8_t *text, size_t text_length,
   text_section_header.sh_flags = SHF_ALLOC | SHF_EXECINSTR;
   text_section_header.sh_addr = 0x8000000 + text_offset;
   text_section_header.sh_offset = text_offset;
-  text_section_header.sh_size = text_length;
+  text_section_header.sh_size = text.size();
   n_written += write(fd, &text_section_header, sizeof(text_section_header));
 
   Elf64_Shdr rodata_section_header = {0};
@@ -256,7 +255,7 @@ static void write_binary(int fd, uint8_t *text, size_t text_length,
   rodata_section_header.sh_flags = SHF_ALLOC;
   rodata_section_header.sh_addr = 0x80000000 + rodata_offset;
   rodata_section_header.sh_offset = rodata_offset;
-  rodata_section_header.sh_size = rodata_length;
+  rodata_section_header.sh_size = rodata.size();
   n_written += write(fd, &rodata_section_header, sizeof(rodata_section_header));
 
   Elf64_Shdr shrtrtab_section_header = {0};
@@ -296,14 +295,13 @@ static int compile_elf_source(std::string filename) {
     return 1;
   }
 
-  autofree_bytes text = bytes_new(0);
+  std::vector<uint8_t> text;
   x86_64_mov32_val(text, X86_64_REG_ACCUMULATOR, 0x3C); // exit
   x86_64_mov32_val(text, X86_64_REG_DESTINATION, 1);    // status = 1
   x86_64_syscall(text);
-  autofree_bytes rodata = bytes_new(0);
-  bytes_add(rodata, 0x00);
-  write_binary(binary_fd, text->data, text->length, rodata->data,
-               rodata->length);
+  std::vector<uint8_t> rodata;
+  rodata.push_back(0x00);
+  write_binary(binary_fd, text, rodata);
 
   close(binary_fd);
 

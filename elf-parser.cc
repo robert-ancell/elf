@@ -14,8 +14,6 @@
 #include <string.h>
 #include <vector>
 
-#include "utils.h"
-
 struct StackFrame {
   Operation *operation;
 

@@ -15,8 +15,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "utils.h"
-
 typedef enum {
   DATA_TYPE_NONE,
   DATA_TYPE_BOOL,

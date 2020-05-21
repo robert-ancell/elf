@@ -10,8 +10,7 @@
 #pragma once
 
 #include <stdint.h>
-
-#include "utils.h"
+#include <vector>
 
 // Registers
 #define X86_64_REG_ACCUMULATOR 0
@@ -59,38 +58,40 @@
 #define X86_64_COND_LESS_EQUAL 14
 #define X86_64_COND_GREATER 15
 
-void x86_64_mov8_val(Bytes *buffer, int reg, uint8_t value);
+void x86_64_mov8_val(std::vector<uint8_t> &buffer, int reg, uint8_t value);
 
-void x86_64_mov32_val(Bytes *buffer, int reg, uint32_t value);
+void x86_64_mov32_val(std::vector<uint8_t> &buffer, int reg, uint32_t value);
 
-void x86_64_mov32_mem(Bytes *buffer, int reg, uint32_t offset);
+void x86_64_mov32_mem(std::vector<uint8_t> &buffer, int reg, uint32_t offset);
 
-void x86_64_mov64_val(Bytes *buffer, int reg, uint64_t value);
+void x86_64_mov64_val(std::vector<uint8_t> &buffer, int reg, uint64_t value);
 
-void x86_64_mov64_mem(Bytes *buffer, int reg, uint32_t offset);
+void x86_64_mov64_mem(std::vector<uint8_t> &buffer, int reg, uint32_t offset);
 
-void x86_64_op32(Bytes *buffer, int op, int reg1, int reg2);
+void x86_64_op32(std::vector<uint8_t> &buffer, int op, int reg1, int reg2);
 
-void x86_64_op32_val(Bytes *buffer, int op, int reg, uint32_t value);
+void x86_64_op32_val(std::vector<uint8_t> &buffer, int op, int reg,
+                     uint32_t value);
 
-void x86_64_op64(Bytes *buffer, int op, int reg1, int reg2);
+void x86_64_op64(std::vector<uint8_t> &buffer, int op, int reg1, int reg2);
 
-void x86_64_op64_val(Bytes *buffer, int op, int reg, uint64_t value);
+void x86_64_op64_val(std::vector<uint8_t> &buffer, int op, int reg,
+                     uint64_t value);
 
-void x86_64_push64(Bytes *buffer, int reg);
+void x86_64_push64(std::vector<uint8_t> &buffer, int reg);
 
-void x86_64_push_val8(Bytes *buffer, uint8_t value);
+void x86_64_push_val8(std::vector<uint8_t> &buffer, uint8_t value);
 
-void x86_64_push_val32(Bytes *buffer, uint32_t value);
+void x86_64_push_val32(std::vector<uint8_t> &buffer, uint32_t value);
 
-void x86_64_pop64(Bytes *buffer, int reg);
+void x86_64_pop64(std::vector<uint8_t> &buffer, int reg);
 
-void x86_64_jmp8(Bytes *buffer, uint8_t offset);
+void x86_64_jmp8(std::vector<uint8_t> &buffer, uint8_t offset);
 
-void x86_64_jmp8_cond(Bytes *buffer, int cond, uint8_t offset);
+void x86_64_jmp8_cond(std::vector<uint8_t> &buffer, int cond, uint8_t offset);
 
-void x86_64_jmp32(Bytes *buffer, uint32_t offset);
+void x86_64_jmp32(std::vector<uint8_t> &buffer, uint32_t offset);
 
-void x86_64_jmp32_cond(Bytes *buffer, int cond, uint32_t offset);
+void x86_64_jmp32_cond(std::vector<uint8_t> &buffer, int cond, uint32_t offset);
 
-void x86_64_syscall(Bytes *buffer);
+void x86_64_syscall(std::vector<uint8_t> &buffer);

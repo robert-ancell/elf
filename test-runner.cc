@@ -7,6 +7,7 @@
  * (at your option) any later version.
  */
 
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,8 +15,31 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <vector>
 
-#include "utils.h"
+static bool fd_readall(int fd, std::vector<uint8_t> &buffer) {
+  while (true) {
+    uint8_t read_buffer[1024];
+    auto n_read = read(fd, read_buffer, 1024);
+    if (n_read < 0) {
+      printf("Failed to read\n");
+      return false;
+    }
+    if (n_read == 0)
+      return true;
+    buffer.insert(buffer.end(), read_buffer, read_buffer + n_read);
+  }
+}
+
+static bool file_readall(std::string &pathname, std::vector<uint8_t> &buffer) {
+  auto fd = open(pathname.c_str(), O_RDONLY);
+  if (fd < 0) {
+    printf("Failed to open %s\n", pathname.c_str());
+    return false;
+  }
+
+  return fd_readall(fd, buffer);
+}
 
 int main(int argc, char **argv) {
   if (argc != 3) {
@@ -44,8 +68,8 @@ int main(int argc, char **argv) {
   close(stdout_pipe[1]);
 
   // Read result from Elf
-  autofree_bytes stdout_data = readall(stdout_pipe[0]);
-  if (stdout_data == nullptr) {
+  std::vector<uint8_t> stdout_data;
+  if (!fd_readall(stdout_pipe[0], stdout_data)) {
     printf("Failed to read Elf output\n");
     return EXIT_FAILURE;
   }
@@ -70,10 +94,10 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
 
   // Get expected result
-  autofree_bytes expected_stdout_data =
-      file_readall(expected_stdout_path.c_str());
+  std::vector<uint8_t> expected_stdout_data;
+  file_readall(expected_stdout_path, expected_stdout_data);
 
-  if (!bytes_equal(stdout_data, expected_stdout_data)) {
+  if (stdout_data != expected_stdout_data) {
     printf("stdout does not match expected\n");
     return EXIT_FAILURE;
   }
