@@ -11,31 +11,13 @@
 
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
-
-typedef enum {
-  DATA_TYPE_NONE,
-  DATA_TYPE_BOOL,
-  DATA_TYPE_UINT8,
-  DATA_TYPE_INT8,
-  DATA_TYPE_UINT16,
-  DATA_TYPE_INT16,
-  DATA_TYPE_UINT32,
-  DATA_TYPE_INT32,
-  DATA_TYPE_UINT64,
-  DATA_TYPE_INT64,
-  DATA_TYPE_UTF8,
-} DataType;
 
 struct DataValue {
   int ref_count;
-  DataType type;
-  uint8_t *data;
-  size_t data_length;
 
-  DataValue(DataType type)
-      : ref_count(1), type(type), data(nullptr), data_length(0) {}
-  ~DataValue() { free(data); }
+  DataValue() : ref_count(1) {}
+  virtual ~DataValue() {}
+  virtual void print() = 0;
 
   DataValue *ref() {
     ref_count++;
@@ -47,6 +29,53 @@ struct DataValue {
     if (ref_count == 0)
       delete this;
   }
+};
+
+struct DataValueNone : DataValue {
+  void print() { printf("none\n"); }
+};
+
+struct DataValueBool : DataValue {
+  bool value;
+
+  DataValueBool(bool value) : value(value) {}
+  ~DataValueBool() {}
+  void print() { printf(value ? "true\n" : "false\n"); }
+};
+
+struct DataValueUint8 : DataValue {
+  uint8_t value;
+
+  DataValueUint8(uint8_t value) : value(value) {}
+  void print() { printf("%d\n", value); }
+};
+
+struct DataValueUint16 : DataValue {
+  uint16_t value;
+
+  DataValueUint16(uint16_t value) : value(value) {}
+  void print() { printf("%d\n", value); }
+};
+
+struct DataValueUint32 : DataValue {
+  uint32_t value;
+
+  DataValueUint32(uint32_t value) : value(value) {}
+  void print() { printf("%d\n", value); }
+};
+
+struct DataValueUint64 : DataValue {
+  uint64_t value;
+
+  DataValueUint64(uint64_t value) : value(value) {}
+  void print() { printf("%lu\n", value); }
+};
+
+struct DataValueUtf8 : DataValue {
+  std::string value;
+
+  DataValueUtf8(std::string value) : value(value) {}
+  void print() { printf("%s\n", value.c_str()); }
 };
 
 struct Variable {
@@ -62,192 +91,92 @@ struct Variable {
 struct ProgramState {
   const char *data;
 
-  DataValue *none_value;
+  DataValueNone none_value;
 
-  Variable **variables;
-  size_t variables_length;
+  std::vector<Variable *> variables;
 
   DataValue *return_value;
 
   OperationAssert *failed_assertion;
+
+  ProgramState(const char *data)
+      : data(data), return_value(nullptr), failed_assertion(nullptr) {}
+
+  ~ProgramState() {
+    for (auto i = variables.begin(); i != variables.end(); i++)
+      delete *i;
+  }
+
+  void run_sequence(std::vector<Operation *> &body);
+  DataValue *run_module(OperationModule *module);
+  DataValue *run_function(OperationFunctionDefinition *function);
+  DataValue *make_default_value(Token *data_type);
+  void add_variable(std::string name, DataValue *value);
+  DataValue *run_variable_definition(OperationVariableDefinition *operation);
+  DataValue *run_variable_assignment(OperationVariableAssignment *operation);
+  DataValue *run_if(OperationIf *operation);
+  DataValue *run_while(OperationWhile *operation);
+  DataValue *run_function_call(OperationFunctionCall *operation);
+  DataValue *run_return(OperationReturn *operation);
+  DataValue *run_assert(OperationAssert *operation);
+  DataValue *run_boolean_constant(OperationBooleanConstant *operation);
+  DataValue *run_number_constant(OperationNumberConstant *operation);
+  DataValue *run_text_constant(OperationTextConstant *operation);
+  DataValue *run_variable_value(OperationVariableValue *operation);
+  DataValue *run_member_value(OperationMemberValue *operation);
+  DataValue *run_binary_boolean(OperationBinary *operation, DataValueBool *a,
+                                DataValueBool *b);
+  DataValue *run_binary_integer(OperationBinary *operation, DataValueUint8 *a,
+                                DataValueUint8 *b);
+  DataValue *run_binary_text(OperationBinary *operation, DataValueUtf8 *a,
+                             DataValueUtf8 *b);
+  DataValue *run_binary(OperationBinary *operation);
+  DataValue *run_operation(Operation *operation);
 };
 
-static DataValue *run_operation(ProgramState *state, Operation *operation);
-
-static DataValue *data_value_new(DataType type) {
-  DataValue *value = new DataValue(type);
-
-  switch (type) {
-  case DATA_TYPE_NONE:
-    value->data_length = 0;
-  case DATA_TYPE_BOOL:
-  case DATA_TYPE_UINT8:
-  case DATA_TYPE_INT8:
-    value->data_length = 1;
-    break;
-  case DATA_TYPE_UINT16:
-  case DATA_TYPE_INT16:
-    value->data_length = 2;
-    break;
-  case DATA_TYPE_UINT32:
-  case DATA_TYPE_INT32:
-    value->data_length = 4;
-    break;
-  case DATA_TYPE_UINT64:
-  case DATA_TYPE_INT64:
-    value->data_length = 8;
-    break;
-  case DATA_TYPE_UTF8:
-    value->data_length = 1;
-    break;
-  }
-  value->data = static_cast<uint8_t *>(malloc(value->data_length));
-  memset(value->data, 0, value->data_length);
-
-  return value;
-}
-
-static DataValue *data_value_new_bool(bool bool_value) {
-  DataValue *value = data_value_new(DATA_TYPE_BOOL);
-  value->data[0] = bool_value ? 0xFF : 0x00;
-  return value;
-}
-
-static DataValue *data_value_new_uint8(uint8_t int_value) {
-  DataValue *value = data_value_new(DATA_TYPE_UINT8);
-  value->data[0] = int_value;
-  return value;
-}
-
-static DataValue *data_value_new_uint16(uint16_t int_value) {
-  DataValue *value = data_value_new(DATA_TYPE_UINT16);
-  value->data[0] = (int_value >> 8) & 0xFF;
-  value->data[1] = (int_value >> 0) & 0xFF;
-  return value;
-}
-
-static DataValue *data_value_new_uint32(uint32_t int_value) {
-  DataValue *value = data_value_new(DATA_TYPE_UINT32);
-  value->data[0] = (int_value >> 24) & 0xFF;
-  value->data[1] = (int_value >> 16) & 0xFF;
-  value->data[2] = (int_value >> 8) & 0xFF;
-  value->data[3] = (int_value >> 0) & 0xFF;
-  return value;
-}
-
-static DataValue *data_value_new_uint64(uint64_t int_value) {
-  DataValue *value = data_value_new(DATA_TYPE_UINT64);
-  value->data[0] = (int_value >> 56) & 0xFF;
-  value->data[1] = (int_value >> 48) & 0xFF;
-  value->data[2] = (int_value >> 40) & 0xFF;
-  value->data[3] = (int_value >> 32) & 0xFF;
-  value->data[4] = (int_value >> 24) & 0xFF;
-  value->data[5] = (int_value >> 16) & 0xFF;
-  value->data[6] = (int_value >> 8) & 0xFF;
-  value->data[7] = (int_value >> 0) & 0xFF;
-  return value;
-}
-
-static DataValue *data_value_new_utf8_sized(size_t length) {
-  DataValue *value = new DataValue(DATA_TYPE_UTF8);
-
-  value->data_length = length;
-  value->data =
-      static_cast<uint8_t *>(malloc(sizeof(char) * value->data_length));
-  value->data[0] = '\0';
-
-  return value;
-}
-
-static DataValue *data_value_new_utf8(std::string string_value) {
-  DataValue *value = data_value_new_utf8_sized(string_value.size() + 1);
-  for (size_t i = 0; i < value->data_length; i++)
-    value->data[i] = string_value[i];
-  value->data[value->data_length] = '\0';
-
-  return value;
-}
-
-static DataValue *data_value_new_utf8_join(DataValue *a, DataValue *b) {
-  DataValue *value = data_value_new_utf8_sized((a->data_length - 1) +
-                                               (b->data_length - 1) + 1);
-  value->data =
-      static_cast<uint8_t *>(malloc(sizeof(char) * value->data_length));
-  for (size_t i = 0; i < a->data_length; i++)
-    value->data[i] = a->data[i];
-  for (size_t i = 0; i < b->data_length; i++)
-    value->data[a->data_length - 1 + i] = b->data[i];
-  value->data[value->data_length] = '\0';
-
-  return value;
-}
-
-static bool data_value_is_integer(DataValue *value) {
-  return value->type == DATA_TYPE_UINT8 || value->type == DATA_TYPE_INT8 ||
-         value->type == DATA_TYPE_UINT16 || value->type == DATA_TYPE_INT16 ||
-         value->type == DATA_TYPE_UINT32 || value->type == DATA_TYPE_INT32 ||
-         value->type == DATA_TYPE_UINT64 || value->type == DATA_TYPE_INT64;
-}
-
-static bool data_value_equal(DataValue *a, DataValue *b) {
-  if (a->type != b->type)
-    return false;
-
-  if (a->data_length != b->data_length)
-    return false;
-
-  for (size_t i = 0; i < a->data_length; i++)
-    if (a->data[i] != b->data[i])
-      return false;
-
-  return true;
-}
-
-static void run_sequence(ProgramState *state, std::vector<Operation *> &body) {
+void ProgramState::run_sequence(std::vector<Operation *> &body) {
   for (auto i = body.begin();
-       i != body.end() && state->failed_assertion == NULL &&
-       state->return_value == NULL;
+       i != body.end() && failed_assertion == NULL && return_value == NULL;
        i++) {
-    DataValue *value = run_operation(state, *i);
+    DataValue *value = run_operation(*i);
     value->unref();
   }
 }
 
-static DataValue *run_module(ProgramState *state, OperationModule *module) {
-  run_sequence(state, module->body);
+DataValue *ProgramState::run_module(OperationModule *module) {
+  run_sequence(module->body);
 
-  return state->none_value->ref();
+  return none_value.ref();
 }
 
-static DataValue *run_function(ProgramState *state,
-                               OperationFunctionDefinition *function) {
-  run_sequence(state, function->body);
+DataValue *ProgramState::run_function(OperationFunctionDefinition *function) {
+  run_sequence(function->body);
 
-  DataValue *return_value = state->return_value;
-  state->return_value = nullptr;
+  auto result = return_value;
+  return_value = nullptr;
 
-  if (return_value == nullptr)
-    return state->none_value->ref();
+  if (result == nullptr)
+    return none_value.ref();
 
-  return return_value;
+  return result;
 }
 
-static DataValue *make_default_value(ProgramState *state, Token *data_type) {
-  auto type_name = data_type->get_text(state->data);
+DataValue *ProgramState::make_default_value(Token *data_type) {
+  auto type_name = data_type->get_text(data);
 
   DataValue *result = NULL;
   if (type_name == "bool")
-    result = data_value_new_bool(false);
+    result = new DataValueBool(false);
   else if (type_name == "uint8")
-    result = data_value_new_uint8(0);
+    result = new DataValueUint8(0);
   else if (type_name == "uint16")
-    result = data_value_new_uint16(0);
+    result = new DataValueUint16(0);
   else if (type_name == "uint32")
-    result = data_value_new_uint32(0);
+    result = new DataValueUint32(0);
   else if (type_name == "uint64")
-    result = data_value_new_uint64(0);
+    result = new DataValueUint64(0);
   else if (type_name == "utf8")
-    result = data_value_new_utf8("");
+    result = new DataValueUtf8("");
 
   if (result == NULL)
     printf("default value (%s)\n", type_name.c_str());
@@ -255,219 +184,175 @@ static DataValue *make_default_value(ProgramState *state, Token *data_type) {
   return result;
 }
 
-static void add_variable(ProgramState *state, std::string name,
-                         DataValue *value) {
-  state->variables_length++;
-  state->variables = static_cast<Variable **>(
-      realloc(state->variables, sizeof(Variable *) * state->variables_length));
-  state->variables[state->variables_length - 1] = new Variable(name, value);
+void ProgramState::add_variable(std::string name, DataValue *value) {
+  variables.push_back(new Variable(name, value));
 }
 
-static DataValue *
-run_variable_definition(ProgramState *state,
-                        OperationVariableDefinition *operation) {
-  auto variable_name = operation->name->get_text(state->data);
+DataValue *
+ProgramState::run_variable_definition(OperationVariableDefinition *operation) {
+  auto variable_name = operation->name->get_text(data);
 
   DataValue *value = NULL;
   if (operation->value != NULL)
-    value = run_operation(state, operation->value);
+    value = run_operation(operation->value);
   else
-    value = make_default_value(state, operation->data_type);
+    value = make_default_value(operation->data_type);
 
   if (value != NULL)
-    add_variable(state, variable_name, value);
+    add_variable(variable_name, value);
 
   value->unref();
 
-  return state->none_value->ref();
+  return none_value.ref();
 }
 
-static DataValue *
-run_variable_assignment(ProgramState *state,
-                        OperationVariableAssignment *operation) {
-  auto variable_name = operation->name->get_text(state->data);
+DataValue *
+ProgramState::run_variable_assignment(OperationVariableAssignment *operation) {
+  auto variable_name = operation->name->get_text(data);
 
-  DataValue *value = run_operation(state, operation->value);
+  DataValue *value = run_operation(operation->value);
 
-  for (size_t i = 0; state->variables[i] != NULL; i++) {
-    Variable *variable = state->variables[i];
+  for (size_t i = 0; variables[i] != NULL; i++) {
+    Variable *variable = variables[i];
     if (variable->name == variable_name) {
       variable->value->unref();
       variable->value = value->ref();
     }
   }
 
-  return state->none_value->ref();
+  return none_value.ref();
 }
 
-static DataValue *run_if(ProgramState *state, OperationIf *operation) {
-  DataValue *value = run_operation(state, operation->condition);
-  if (value->type != DATA_TYPE_BOOL) {
+DataValue *ProgramState::run_if(OperationIf *operation) {
+  DataValue *value = run_operation(operation->condition);
+  auto bool_value = dynamic_cast<DataValueBool *>(value);
+  if (bool_value == nullptr) {
     value->unref();
-    return state->none_value->ref();
+    return none_value.ref();
   }
-  bool condition = value->data[0] != 0;
+  bool condition = bool_value->value;
   value->unref();
 
   if (condition) {
-    run_sequence(state, operation->body);
+    run_sequence(operation->body);
   } else if (operation->else_operation != NULL) {
-    run_sequence(state, operation->else_operation->body);
+    run_sequence(operation->else_operation->body);
   }
 
-  return state->none_value->ref();
+  return none_value.ref();
 }
 
-static DataValue *run_while(ProgramState *state, OperationWhile *operation) {
+DataValue *ProgramState::run_while(OperationWhile *operation) {
   while (true) {
-    DataValue *value = run_operation(state, operation->condition);
-    if (value->type != DATA_TYPE_BOOL) {
+    DataValue *value = run_operation(operation->condition);
+    auto bool_value = dynamic_cast<DataValueBool *>(value);
+    if (bool_value == nullptr) {
       value->unref();
-      return state->none_value->ref();
+      return none_value.ref();
     }
-    bool condition = value->data[0] != 0;
+    bool condition = bool_value->value;
     value->unref();
 
     if (!condition)
-      return state->none_value->ref();
+      return none_value.ref();
 
-    run_sequence(state, operation->body);
+    run_sequence(operation->body);
   }
 }
 
-static DataValue *run_function_call(ProgramState *state,
-                                    OperationFunctionCall *operation) {
+DataValue *ProgramState::run_function_call(OperationFunctionCall *operation) {
   if (operation->function != NULL) {
     // FIXME: Use a stack, these variables shouldn't remain after the call
     for (auto i = operation->parameters.begin();
          i != operation->parameters.end(); i++) {
-      DataValue *value = run_operation(state, *i);
+      DataValue *value = run_operation(*i);
       OperationVariableDefinition *parameter_definition =
           (OperationVariableDefinition *)operation->function
               ->parameters[i - operation->parameters.begin()];
-      auto variable_name = parameter_definition->name->get_text(state->data);
-      add_variable(state, variable_name, value);
+      auto variable_name = parameter_definition->name->get_text(data);
+      add_variable(variable_name, value);
     }
 
-    return run_function(state, operation->function);
+    return run_function(operation->function);
   }
 
-  std::string function_name = operation->name->get_text(state->data);
+  std::string function_name = operation->name->get_text(data);
 
   if (function_name == "print") {
-    DataValue *value = run_operation(state, operation->parameters[0]);
-
-    switch (value->type) {
-    case DATA_TYPE_BOOL:
-      if (value->data[0] == 0)
-        printf("false");
-      else
-        printf("true");
-      break;
-    case DATA_TYPE_UINT8:
-      printf("%d", value->data[0]);
-      break;
-    case DATA_TYPE_UINT16:
-      printf("%d", value->data[0] << 8 | value->data[1]);
-      break;
-    case DATA_TYPE_UINT32:
-      printf("%d", value->data[3] << 24 | value->data[1] << 16 |
-                       value->data[1] << 8 | value->data[0]);
-      break;
-    case DATA_TYPE_UINT64: {
-      uint64_t v =
-          (uint64_t)value->data[7] << 56 | (uint64_t)value->data[6] << 48 |
-          (uint64_t)value->data[5] << 40 | (uint64_t)value->data[4] << 32 |
-          (uint64_t)value->data[3] << 24 | (uint64_t)value->data[1] << 16 |
-          (uint64_t)value->data[1] << 8 | (uint64_t)value->data[0];
-      printf("%lu", v);
-      break;
-    }
-    case DATA_TYPE_UTF8:
-      printf("%.*s", (int)value->data_length, value->data);
-      break;
-    default:
-      for (size_t i = 0; i < value->data_length; i++)
-        printf("%02X", value->data[i]);
-      break;
-    }
-    printf("\n");
-
+    DataValue *value = run_operation(operation->parameters[0]);
+    value->print();
     value->unref();
   }
 
-  return state->none_value->ref();
+  return none_value.ref();
 }
 
-static DataValue *run_return(ProgramState *state, OperationReturn *operation) {
-  DataValue *value = run_operation(state, operation->value);
-  state->return_value = value->ref();
+DataValue *ProgramState::run_return(OperationReturn *operation) {
+  DataValue *value = run_operation(operation->value);
+  return_value = value->ref();
   return value;
 }
 
-static DataValue *run_assert(ProgramState *state, OperationAssert *operation) {
-  DataValue *value = run_operation(state, operation->expression);
-  assert(value->type == DATA_TYPE_BOOL);
-  if (value->data[0] == 0)
-    state->failed_assertion = operation;
+DataValue *ProgramState::run_assert(OperationAssert *operation) {
+  DataValue *value = run_operation(operation->expression);
+  auto bool_value = dynamic_cast<DataValueBool *>(value);
+  if (bool_value == nullptr || !bool_value->value)
+    failed_assertion = operation;
   return value;
 }
 
-static DataValue *run_boolean_constant(ProgramState *state,
-                                       OperationBooleanConstant *operation) {
-  bool value = operation->value->parse_boolean_constant(state->data);
-  return data_value_new_bool(value);
+DataValue *
+ProgramState::run_boolean_constant(OperationBooleanConstant *operation) {
+  bool value = operation->value->parse_boolean_constant(data);
+  return new DataValueBool(value);
 }
 
-static DataValue *run_number_constant(ProgramState *state,
-                                      OperationNumberConstant *operation) {
-  uint64_t value = operation->value->parse_number_constant(state->data);
+DataValue *
+ProgramState::run_number_constant(OperationNumberConstant *operation) {
+  uint64_t value = operation->value->parse_number_constant(data);
   // FIXME: Catch overflow (numbers > 64 bit not supported)
 
   if (value <= UINT8_MAX)
-    return data_value_new_uint8(value);
+    return new DataValueUint8(value);
   else if (value <= UINT16_MAX)
-    return data_value_new_uint16(value);
+    return new DataValueUint16(value);
   else if (value <= UINT32_MAX)
-    return data_value_new_uint32(value);
+    return new DataValueUint32(value);
   else
-    return data_value_new_uint64(value);
+    return new DataValueUint64(value);
 }
 
-static DataValue *run_text_constant(ProgramState *state,
-                                    OperationTextConstant *operation) {
-  auto value = operation->value->parse_text_constant(state->data);
-  DataValue *result = data_value_new_utf8(value);
+DataValue *ProgramState::run_text_constant(OperationTextConstant *operation) {
+  auto value = operation->value->parse_text_constant(data);
+  DataValue *result = new DataValueUtf8(value);
   return result;
 }
 
-static DataValue *run_variable_value(ProgramState *state,
-                                     OperationVariableValue *operation) {
-  auto variable_name = operation->name->get_text(state->data);
+DataValue *ProgramState::run_variable_value(OperationVariableValue *operation) {
+  auto variable_name = operation->name->get_text(data);
 
-  for (size_t i = 0; i < state->variables_length; i++) {
-    Variable *variable = state->variables[i];
+  for (auto i = variables.begin(); i != variables.end(); i++) {
+    auto variable = *i;
     if (variable->name == variable_name)
       return variable->value->ref();
   }
 
   printf("variable value %s\n", variable_name.c_str());
-  return state->none_value->ref();
+  return none_value.ref();
 }
 
-static DataValue *run_member_value(ProgramState *state,
-                                   OperationMemberValue *operation) {
-  DataValue *object = run_operation(state, operation->object);
+DataValue *ProgramState::run_member_value(OperationMemberValue *operation) {
+  DataValue *object = run_operation(operation->object);
 
   DataValue *result = NULL;
-  if (object->type == DATA_TYPE_UTF8) {
-    if (operation->member->has_text(state->data, ".length"))
-      result =
-          data_value_new_uint8(object->data_length - 1); // FIXME: Total hack
-    else if (operation->member->has_text(state->data, ".upper"))
-      result = data_value_new_utf8("FOO"); // FIXME: Total hack
-    else if (operation->member->has_text(state->data, ".lower"))
-      result = data_value_new_utf8("foo"); // FIXME: Total hack
+  auto utf8_value = dynamic_cast<DataValueUtf8 *>(object);
+  if (utf8_value != nullptr) {
+    if (operation->member->has_text(data, ".length"))
+      result = new DataValueUint8(utf8_value->value.size());
+    else if (operation->member->has_text(data, ".upper"))
+      result = new DataValueUtf8("FOO"); // FIXME: Total hack
+    else if (operation->member->has_text(data, ".lower"))
+      result = new DataValueUtf8("foo"); // FIXME: Total hack
   }
 
   object->unref();
@@ -475,78 +360,81 @@ static DataValue *run_member_value(ProgramState *state,
   return result;
 }
 
-static DataValue *run_binary_boolean(ProgramState *state,
-                                     OperationBinary *operation, DataValue *a,
-                                     DataValue *b) {
+DataValue *ProgramState::run_binary_boolean(OperationBinary *operation,
+                                            DataValueBool *a,
+                                            DataValueBool *b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
-    return data_value_new_bool(a->data[0] == b->data[0]);
+    return new DataValueBool(a->value == b->value);
   case TOKEN_TYPE_NOT_EQUAL:
-    return data_value_new_bool(a->data[0] != b->data[0]);
+    return new DataValueBool(a->value != b->value);
   default:
-    return state->none_value->ref();
+    return none_value.ref();
   }
 }
 
-static DataValue *run_binary_integer(ProgramState *state,
-                                     OperationBinary *operation, DataValue *a,
-                                     DataValue *b) {
-  if (a->type != DATA_TYPE_UINT8 || b->type != DATA_TYPE_UINT8)
-    return state->none_value->ref();
-
+DataValue *ProgramState::run_binary_integer(OperationBinary *operation,
+                                            DataValueUint8 *a,
+                                            DataValueUint8 *b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
-    return data_value_new_bool(a->data[0] == b->data[0]);
+    return new DataValueBool(a->value == b->value);
   case TOKEN_TYPE_NOT_EQUAL:
-    return data_value_new_bool(a->data[0] != b->data[0]);
+    return new DataValueBool(a->value != b->value);
   case TOKEN_TYPE_GREATER:
-    return data_value_new_bool(a->data[0] > b->data[0]);
+    return new DataValueBool(a->value > b->value);
   case TOKEN_TYPE_GREATER_EQUAL:
-    return data_value_new_bool(a->data[0] >= b->data[0]);
+    return new DataValueBool(a->value >= b->value);
   case TOKEN_TYPE_LESS:
-    return data_value_new_bool(a->data[0] < b->data[0]);
+    return new DataValueBool(a->value < b->value);
   case TOKEN_TYPE_LESS_EQUAL:
-    return data_value_new_bool(a->data[0] <= b->data[0]);
+    return new DataValueBool(a->value <= b->value);
   case TOKEN_TYPE_ADD:
-    return data_value_new_uint8(a->data[0] + b->data[0]);
+    return new DataValueUint8(a->value + b->value);
   case TOKEN_TYPE_SUBTRACT:
-    return data_value_new_uint8(a->data[0] - b->data[0]);
+    return new DataValueUint8(a->value - b->value);
   case TOKEN_TYPE_MULTIPLY:
-    return data_value_new_uint8(a->data[0] * b->data[0]);
+    return new DataValueUint8(a->value * b->value);
   case TOKEN_TYPE_DIVIDE:
-    return data_value_new_uint8(a->data[0] / b->data[0]);
+    return new DataValueUint8(a->value / b->value);
   default:
-    return state->none_value->ref();
+    return none_value.ref();
   }
 }
 
-static DataValue *run_binary_text(ProgramState *state,
-                                  OperationBinary *operation, DataValue *a,
-                                  DataValue *b) {
+DataValue *ProgramState::run_binary_text(OperationBinary *operation,
+                                         DataValueUtf8 *a, DataValueUtf8 *b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
-    return data_value_new_bool(data_value_equal(a, b));
+    return new DataValueBool(a->value == b->value);
   case TOKEN_TYPE_NOT_EQUAL:
-    return data_value_new_bool(!data_value_equal(a, b));
+    return new DataValueBool(a->value != b->value);
   case TOKEN_TYPE_ADD:
-    return data_value_new_utf8_join(a, b);
+    return new DataValueUtf8(a->value + b->value);
   default:
-    return state->none_value->ref();
+    return none_value.ref();
   }
 }
 
-static DataValue *run_binary(ProgramState *state, OperationBinary *operation) {
-  DataValue *a = run_operation(state, operation->a);
-  DataValue *b = run_operation(state, operation->b);
+DataValue *ProgramState::run_binary(OperationBinary *operation) {
+  DataValue *a = run_operation(operation->a);
+  DataValue *b = run_operation(operation->b);
 
   // FIXME: Support string multiply "*" * 5 == "*****"
+  // FIXME: Have compile tell us the data types in advance
   DataValue *result;
-  if (a->type == DATA_TYPE_BOOL && b->type == DATA_TYPE_BOOL)
-    result = run_binary_boolean(state, operation, a, b);
-  else if (data_value_is_integer(a) && data_value_is_integer(b))
-    result = run_binary_integer(state, operation, a, b);
-  else if (a->type == DATA_TYPE_UTF8 && b->type == DATA_TYPE_UTF8)
-    result = run_binary_text(state, operation, a, b);
+  auto bool_a = dynamic_cast<DataValueBool *>(a);
+  auto bool_b = dynamic_cast<DataValueBool *>(b);
+  if (bool_a != nullptr && bool_b != nullptr)
+    result = run_binary_boolean(operation, bool_a, bool_b);
+  auto uint8_a = dynamic_cast<DataValueUint8 *>(a);
+  auto uint8_b = dynamic_cast<DataValueUint8 *>(b);
+  if (uint8_a != nullptr && uint8_b != nullptr)
+    result = run_binary_integer(operation, uint8_a, uint8_b);
+  auto utf8_a = dynamic_cast<DataValueUtf8 *>(a);
+  auto utf8_b = dynamic_cast<DataValueUtf8 *>(b);
+  if (utf8_a != nullptr && utf8_b != nullptr)
+    result = run_binary_text(operation, utf8_a, utf8_b);
 
   a->unref();
   b->unref();
@@ -554,95 +442,86 @@ static DataValue *run_binary(ProgramState *state, OperationBinary *operation) {
   return result;
 }
 
-static DataValue *run_operation(ProgramState *state, Operation *operation) {
+DataValue *ProgramState::run_operation(Operation *operation) {
   OperationModule *op_module = dynamic_cast<OperationModule *>(operation);
   if (op_module != nullptr)
-    return run_module(state, op_module);
+    return run_module(op_module);
 
   OperationVariableDefinition *op_variable_definition =
       dynamic_cast<OperationVariableDefinition *>(operation);
   if (op_variable_definition != nullptr)
-    return run_variable_definition(state, op_variable_definition);
+    return run_variable_definition(op_variable_definition);
 
   OperationVariableAssignment *op_variable_assignment =
       dynamic_cast<OperationVariableAssignment *>(operation);
   if (op_variable_assignment != nullptr)
-    return run_variable_assignment(state, op_variable_assignment);
+    return run_variable_assignment(op_variable_assignment);
 
   OperationIf *op_if = dynamic_cast<OperationIf *>(operation);
   if (op_if != nullptr)
-    return run_if(state, op_if);
+    return run_if(op_if);
 
   OperationElse *op_else = dynamic_cast<OperationElse *>(operation);
   if (op_else != nullptr)
-    return state->none_value->ref(); // Resolved in IF
+    return none_value.ref(); // Resolved in IF
 
   OperationWhile *op_while = dynamic_cast<OperationWhile *>(operation);
   if (op_while != nullptr)
-    return run_while(state, op_while);
+    return run_while(op_while);
 
   OperationFunctionDefinition *op_function_definition =
       dynamic_cast<OperationFunctionDefinition *>(operation);
   if (op_function_definition != nullptr)
-    return state->none_value->ref(); // Resolved at compile time
+    return none_value.ref(); // Resolved at compile time
 
   OperationFunctionCall *op_function_call =
       dynamic_cast<OperationFunctionCall *>(operation);
   if (op_function_call != nullptr)
-    return run_function_call(state, op_function_call);
+    return run_function_call(op_function_call);
 
   OperationReturn *op_return = dynamic_cast<OperationReturn *>(operation);
   if (op_return != nullptr)
-    return run_return(state, op_return);
+    return run_return(op_return);
 
   OperationAssert *op_assert = dynamic_cast<OperationAssert *>(operation);
   if (op_assert != nullptr)
-    return run_assert(state, op_assert);
+    return run_assert(op_assert);
 
   OperationBooleanConstant *op_boolean_constant =
       dynamic_cast<OperationBooleanConstant *>(operation);
   if (op_boolean_constant != nullptr)
-    return run_boolean_constant(state, op_boolean_constant);
+    return run_boolean_constant(op_boolean_constant);
 
   OperationNumberConstant *op_number_constant =
       dynamic_cast<OperationNumberConstant *>(operation);
   if (op_number_constant != nullptr)
-    return run_number_constant(state, op_number_constant);
+    return run_number_constant(op_number_constant);
 
   OperationTextConstant *op_text_constant =
       dynamic_cast<OperationTextConstant *>(operation);
   if (op_text_constant != nullptr)
-    return run_text_constant(state, op_text_constant);
+    return run_text_constant(op_text_constant);
 
   OperationVariableValue *op_variable_value =
       dynamic_cast<OperationVariableValue *>(operation);
   if (op_variable_value != nullptr)
-    return run_variable_value(state, op_variable_value);
+    return run_variable_value(op_variable_value);
 
   OperationMemberValue *op_member_value =
       dynamic_cast<OperationMemberValue *>(operation);
   if (op_member_value != nullptr)
-    return run_member_value(state, op_member_value);
+    return run_member_value(op_member_value);
 
   OperationBinary *op_binary = dynamic_cast<OperationBinary *>(operation);
   if (op_binary != nullptr)
-    return run_binary(state, op_binary);
+    return run_binary(op_binary);
 
-  return state->none_value->ref();
+  return none_value.ref();
 }
 
 void elf_run(const char *data, OperationModule *module) {
-  ProgramState *state = new ProgramState;
-  memset(state, 0, sizeof(ProgramState));
-  state->data = data;
-  state->none_value = data_value_new(DATA_TYPE_NONE);
+  ProgramState state(data);
 
-  DataValue *result = run_module(state, module);
+  auto result = state.run_module(module);
   result->unref();
-
-  state->none_value->unref();
-  for (size_t i = 0; i < state->variables_length; i++)
-    delete state->variables[i];
-  free(state->variables);
-  delete state;
 }
