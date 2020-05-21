@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include <stdbool.h>
 #include <string>
 #include <vector>
 

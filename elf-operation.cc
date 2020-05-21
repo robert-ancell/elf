@@ -9,8 +9,6 @@
 
 #include "elf-operation.h"
 
-#include <string.h>
-
 OperationModule::~OperationModule() {
   for (auto i = body.begin(); i != body.end(); i++)
     (*i)->unref();
