@@ -41,7 +41,6 @@ struct Token {
   TokenType type;
   size_t offset;
   size_t length;
-  int ref_count;
 
   Token(TokenType type, size_t offset, size_t length);
 
@@ -56,8 +55,4 @@ struct Token {
   std::string parse_text_constant(const char *data);
 
   std::string to_string();
-
-  Token *ref();
-
-  void unref();
 };

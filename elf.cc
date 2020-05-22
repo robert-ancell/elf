@@ -145,7 +145,7 @@ static int run_elf_source(std::string filename) {
   if (fd < 0)
     return 1;
 
-  OperationModule *module = elf_parse(data, data_length);
+  auto module = elf_parse(data, data_length);
   if (module == NULL) {
     munmap_file(fd, data, data_length);
     return 1;
@@ -282,7 +282,7 @@ static int compile_elf_source(std::string filename) {
   if (fd < 0)
     return 1;
 
-  autofree_operation module = (Operation *)elf_parse(data, data_length);
+  auto module = elf_parse(data, data_length);
   if (module == NULL) {
     munmap_file(fd, data, data_length);
     return 1;

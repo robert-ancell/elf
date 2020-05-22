@@ -21,7 +21,7 @@ static int hex_digit(char c) {
 }
 
 Token::Token(TokenType type, size_t offset, size_t length)
-    : type(type), offset(offset), length(length), ref_count(1) {}
+    : type(type), offset(offset), length(length) {}
 
 std::string Token::get_text(const char *data) {
   std::string value;
@@ -186,15 +186,4 @@ std::string Token::to_string() {
   }
 
   return "UNKNOWN(" + std::to_string(type) + ")";
-}
-
-Token *Token::ref() {
-  ref_count++;
-  return this;
-}
-
-void Token::unref() {
-  ref_count--;
-  if (ref_count == 0)
-    delete this;
 }

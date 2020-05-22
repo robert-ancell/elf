@@ -9,9 +9,10 @@
 
 #pragma once
 
-#include <stdlib.h>
+#include <memory>
 
 #include "elf-operation.h"
 #include "elf-token.h"
 
-OperationModule *elf_parse(const char *data, size_t data_length);
+std::shared_ptr<OperationModule> elf_parse(const char *data,
+                                           size_t data_length);

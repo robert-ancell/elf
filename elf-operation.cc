@@ -9,20 +9,9 @@
 
 #include "elf-operation.h"
 
-OperationModule::~OperationModule() {
-  for (auto i = body.begin(); i != body.end(); i++)
-    (*i)->unref();
-}
-
 bool OperationFunctionCall::is_constant() {
   // FIXME: Check if parameters are constant
   return function->is_constant();
-}
-
-OperationFunctionCall::~OperationFunctionCall() {
-  name->unref();
-  for (auto i = parameters.begin(); i != parameters.end(); i++)
-    (*i)->unref();
 }
 
 bool OperationVariableValue::is_constant() {
@@ -40,25 +29,9 @@ bool OperationMemberValue::is_constant() {
   return false;
 }
 
-OperationMemberValue::~OperationMemberValue() {
-  object->unref();
-  member->unref();
-  for (auto i = parameters.begin(); i != parameters.end(); i++)
-    (*i)->unref();
-}
-
 bool OperationFunctionDefinition::is_constant() {
   // FIXME: Should scan function for return value
   return false;
-}
-
-OperationFunctionDefinition::~OperationFunctionDefinition() {
-  data_type->unref();
-  name->unref();
-  for (auto i = parameters.begin(); i != parameters.end(); i++)
-    (*i)->unref();
-  for (auto i = body.begin(); i != body.end(); i++)
-    (*i)->unref();
 }
 
 std::string OperationNumberConstant::get_data_type(const char *data) {
@@ -70,36 +43,10 @@ std::string OperationBinary::get_data_type(const char *data) {
   return a->get_data_type(data);
 }
 
-Operation *Operation::get_last_child() {
+std::shared_ptr<Operation> Operation::get_last_child() {
   size_t n_children = get_n_children();
   if (n_children > 0)
     return get_child(n_children - 1);
   else
     return nullptr;
-}
-
-OperationIf::~OperationIf() {
-  keyword->unref();
-  condition->unref();
-  for (auto i = body.begin(); i != body.end(); i++)
-    (*i)->unref();
-}
-
-OperationElse::~OperationElse() {
-  keyword->unref();
-  for (auto i = body.begin(); i != body.end(); i++)
-    (*i)->unref();
-}
-
-OperationWhile::~OperationWhile() {
-  condition->unref();
-  for (auto i = body.begin(); i != body.end(); i++)
-    (*i)->unref();
-}
-
-void operation_cleanup(Operation **operation) {
-  if (*operation == nullptr)
-    return;
-  (*operation)->unref();
-  *operation = nullptr;
 }

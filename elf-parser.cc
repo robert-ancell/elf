@@ -9,22 +9,23 @@
 
 #include "elf-parser.h"
 
+#include <memory>
 #include <stdio.h>
 #include <vector>
 
 struct StackFrame {
-  Operation *operation;
+  std::shared_ptr<Operation> operation;
 
-  std::vector<OperationVariableDefinition *> variables;
+  std::vector<std::shared_ptr<OperationVariableDefinition>> variables;
 
-  StackFrame(Operation *operation) : operation(operation) {}
+  StackFrame(std::shared_ptr<Operation> operation) : operation(operation) {}
 };
 
 struct Parser {
   const char *data;
   size_t data_length;
 
-  std::vector<Token *> tokens;
+  std::vector<std::shared_ptr<Token>> tokens;
   size_t offset;
 
   std::vector<StackFrame *> stack;
@@ -32,39 +33,45 @@ struct Parser {
   Parser(const char *data, size_t data_length)
       : data(data), data_length(data_length), offset(0) {}
 
-  void push_stack(Operation *operation);
-  void add_stack_variable(OperationVariableDefinition *definition);
+  void push_stack(std::shared_ptr<Operation> operation);
+  void
+  add_stack_variable(std::shared_ptr<OperationVariableDefinition> definition);
   void pop_stack();
-  void print_token_error(Token *token, std::string message);
-  bool is_data_type(Token *token);
-  bool is_parameter_name(Token *token);
-  bool token_text_matches(Token *a, Token *b);
-  bool is_boolean(Token *token);
-  OperationVariableDefinition *find_variable(Token *token);
-  OperationFunctionDefinition *find_function(Token *token);
-  bool is_builtin_function(Token *token);
-  bool has_member(Operation *value, Token *member);
-  Token *current_token();
+  void print_token_error(std::shared_ptr<Token> token, std::string message);
+  bool is_data_type(std::shared_ptr<Token> token);
+  bool is_parameter_name(std::shared_ptr<Token> token);
+  bool token_text_matches(std::shared_ptr<Token> a, std::shared_ptr<Token> b);
+  bool is_boolean(std::shared_ptr<Token> token);
+  std::shared_ptr<OperationVariableDefinition>
+  find_variable(std::shared_ptr<Token> token);
+  std::shared_ptr<OperationFunctionDefinition>
+  find_function(std::shared_ptr<Token> token);
+  bool is_builtin_function(std::shared_ptr<Token> token);
+  bool has_member(std::shared_ptr<Operation> value,
+                  std::shared_ptr<Token> member);
+  std::shared_ptr<Token> current_token();
   void next_token();
-  bool parse_parameters(std::vector<Operation *> &parameters);
-  Operation *parse_value();
-  Operation *parse_expression();
-  OperationFunctionDefinition *get_current_function();
+  bool parse_parameters(std::vector<std::shared_ptr<Operation>> &parameters);
+  std::shared_ptr<Operation> parse_value();
+  std::shared_ptr<Operation> parse_expression();
+  std::shared_ptr<OperationFunctionDefinition> get_current_function();
   bool parse_sequence();
 };
 
-void Parser::push_stack(Operation *operation) {
+void Parser::push_stack(std::shared_ptr<Operation> operation) {
   stack.push_back(new StackFrame(operation));
 }
 
-void Parser::add_stack_variable(OperationVariableDefinition *definition) {
+void Parser::add_stack_variable(
+    std::shared_ptr<OperationVariableDefinition> definition) {
   StackFrame *frame = stack.back();
   frame->variables.push_back(definition);
 }
 
 void Parser::pop_stack() { stack.pop_back(); }
 
-void Parser::print_token_error(Token *token, std::string message) {
+void Parser::print_token_error(std::shared_ptr<Token> token,
+                               std::string message) {
   size_t line_offset = 0;
   size_t line_number = 1;
   for (size_t i = 0; i < token->offset; i++) {
@@ -93,7 +100,7 @@ static bool is_symbol_char(char c) {
          (c >= 'A' && c <= 'Z') || c == '_';
 }
 
-static char string_is_complete(const char *data, Token *token) {
+static char string_is_complete(const char *data, std::shared_ptr<Token> token) {
   // Need at least an open and closing quote
   if (token->length < 2)
     return false;
@@ -119,7 +126,8 @@ static char string_is_complete(const char *data, Token *token) {
   return !in_escape;
 }
 
-static bool token_is_complete(const char *data, Token *token, char next_c) {
+static bool token_is_complete(const char *data, std::shared_ptr<Token> token,
+                              char next_c) {
   switch (token->type) {
   case TOKEN_TYPE_COMMENT:
     return next_c == '\n' || next_c == '\0';
@@ -158,9 +166,10 @@ static bool token_is_complete(const char *data, Token *token, char next_c) {
   return false;
 }
 
-static std::vector<Token *> elf_lex(const char *data, size_t data_length) {
-  std::vector<Token *> tokens;
-  Token *current_token = nullptr;
+static std::vector<std::shared_ptr<Token>> elf_lex(const char *data,
+                                                   size_t data_length) {
+  std::vector<std::shared_ptr<Token>> tokens;
+  std::shared_ptr<Token> current_token = nullptr;
 
   for (size_t offset = 0; offset < data_length; offset++) {
     // FIXME: Support UTF-8
@@ -210,7 +219,7 @@ static std::vector<Token *> elf_lex(const char *data, size_t data_length) {
       else if (is_symbol_char(c))
         type = TOKEN_TYPE_WORD;
 
-      Token *token = new Token(type, offset, 1);
+      auto token = std::make_shared<Token>(type, offset, 1);
       tokens.push_back(token);
 
       current_token = token;
@@ -233,7 +242,7 @@ static std::vector<Token *> elf_lex(const char *data, size_t data_length) {
   return tokens;
 }
 
-bool Parser::is_data_type(Token *token) {
+bool Parser::is_data_type(std::shared_ptr<Token> token) {
   const char *builtin_types[] = {"bool",  "uint8",  "int8",  "uint16",
                                  "int16", "uint32", "int32", "uint64",
                                  "int64", "utf8",   nullptr};
@@ -248,7 +257,7 @@ bool Parser::is_data_type(Token *token) {
   return false;
 }
 
-bool Parser::is_parameter_name(Token *token) {
+bool Parser::is_parameter_name(std::shared_ptr<Token> token) {
   if (token->type != TOKEN_TYPE_WORD)
     return false;
 
@@ -257,7 +266,8 @@ bool Parser::is_parameter_name(Token *token) {
   return true;
 }
 
-bool Parser::token_text_matches(Token *a, Token *b) {
+bool Parser::token_text_matches(std::shared_ptr<Token> a,
+                                std::shared_ptr<Token> b) {
   if (a->length != b->length)
     return false;
 
@@ -268,11 +278,12 @@ bool Parser::token_text_matches(Token *a, Token *b) {
   return true;
 }
 
-bool Parser::is_boolean(Token *token) {
+bool Parser::is_boolean(std::shared_ptr<Token> token) {
   return token->has_text(data, "true") || token->has_text(data, "false");
 }
 
-OperationVariableDefinition *Parser::find_variable(Token *token) {
+std::shared_ptr<OperationVariableDefinition>
+Parser::find_variable(std::shared_ptr<Token> token) {
   if (token->type != TOKEN_TYPE_WORD)
     return nullptr;
 
@@ -280,7 +291,7 @@ OperationVariableDefinition *Parser::find_variable(Token *token) {
     StackFrame *frame = *i;
 
     for (auto j = frame->variables.begin(); j != frame->variables.end(); j++) {
-      OperationVariableDefinition *definition = *j;
+      auto definition = *j;
 
       if (token_text_matches(definition->name, token))
         return definition;
@@ -290,19 +301,19 @@ OperationVariableDefinition *Parser::find_variable(Token *token) {
   return nullptr;
 }
 
-OperationFunctionDefinition *Parser::find_function(Token *token) {
+std::shared_ptr<OperationFunctionDefinition>
+Parser::find_function(std::shared_ptr<Token> token) {
   if (token->type != TOKEN_TYPE_WORD)
     return nullptr;
 
   for (auto i = stack.rbegin(); i != stack.rend(); i++) {
-    Operation *operation = (*i)->operation;
+    auto operation = (*i)->operation;
 
     size_t n_children = operation->get_n_children();
     for (size_t j = 0; j < n_children; j++) {
-      Operation *child = operation->get_child(j);
+      auto child = operation->get_child(j);
 
-      OperationFunctionDefinition *op =
-          dynamic_cast<OperationFunctionDefinition *>(child);
+      auto op = std::dynamic_pointer_cast<OperationFunctionDefinition>(child);
       if (op != nullptr && token_text_matches(op->name, token))
         return op;
     }
@@ -311,7 +322,7 @@ OperationFunctionDefinition *Parser::find_function(Token *token) {
   return nullptr;
 }
 
-bool Parser::is_builtin_function(Token *token) {
+bool Parser::is_builtin_function(std::shared_ptr<Token> token) {
   const char *builtin_functions[] = {"print", nullptr};
 
   if (token->type != TOKEN_TYPE_WORD)
@@ -324,7 +335,8 @@ bool Parser::is_builtin_function(Token *token) {
   return false;
 }
 
-bool Parser::has_member(Operation *value, Token *member) {
+bool Parser::has_member(std::shared_ptr<Operation> value,
+                        std::shared_ptr<Token> member) {
   auto data_type = value->get_data_type(data);
 
   // FIXME: Super hacky. The nullptr is because Elf can't determine the return
@@ -337,15 +349,15 @@ bool Parser::has_member(Operation *value, Token *member) {
   return false;
 }
 
-Token *Parser::current_token() {
+std::shared_ptr<Token> Parser::current_token() {
   return offset < tokens.size() ? tokens[offset] : 0;
 }
 
 void Parser::next_token() { offset++; }
 
-bool Parser::parse_parameters(std::vector<Operation *> &parameters) {
-
-  Token *open_paren_token = current_token();
+bool Parser::parse_parameters(
+    std::vector<std::shared_ptr<Operation>> &parameters) {
+  auto open_paren_token = current_token();
   if (open_paren_token == nullptr ||
       open_paren_token->type != TOKEN_TYPE_OPEN_PAREN)
     return true;
@@ -353,7 +365,7 @@ bool Parser::parse_parameters(std::vector<Operation *> &parameters) {
 
   bool closed = false;
   while (current_token() != nullptr) {
-    Token *t = current_token();
+    auto t = current_token();
     if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
       next_token();
       closed = true;
@@ -369,7 +381,7 @@ bool Parser::parse_parameters(std::vector<Operation *> &parameters) {
       t = current_token();
     }
 
-    Operation *value = parse_expression();
+    auto value = parse_expression();
     if (value == nullptr) {
       print_token_error(current_token(), "Invalid parameter");
       return false;
@@ -386,36 +398,36 @@ bool Parser::parse_parameters(std::vector<Operation *> &parameters) {
   return true;
 }
 
-Operation *Parser::parse_value() {
-  Token *token = current_token();
+std::shared_ptr<Operation> Parser::parse_value() {
+  auto token = current_token();
   if (token == nullptr)
     return nullptr;
 
-  OperationFunctionDefinition *f;
-  OperationVariableDefinition *v;
-  autofree_operation value = nullptr;
+  std::shared_ptr<OperationFunctionDefinition> f;
+  std::shared_ptr<OperationVariableDefinition> v;
+  std::shared_ptr<Operation> value = nullptr;
   if (token->type == TOKEN_TYPE_NUMBER) {
     next_token();
-    value = new OperationNumberConstant(token);
+    value = std::make_shared<OperationNumberConstant>(token);
   } else if (token->type == TOKEN_TYPE_TEXT) {
     next_token();
-    value = new OperationTextConstant(token);
+    value = std::make_shared<OperationTextConstant>(token);
   } else if (is_boolean(token)) {
     next_token();
-    value = new OperationBooleanConstant(token);
+    value = std::make_shared<OperationBooleanConstant>(token);
   } else if ((v = find_variable(token)) != nullptr) {
     next_token();
-    value = new OperationVariableValue(token, v);
+    value = std::make_shared<OperationVariableValue>(token, v);
   } else if ((f = find_function(token)) != nullptr ||
              is_builtin_function(token)) {
-    Token *name = token;
+    auto name = token;
     next_token();
 
-    std::vector<Operation *> parameters;
+    std::vector<std::shared_ptr<Operation>> parameters;
     if (!parse_parameters(parameters))
       return nullptr;
 
-    value = new OperationFunctionCall(name, parameters, f);
+    value = std::make_shared<OperationFunctionCall>(name, parameters, f);
   }
 
   if (value == nullptr)
@@ -429,18 +441,18 @@ Operation *Parser::parse_value() {
     }
     next_token();
 
-    std::vector<Operation *> parameters;
+    std::vector<std::shared_ptr<Operation>> parameters;
     if (!parse_parameters(parameters))
       return nullptr;
 
-    value = new OperationMemberValue(value, token, parameters);
+    value = std::make_shared<OperationMemberValue>(value, token, parameters);
     token = current_token();
   }
 
-  return value->ref();
+  return value;
 }
 
-static bool token_is_binary_operator(Token *token) {
+static bool token_is_binary_operator(std::shared_ptr<Token> token) {
   return token->type == TOKEN_TYPE_EQUAL ||
          token->type == TOKEN_TYPE_NOT_EQUAL ||
          token->type == TOKEN_TYPE_GREATER ||
@@ -451,20 +463,20 @@ static bool token_is_binary_operator(Token *token) {
          token->type == TOKEN_TYPE_MULTIPLY || token->type == TOKEN_TYPE_DIVIDE;
 }
 
-Operation *Parser::parse_expression() {
-  autofree_operation a = parse_value();
+std::shared_ptr<Operation> Parser::parse_expression() {
+  auto a = parse_value();
   if (a == nullptr)
     return nullptr;
 
-  Token *op = current_token();
+  auto op = current_token();
   if (op == nullptr)
-    return a->ref();
+    return a;
 
   if (!token_is_binary_operator(op))
-    return a->ref();
+    return a;
   next_token();
 
-  autofree_operation b = parse_value();
+  auto b = parse_value();
   if (b == nullptr) {
     print_token_error(current_token(),
                       "Missing second value in binary operation");
@@ -479,13 +491,13 @@ Operation *Parser::parse_expression() {
     return nullptr;
   }
 
-  return new OperationBinary(op, a, b);
+  return std::make_shared<OperationBinary>(op, a, b);
 }
 
-OperationFunctionDefinition *Parser::get_current_function() {
+std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
   for (auto i = stack.rbegin(); i != stack.rend(); i++) {
-    OperationFunctionDefinition *op =
-        dynamic_cast<OperationFunctionDefinition *>((*i)->operation);
+    auto op =
+        std::dynamic_pointer_cast<OperationFunctionDefinition>((*i)->operation);
     if (op != nullptr)
       return op;
   }
@@ -510,10 +522,10 @@ static bool can_assign(std::string variable_type, std::string value_type) {
 }
 
 bool Parser::parse_sequence() {
-  Operation *parent = stack.back()->operation;
+  std::shared_ptr<Operation> parent = stack.back()->operation;
 
   while (current_token() != nullptr) {
-    Token *token = current_token();
+    auto token = current_token();
 
     // Stop when sequence ends
     if (token->type == TOKEN_TYPE_CLOSE_BRACE)
@@ -525,23 +537,25 @@ bool Parser::parse_sequence() {
       continue;
     }
 
-    autofree_operation op = nullptr;
-    OperationVariableDefinition *v;
+    std::shared_ptr<Operation> op = nullptr;
+    std::shared_ptr<OperationVariableDefinition> v;
     if (is_data_type(token)) {
-      Token *data_type = token;
+      auto data_type = token;
       next_token();
 
-      Token *name = current_token(); // FIXME: Check valid name
+      auto name = current_token(); // FIXME: Check valid name
       next_token();
 
-      Token *assignment_token = current_token();
+      auto assignment_token = current_token();
       if (assignment_token == nullptr) {
-        op = new OperationVariableDefinition(data_type, name, nullptr);
-        add_stack_variable((OperationVariableDefinition *)op);
+        auto definition = std::make_shared<OperationVariableDefinition>(
+            data_type, name, nullptr);
+        add_stack_variable(definition);
+        op = definition;
       } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
         next_token();
 
-        autofree_operation value = parse_expression();
+        auto value = parse_expression();
         if (value == nullptr) {
           print_token_error(current_token(), "Invalid value for variable");
           return false;
@@ -556,15 +570,17 @@ bool Parser::parse_sequence() {
           return false;
         }
 
-        op = new OperationVariableDefinition(data_type, name, value);
-        add_stack_variable((OperationVariableDefinition *)op);
+        auto definition = std::make_shared<OperationVariableDefinition>(
+            data_type, name, value);
+        add_stack_variable(definition);
+        op = definition;
       } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
         next_token();
 
-        std::vector<OperationVariableDefinition *> parameters;
+        std::vector<std::shared_ptr<OperationVariableDefinition>> parameters;
         bool closed = false;
         while (current_token() != nullptr) {
-          Token *t = current_token();
+          auto t = current_token();
           if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
             next_token();
             closed = true;
@@ -587,15 +603,15 @@ bool Parser::parse_sequence() {
           data_type = t;
           next_token();
 
-          Token *name = current_token();
+          auto name = current_token();
           if (!is_parameter_name(name)) {
             print_token_error(current_token(), "Not a parameter name");
             return false;
           }
           next_token();
 
-          parameters.push_back(
-              new OperationVariableDefinition(data_type, name, nullptr));
+          parameters.push_back(std::make_shared<OperationVariableDefinition>(
+              data_type, name, nullptr));
         }
 
         if (!closed) {
@@ -603,14 +619,15 @@ bool Parser::parse_sequence() {
           return false;
         }
 
-        Token *open_brace = current_token();
+        auto open_brace = current_token();
         if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
           print_token_error(current_token(), "Missing function open brace");
           return false;
         }
         next_token();
 
-        op = new OperationFunctionDefinition(data_type, name, parameters);
+        op = std::make_shared<OperationFunctionDefinition>(data_type, name,
+                                                           parameters);
         push_stack(op);
 
         for (auto i = parameters.begin(); i != parameters.end(); i++)
@@ -619,7 +636,7 @@ bool Parser::parse_sequence() {
         if (!parse_sequence())
           return false;
 
-        Token *close_brace = current_token();
+        auto close_brace = current_token();
         if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
           print_token_error(current_token(), "Missing function close brace");
           return false;
@@ -628,31 +645,33 @@ bool Parser::parse_sequence() {
 
         pop_stack();
       } else {
-        op = new OperationVariableDefinition(data_type, name, nullptr);
-        add_stack_variable((OperationVariableDefinition *)op);
+        auto definition = std::make_shared<OperationVariableDefinition>(
+            data_type, name, nullptr);
+        add_stack_variable(definition);
+        op = definition;
       }
     } else if (token->has_text(data, "if")) {
       next_token();
 
-      autofree_operation condition = parse_expression();
+      auto condition = parse_expression();
       if (condition == nullptr) {
         print_token_error(current_token(), "Not valid if condition");
         return false;
       }
 
-      Token *open_brace = current_token();
+      auto open_brace = current_token();
       if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
         print_token_error(current_token(), "Missing if open brace");
         return false;
       }
       next_token();
 
-      op = new OperationIf(token, condition);
+      op = std::make_shared<OperationIf>(token, condition);
       push_stack(op);
       if (!parse_sequence())
         return false;
 
-      Token *close_brace = current_token();
+      auto close_brace = current_token();
       if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
         print_token_error(current_token(), "Missing if close brace");
         return false;
@@ -661,8 +680,9 @@ bool Parser::parse_sequence() {
 
       pop_stack();
     } else if (token->has_text(data, "else")) {
-      Operation *last_operation = parent->get_last_child();
-      OperationIf *if_operation = dynamic_cast<OperationIf *>(last_operation);
+      std::shared_ptr<Operation> last_operation = parent->get_last_child();
+      auto if_operation =
+          std::dynamic_pointer_cast<OperationIf>(last_operation);
       if (if_operation == nullptr) {
         print_token_error(current_token(), "else must follow if");
         return false;
@@ -670,20 +690,21 @@ bool Parser::parse_sequence() {
 
       next_token();
 
-      Token *open_brace = current_token();
+      auto open_brace = current_token();
       if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
         print_token_error(current_token(), "Missing else open brace");
         return false;
       }
       next_token();
 
-      op = new OperationElse(token);
-      if_operation->else_operation = (OperationElse *)op;
+      auto else_op = std::make_shared<OperationElse>(token);
+      if_operation->else_operation = else_op;
+      op = else_op;
       push_stack(op);
       if (!parse_sequence())
         return false;
 
-      Token *close_brace = current_token();
+      auto close_brace = current_token();
       if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
         print_token_error(current_token(), "Missing else close brace");
         return false;
@@ -694,25 +715,25 @@ bool Parser::parse_sequence() {
     } else if (token->has_text(data, "while")) {
       next_token();
 
-      autofree_operation condition = parse_expression();
+      auto condition = parse_expression();
       if (condition == nullptr) {
         print_token_error(current_token(), "Not valid while condition");
         return false;
       }
 
-      Token *open_brace = current_token();
+      auto open_brace = current_token();
       if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
         print_token_error(current_token(), "Missing while open brace");
         return false;
       }
       next_token();
 
-      op = new OperationWhile(condition);
+      op = std::make_shared<OperationWhile>(condition);
       push_stack(op);
       if (!parse_sequence())
         return false;
 
-      Token *close_brace = current_token();
+      auto close_brace = current_token();
       if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
         print_token_error(current_token(), "Missing while close brace");
         return false;
@@ -723,35 +744,35 @@ bool Parser::parse_sequence() {
     } else if (token->has_text(data, "return")) {
       next_token();
 
-      Operation *value = parse_expression();
+      std::shared_ptr<Operation> value = parse_expression();
       if (value == nullptr) {
         print_token_error(current_token(), "Not valid return value");
         return false;
       }
 
-      op = new OperationReturn(value, get_current_function());
+      op = std::make_shared<OperationReturn>(value, get_current_function());
     } else if (token->has_text(data, "assert")) {
       next_token();
 
-      autofree_operation expression = parse_expression();
+      auto expression = parse_expression();
       if (expression == nullptr) {
         print_token_error(current_token(), "Not valid assertion expression");
         return false;
       }
 
-      op = new OperationAssert(token, expression);
+      op = std::make_shared<OperationAssert>(token, expression);
     } else if ((v = find_variable(token)) != nullptr) {
-      Token *name = token;
+      auto name = token;
       next_token();
 
-      Token *assignment_token = current_token();
+      auto assignment_token = current_token();
       if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
         print_token_error(current_token(), "Missing assignment token");
         return false;
       }
       next_token();
 
-      autofree_operation value = parse_expression();
+      auto value = parse_expression();
       if (value == nullptr) {
         print_token_error(current_token(), "Invalid value for variable");
         return false;
@@ -766,7 +787,7 @@ bool Parser::parse_sequence() {
         return false;
       }
 
-      op = new OperationVariableAssignment(name, value, v);
+      op = std::make_shared<OperationVariableAssignment>(name, value, v);
     } else if ((op = parse_value()) != nullptr) {
       // FIXME: Only allow functions and variable values
     } else {
@@ -780,25 +801,22 @@ bool Parser::parse_sequence() {
   return true;
 }
 
-OperationModule *elf_parse(const char *data, size_t data_length) {
-  auto parser = new Parser(data, data_length);
+std::shared_ptr<OperationModule> elf_parse(const char *data,
+                                           size_t data_length) {
+  Parser parser(data, data_length);
 
-  parser->tokens = elf_lex(data, data_length);
+  parser.tokens = elf_lex(data, data_length);
 
-  Operation *module = new OperationModule();
-  parser->push_stack(module);
+  auto module = std::make_shared<OperationModule>();
+  parser.push_stack(module);
 
-  if (!parser->parse_sequence()) {
-    delete parser;
+  if (!parser.parse_sequence())
     return nullptr;
-  }
 
-  if (parser->current_token() != nullptr) {
+  if (parser.current_token() != nullptr) {
     printf("Expected end of input\n");
     return nullptr;
   }
 
-  delete parser;
-
-  return static_cast<OperationModule *>(module->ref());
+  return module;
 }

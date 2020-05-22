@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "elf-operation.h"
 
-void elf_run(const char *data, OperationModule *module);
+void elf_run(const char *data, std::shared_ptr<OperationModule> module);
