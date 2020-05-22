@@ -10,25 +10,12 @@
 #include "elf-runner.h"
 
 #include <assert.h>
+#include <memory>
 #include <stdio.h>
 
 struct DataValue {
-  int ref_count;
-
-  DataValue() : ref_count(1) {}
   virtual ~DataValue() {}
   virtual void print() = 0;
-
-  DataValue *ref() {
-    ref_count++;
-    return this;
-  }
-
-  void unref() {
-    ref_count--;
-    if (ref_count == 0)
-      delete this;
-  }
 };
 
 struct DataValueNone : DataValue {
@@ -80,22 +67,20 @@ struct DataValueUtf8 : DataValue {
 
 struct Variable {
   std::string name;
-  DataValue *value;
+  std::shared_ptr<DataValue> value;
 
-  Variable(std::string name, DataValue *value)
-      : name(name), value(value->ref()) {}
-
-  ~Variable() { value->unref(); }
+  Variable(std::string name, std::shared_ptr<DataValue> value)
+      : name(name), value(value) {}
 };
 
 struct ProgramState {
   const char *data;
 
-  DataValueNone none_value;
+  std::shared_ptr<DataValueNone> none_value;
 
   std::vector<Variable *> variables;
 
-  DataValue *return_value;
+  std::shared_ptr<DataValue> return_value;
 
   OperationAssert *failed_assertion;
 
@@ -108,130 +93,135 @@ struct ProgramState {
   }
 
   void run_sequence(std::vector<Operation *> &body);
-  DataValue *run_module(OperationModule *module);
-  DataValue *run_function(OperationFunctionDefinition *function);
-  DataValue *make_default_value(Token *data_type);
-  void add_variable(std::string name, DataValue *value);
-  DataValue *run_variable_definition(OperationVariableDefinition *operation);
-  DataValue *run_variable_assignment(OperationVariableAssignment *operation);
-  DataValue *run_if(OperationIf *operation);
-  DataValue *run_while(OperationWhile *operation);
-  DataValue *run_function_call(OperationFunctionCall *operation);
-  DataValue *run_return(OperationReturn *operation);
-  DataValue *run_assert(OperationAssert *operation);
-  DataValue *run_boolean_constant(OperationBooleanConstant *operation);
-  DataValue *run_number_constant(OperationNumberConstant *operation);
-  DataValue *run_text_constant(OperationTextConstant *operation);
-  DataValue *run_variable_value(OperationVariableValue *operation);
-  DataValue *run_member_value(OperationMemberValue *operation);
-  DataValue *run_binary_boolean(OperationBinary *operation, DataValueBool *a,
-                                DataValueBool *b);
-  DataValue *run_binary_integer(OperationBinary *operation, DataValueUint8 *a,
-                                DataValueUint8 *b);
-  DataValue *run_binary_text(OperationBinary *operation, DataValueUtf8 *a,
-                             DataValueUtf8 *b);
-  DataValue *run_binary(OperationBinary *operation);
-  DataValue *run_operation(Operation *operation);
+  std::shared_ptr<DataValue> run_module(OperationModule *module);
+  std::shared_ptr<DataValue>
+  run_function(OperationFunctionDefinition *function);
+  std::shared_ptr<DataValue> make_default_value(Token *data_type);
+  void add_variable(std::string name, std::shared_ptr<DataValue> value);
+  std::shared_ptr<DataValue>
+  run_variable_definition(OperationVariableDefinition *operation);
+  std::shared_ptr<DataValue>
+  run_variable_assignment(OperationVariableAssignment *operation);
+  std::shared_ptr<DataValue> run_if(OperationIf *operation);
+  std::shared_ptr<DataValue> run_while(OperationWhile *operation);
+  std::shared_ptr<DataValue>
+  run_function_call(OperationFunctionCall *operation);
+  std::shared_ptr<DataValue> run_return(OperationReturn *operation);
+  std::shared_ptr<DataValue> run_assert(OperationAssert *operation);
+  std::shared_ptr<DataValue>
+  run_boolean_constant(OperationBooleanConstant *operation);
+  std::shared_ptr<DataValue>
+  run_number_constant(OperationNumberConstant *operation);
+  std::shared_ptr<DataValue>
+  run_text_constant(OperationTextConstant *operation);
+  std::shared_ptr<DataValue>
+  run_variable_value(OperationVariableValue *operation);
+  std::shared_ptr<DataValue> run_member_value(OperationMemberValue *operation);
+  std::shared_ptr<DataValue>
+  run_binary_boolean(OperationBinary *operation,
+                     std::shared_ptr<DataValueBool> a,
+                     std::shared_ptr<DataValueBool> b);
+  std::shared_ptr<DataValue>
+  run_binary_integer(OperationBinary *operation,
+                     std::shared_ptr<DataValueUint8> a,
+                     std::shared_ptr<DataValueUint8> b);
+  std::shared_ptr<DataValue> run_binary_text(OperationBinary *operation,
+                                             std::shared_ptr<DataValueUtf8> a,
+                                             std::shared_ptr<DataValueUtf8> b);
+  std::shared_ptr<DataValue> run_binary(OperationBinary *operation);
+  std::shared_ptr<DataValue> run_operation(Operation *operation);
 };
 
 void ProgramState::run_sequence(std::vector<Operation *> &body) {
   for (auto i = body.begin();
        i != body.end() && failed_assertion == NULL && return_value == NULL;
        i++) {
-    DataValue *value = run_operation(*i);
-    value->unref();
+    std::shared_ptr<DataValue> value = run_operation(*i);
   }
 }
 
-DataValue *ProgramState::run_module(OperationModule *module) {
+std::shared_ptr<DataValue> ProgramState::run_module(OperationModule *module) {
   run_sequence(module->body);
 
-  return none_value.ref();
+  return none_value;
 }
 
-DataValue *ProgramState::run_function(OperationFunctionDefinition *function) {
+std::shared_ptr<DataValue>
+ProgramState::run_function(OperationFunctionDefinition *function) {
   run_sequence(function->body);
 
   auto result = return_value;
   return_value = nullptr;
 
   if (result == nullptr)
-    return none_value.ref();
+    return none_value;
 
   return result;
 }
 
-DataValue *ProgramState::make_default_value(Token *data_type) {
+std::shared_ptr<DataValue> ProgramState::make_default_value(Token *data_type) {
   auto type_name = data_type->get_text(data);
 
-  DataValue *result = NULL;
   if (type_name == "bool")
-    result = new DataValueBool(false);
+    return std::make_shared<DataValueBool>(false);
   else if (type_name == "uint8")
-    result = new DataValueUint8(0);
+    return std::make_shared<DataValueUint8>(0);
   else if (type_name == "uint16")
-    result = new DataValueUint16(0);
+    return std::make_shared<DataValueUint16>(0);
   else if (type_name == "uint32")
-    result = new DataValueUint32(0);
+    return std::make_shared<DataValueUint32>(0);
   else if (type_name == "uint64")
-    result = new DataValueUint64(0);
+    return std::make_shared<DataValueUint64>(0);
   else if (type_name == "utf8")
-    result = new DataValueUtf8("");
-
-  if (result == NULL)
-    printf("default value (%s)\n", type_name.c_str());
-
-  return result;
+    return std::make_shared<DataValueUtf8>("");
+  else
+    return none_value;
 }
 
-void ProgramState::add_variable(std::string name, DataValue *value) {
+void ProgramState::add_variable(std::string name,
+                                std::shared_ptr<DataValue> value) {
   variables.push_back(new Variable(name, value));
 }
 
-DataValue *
+std::shared_ptr<DataValue>
 ProgramState::run_variable_definition(OperationVariableDefinition *operation) {
   auto variable_name = operation->name->get_text(data);
 
-  DataValue *value = NULL;
-  if (operation->value != NULL)
-    value = run_operation(operation->value);
-  else
-    value = make_default_value(operation->data_type);
-
-  if (value != NULL)
+  if (operation->value != nullptr) {
+    auto value = run_operation(operation->value);
     add_variable(variable_name, value);
+  } else {
+    auto value = make_default_value(operation->data_type);
+    add_variable(variable_name, value);
+  }
 
-  value->unref();
-
-  return none_value.ref();
+  return none_value;
 }
 
-DataValue *
+std::shared_ptr<DataValue>
 ProgramState::run_variable_assignment(OperationVariableAssignment *operation) {
   auto variable_name = operation->name->get_text(data);
 
-  DataValue *value = run_operation(operation->value);
+  auto value = run_operation(operation->value);
 
   for (size_t i = 0; variables[i] != NULL; i++) {
     Variable *variable = variables[i];
+
     if (variable->name == variable_name) {
-      variable->value->unref();
-      variable->value = value->ref();
+      variable->value = value;
+      break;
     }
   }
 
-  return none_value.ref();
+  return none_value;
 }
 
-DataValue *ProgramState::run_if(OperationIf *operation) {
-  DataValue *value = run_operation(operation->condition);
-  auto bool_value = dynamic_cast<DataValueBool *>(value);
-  if (bool_value == nullptr) {
-    value->unref();
-    return none_value.ref();
-  }
+std::shared_ptr<DataValue> ProgramState::run_if(OperationIf *operation) {
+  auto value = run_operation(operation->condition);
+  auto bool_value = std::dynamic_pointer_cast<DataValueBool>(value);
+  if (bool_value == nullptr)
+    return none_value;
   bool condition = bool_value->value;
-  value->unref();
 
   if (condition) {
     run_sequence(operation->body);
@@ -239,33 +229,30 @@ DataValue *ProgramState::run_if(OperationIf *operation) {
     run_sequence(operation->else_operation->body);
   }
 
-  return none_value.ref();
+  return none_value;
 }
 
-DataValue *ProgramState::run_while(OperationWhile *operation) {
+std::shared_ptr<DataValue> ProgramState::run_while(OperationWhile *operation) {
   while (true) {
-    DataValue *value = run_operation(operation->condition);
-    auto bool_value = dynamic_cast<DataValueBool *>(value);
-    if (bool_value == nullptr) {
-      value->unref();
-      return none_value.ref();
-    }
-    bool condition = bool_value->value;
-    value->unref();
+    auto value = run_operation(operation->condition);
+    auto bool_value = std::dynamic_pointer_cast<DataValueBool>(value);
+    if (bool_value == nullptr)
+      return none_value;
 
-    if (!condition)
-      return none_value.ref();
+    if (!bool_value->value)
+      return none_value;
 
     run_sequence(operation->body);
   }
 }
 
-DataValue *ProgramState::run_function_call(OperationFunctionCall *operation) {
+std::shared_ptr<DataValue>
+ProgramState::run_function_call(OperationFunctionCall *operation) {
   if (operation->function != NULL) {
     // FIXME: Use a stack, these variables shouldn't remain after the call
     for (auto i = operation->parameters.begin();
          i != operation->parameters.end(); i++) {
-      DataValue *value = run_operation(*i);
+      auto value = run_operation(*i);
       OperationVariableDefinition *parameter_definition =
           (OperationVariableDefinition *)operation->function
               ->parameters[i - operation->parameters.begin()];
@@ -279,170 +266,172 @@ DataValue *ProgramState::run_function_call(OperationFunctionCall *operation) {
   std::string function_name = operation->name->get_text(data);
 
   if (function_name == "print") {
-    DataValue *value = run_operation(operation->parameters[0]);
+    auto value = run_operation(operation->parameters[0]);
     value->print();
-    value->unref();
   }
 
-  return none_value.ref();
+  return none_value;
 }
 
-DataValue *ProgramState::run_return(OperationReturn *operation) {
-  DataValue *value = run_operation(operation->value);
-  return_value = value->ref();
+std::shared_ptr<DataValue>
+ProgramState::run_return(OperationReturn *operation) {
+  auto value = run_operation(operation->value);
+  return_value = value;
   return value;
 }
 
-DataValue *ProgramState::run_assert(OperationAssert *operation) {
-  DataValue *value = run_operation(operation->expression);
-  auto bool_value = dynamic_cast<DataValueBool *>(value);
+std::shared_ptr<DataValue>
+ProgramState::run_assert(OperationAssert *operation) {
+  auto value = run_operation(operation->expression);
+  auto bool_value = std::dynamic_pointer_cast<DataValueBool>(value);
   if (bool_value == nullptr || !bool_value->value)
     failed_assertion = operation;
   return value;
 }
 
-DataValue *
+std::shared_ptr<DataValue>
 ProgramState::run_boolean_constant(OperationBooleanConstant *operation) {
   bool value = operation->value->parse_boolean_constant(data);
-  return new DataValueBool(value);
+  return std::make_shared<DataValueBool>(value);
 }
 
-DataValue *
+std::shared_ptr<DataValue>
 ProgramState::run_number_constant(OperationNumberConstant *operation) {
   uint64_t value = operation->value->parse_number_constant(data);
   // FIXME: Catch overflow (numbers > 64 bit not supported)
 
   if (value <= UINT8_MAX)
-    return new DataValueUint8(value);
+    return std::make_shared<DataValueUint8>(value);
   else if (value <= UINT16_MAX)
-    return new DataValueUint16(value);
+    return std::make_shared<DataValueUint16>(value);
   else if (value <= UINT32_MAX)
-    return new DataValueUint32(value);
+    return std::make_shared<DataValueUint32>(value);
   else
-    return new DataValueUint64(value);
+    return std::make_shared<DataValueUint64>(value);
 }
 
-DataValue *ProgramState::run_text_constant(OperationTextConstant *operation) {
+std::shared_ptr<DataValue>
+ProgramState::run_text_constant(OperationTextConstant *operation) {
   auto value = operation->value->parse_text_constant(data);
-  DataValue *result = new DataValueUtf8(value);
-  return result;
+  return std::make_shared<DataValueUtf8>(value);
 }
 
-DataValue *ProgramState::run_variable_value(OperationVariableValue *operation) {
+std::shared_ptr<DataValue>
+ProgramState::run_variable_value(OperationVariableValue *operation) {
   auto variable_name = operation->name->get_text(data);
 
   for (auto i = variables.begin(); i != variables.end(); i++) {
     auto variable = *i;
     if (variable->name == variable_name)
-      return variable->value->ref();
+      return variable->value;
   }
 
   printf("variable value %s\n", variable_name.c_str());
-  return none_value.ref();
+  return none_value;
 }
 
-DataValue *ProgramState::run_member_value(OperationMemberValue *operation) {
-  DataValue *object = run_operation(operation->object);
+std::shared_ptr<DataValue>
+ProgramState::run_member_value(OperationMemberValue *operation) {
+  std::shared_ptr<DataValue> object = run_operation(operation->object);
 
-  DataValue *result = NULL;
-  auto utf8_value = dynamic_cast<DataValueUtf8 *>(object);
+  std::shared_ptr<DataValue> result = NULL;
+  auto utf8_value = std::dynamic_pointer_cast<DataValueUtf8>(object);
   if (utf8_value != nullptr) {
     if (operation->member->has_text(data, ".length"))
-      result = new DataValueUint8(utf8_value->value.size());
+      return std::make_shared<DataValueUint8>(utf8_value->value.size());
     else if (operation->member->has_text(data, ".upper"))
-      result = new DataValueUtf8("FOO"); // FIXME: Total hack
+      return std::make_shared<DataValueUtf8>("FOO"); // FIXME: Total hack
     else if (operation->member->has_text(data, ".lower"))
-      result = new DataValueUtf8("foo"); // FIXME: Total hack
+      return std::make_shared<DataValueUtf8>("foo"); // FIXME: Total hack
   }
 
-  object->unref();
-
-  return result;
+  return none_value;
 }
 
-DataValue *ProgramState::run_binary_boolean(OperationBinary *operation,
-                                            DataValueBool *a,
-                                            DataValueBool *b) {
+std::shared_ptr<DataValue>
+ProgramState::run_binary_boolean(OperationBinary *operation,
+                                 std::shared_ptr<DataValueBool> a,
+                                 std::shared_ptr<DataValueBool> b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
-    return new DataValueBool(a->value == b->value);
+    return std::make_shared<DataValueBool>(a->value == b->value);
   case TOKEN_TYPE_NOT_EQUAL:
-    return new DataValueBool(a->value != b->value);
+    return std::make_shared<DataValueBool>(a->value != b->value);
   default:
-    return none_value.ref();
+    return none_value;
   }
 }
 
-DataValue *ProgramState::run_binary_integer(OperationBinary *operation,
-                                            DataValueUint8 *a,
-                                            DataValueUint8 *b) {
+std::shared_ptr<DataValue>
+ProgramState::run_binary_integer(OperationBinary *operation,
+                                 std::shared_ptr<DataValueUint8> a,
+                                 std::shared_ptr<DataValueUint8> b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
-    return new DataValueBool(a->value == b->value);
+    return std::make_shared<DataValueBool>(a->value == b->value);
   case TOKEN_TYPE_NOT_EQUAL:
-    return new DataValueBool(a->value != b->value);
+    return std::make_shared<DataValueBool>(a->value != b->value);
   case TOKEN_TYPE_GREATER:
-    return new DataValueBool(a->value > b->value);
+    return std::make_shared<DataValueBool>(a->value > b->value);
   case TOKEN_TYPE_GREATER_EQUAL:
-    return new DataValueBool(a->value >= b->value);
+    return std::make_shared<DataValueBool>(a->value >= b->value);
   case TOKEN_TYPE_LESS:
-    return new DataValueBool(a->value < b->value);
+    return std::make_shared<DataValueBool>(a->value < b->value);
   case TOKEN_TYPE_LESS_EQUAL:
-    return new DataValueBool(a->value <= b->value);
+    return std::make_shared<DataValueBool>(a->value <= b->value);
   case TOKEN_TYPE_ADD:
-    return new DataValueUint8(a->value + b->value);
+    return std::make_shared<DataValueUint8>(a->value + b->value);
   case TOKEN_TYPE_SUBTRACT:
-    return new DataValueUint8(a->value - b->value);
+    return std::make_shared<DataValueUint8>(a->value - b->value);
   case TOKEN_TYPE_MULTIPLY:
-    return new DataValueUint8(a->value * b->value);
+    return std::make_shared<DataValueUint8>(a->value * b->value);
   case TOKEN_TYPE_DIVIDE:
-    return new DataValueUint8(a->value / b->value);
+    return std::make_shared<DataValueUint8>(a->value / b->value);
   default:
-    return none_value.ref();
+    return none_value;
   }
 }
 
-DataValue *ProgramState::run_binary_text(OperationBinary *operation,
-                                         DataValueUtf8 *a, DataValueUtf8 *b) {
+std::shared_ptr<DataValue>
+ProgramState::run_binary_text(OperationBinary *operation,
+                              std::shared_ptr<DataValueUtf8> a,
+                              std::shared_ptr<DataValueUtf8> b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
-    return new DataValueBool(a->value == b->value);
+    return std::make_shared<DataValueBool>(a->value == b->value);
   case TOKEN_TYPE_NOT_EQUAL:
-    return new DataValueBool(a->value != b->value);
+    return std::make_shared<DataValueBool>(a->value != b->value);
   case TOKEN_TYPE_ADD:
-    return new DataValueUtf8(a->value + b->value);
+    return std::make_shared<DataValueUtf8>(a->value + b->value);
   default:
-    return none_value.ref();
+    return none_value;
   }
 }
 
-DataValue *ProgramState::run_binary(OperationBinary *operation) {
-  DataValue *a = run_operation(operation->a);
-  DataValue *b = run_operation(operation->b);
+std::shared_ptr<DataValue>
+ProgramState::run_binary(OperationBinary *operation) {
+  std::shared_ptr<DataValue> a = run_operation(operation->a);
+  std::shared_ptr<DataValue> b = run_operation(operation->b);
 
   // FIXME: Support string multiply "*" * 5 == "*****"
   // FIXME: Have compile tell us the data types in advance
-  DataValue *result;
-  auto bool_a = dynamic_cast<DataValueBool *>(a);
-  auto bool_b = dynamic_cast<DataValueBool *>(b);
+  auto bool_a = std::dynamic_pointer_cast<DataValueBool>(a);
+  auto bool_b = std::dynamic_pointer_cast<DataValueBool>(b);
   if (bool_a != nullptr && bool_b != nullptr)
-    result = run_binary_boolean(operation, bool_a, bool_b);
-  auto uint8_a = dynamic_cast<DataValueUint8 *>(a);
-  auto uint8_b = dynamic_cast<DataValueUint8 *>(b);
+    return run_binary_boolean(operation, bool_a, bool_b);
+  auto uint8_a = std::dynamic_pointer_cast<DataValueUint8>(a);
+  auto uint8_b = std::dynamic_pointer_cast<DataValueUint8>(b);
   if (uint8_a != nullptr && uint8_b != nullptr)
-    result = run_binary_integer(operation, uint8_a, uint8_b);
-  auto utf8_a = dynamic_cast<DataValueUtf8 *>(a);
-  auto utf8_b = dynamic_cast<DataValueUtf8 *>(b);
+    return run_binary_integer(operation, uint8_a, uint8_b);
+  auto utf8_a = std::dynamic_pointer_cast<DataValueUtf8>(a);
+  auto utf8_b = std::dynamic_pointer_cast<DataValueUtf8>(b);
   if (utf8_a != nullptr && utf8_b != nullptr)
-    result = run_binary_text(operation, utf8_a, utf8_b);
+    return run_binary_text(operation, utf8_a, utf8_b);
 
-  a->unref();
-  b->unref();
-
-  return result;
+  return none_value;
 }
 
-DataValue *ProgramState::run_operation(Operation *operation) {
+std::shared_ptr<DataValue> ProgramState::run_operation(Operation *operation) {
   OperationModule *op_module = dynamic_cast<OperationModule *>(operation);
   if (op_module != nullptr)
     return run_module(op_module);
@@ -463,7 +452,7 @@ DataValue *ProgramState::run_operation(Operation *operation) {
 
   OperationElse *op_else = dynamic_cast<OperationElse *>(operation);
   if (op_else != nullptr)
-    return none_value.ref(); // Resolved in IF
+    return none_value; // Resolved in IF
 
   OperationWhile *op_while = dynamic_cast<OperationWhile *>(operation);
   if (op_while != nullptr)
@@ -472,7 +461,7 @@ DataValue *ProgramState::run_operation(Operation *operation) {
   OperationFunctionDefinition *op_function_definition =
       dynamic_cast<OperationFunctionDefinition *>(operation);
   if (op_function_definition != nullptr)
-    return none_value.ref(); // Resolved at compile time
+    return none_value; // Resolved at compile time
 
   OperationFunctionCall *op_function_call =
       dynamic_cast<OperationFunctionCall *>(operation);
@@ -516,12 +505,11 @@ DataValue *ProgramState::run_operation(Operation *operation) {
   if (op_binary != nullptr)
     return run_binary(op_binary);
 
-  return none_value.ref();
+  return none_value;
 }
 
 void elf_run(const char *data, OperationModule *module) {
   ProgramState state(data);
 
-  auto result = state.run_module(module);
-  result->unref();
+  state.run_module(module);
 }
