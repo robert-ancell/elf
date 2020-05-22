@@ -20,17 +20,17 @@ static int hex_digit(char c) {
     return -1;
 }
 
-Token::Token(TokenType type, size_t offset, size_t length)
-    : type(type), offset(offset), length(length) {}
+Token::Token(TokenType type, size_t offset, size_t length, const char *data)
+    : type(type), offset(offset), length(length), data(data) {}
 
-std::string Token::get_text(const char *data) {
+std::string Token::get_text() {
   std::string value;
   for (size_t i = 0; i < length; i++)
     value += data[offset + i];
   return value;
 }
 
-bool Token::has_text(const char *data, std::string value) {
+bool Token::has_text(std::string value) {
   for (size_t i = 0; i < length; i++) {
     if (value[i] == '\0' || data[offset + i] != value[i])
       return false;
@@ -39,11 +39,9 @@ bool Token::has_text(const char *data, std::string value) {
   return value[length] == '\0';
 }
 
-bool Token::parse_boolean_constant(const char *data) {
-  return get_text(data) == "true";
-}
+bool Token::parse_boolean_constant() { return get_text() == "true"; }
 
-uint64_t Token::parse_number_constant(const char *data) {
+uint64_t Token::parse_number_constant() {
   uint64_t value = 0;
 
   for (size_t i = 0; i < length; i++)
@@ -52,7 +50,7 @@ uint64_t Token::parse_number_constant(const char *data) {
   return value;
 }
 
-std::string Token::parse_text_constant(const char *data) {
+std::string Token::parse_text_constant() {
   std::string value;
   // Iterate over the characters inside the quotes
   bool in_escape = false;

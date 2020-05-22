@@ -19,7 +19,7 @@ bool OperationVariableValue::is_constant() {
   return false;
 }
 
-std::string OperationMemberValue::get_data_type(const char *data) {
+std::string OperationMemberValue::get_data_type() {
   // FIXME
   return nullptr;
 }
@@ -34,13 +34,13 @@ bool OperationFunctionDefinition::is_constant() {
   return false;
 }
 
-std::string OperationNumberConstant::get_data_type(const char *data) {
+std::string OperationNumberConstant::get_data_type() {
   return "uint8"; // FIXME: Find minimum size
 }
 
-std::string OperationBinary::get_data_type(const char *data) {
+std::string OperationBinary::get_data_type() {
   // FIXME: Need to combine data type
-  return a->get_data_type(data);
+  return a->get_data_type();
 }
 
 std::shared_ptr<Operation> Operation::get_last_child() {

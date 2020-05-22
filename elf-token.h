@@ -41,18 +41,19 @@ struct Token {
   TokenType type;
   size_t offset;
   size_t length;
+  const char *data;
 
-  Token(TokenType type, size_t offset, size_t length);
+  Token(TokenType type, size_t offset, size_t length, const char *data);
 
-  std::string get_text(const char *data);
+  std::string get_text();
 
-  bool has_text(const char *data, std::string value);
+  bool has_text(std::string value);
 
-  bool parse_boolean_constant(const char *data);
+  bool parse_boolean_constant();
 
-  uint64_t parse_number_constant(const char *data);
+  uint64_t parse_number_constant();
 
-  std::string parse_text_constant(const char *data);
+  std::string parse_text_constant();
 
   std::string to_string();
 };

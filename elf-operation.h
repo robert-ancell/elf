@@ -18,7 +18,7 @@
 struct Operation {
   virtual ~Operation() {}
   virtual bool is_constant() { return false; }
-  virtual std::string get_data_type(const char *data) { return nullptr; }
+  virtual std::string get_data_type() { return nullptr; }
   virtual void add_child(std::shared_ptr<Operation> child) {}
   virtual size_t get_n_children() { return 0; }
   virtual std::shared_ptr<Operation> get_child(size_t index) { return nullptr; }
@@ -46,9 +46,7 @@ struct OperationVariableDefinition : Operation {
                               std::shared_ptr<Operation> value)
       : data_type(data_type), name(name), value(value ? value : nullptr) {}
   bool is_constant() { return value == nullptr || value->is_constant(); }
-  std::string get_data_type(const char *data) {
-    return data_type->get_text(data);
-  }
+  std::string get_data_type() { return data_type->get_text(); }
   std::string to_string() { return "VARIABLE_DEFINITION"; }
 };
 
@@ -62,9 +60,7 @@ struct OperationVariableAssignment : Operation {
       std::shared_ptr<OperationVariableDefinition> variable)
       : name(name), value(value), variable(variable) {}
   bool is_constant() { return value->is_constant(); }
-  std::string get_data_type(const char *data) {
-    return variable->get_data_type(data);
-  }
+  std::string get_data_type() { return variable->get_data_type(); }
   std::string to_string() { return "VARIABLE_ASSIGNMENT"; }
 };
 
@@ -119,9 +115,7 @@ struct OperationFunctionDefinition : Operation {
       std::vector<std::shared_ptr<OperationVariableDefinition>> parameters)
       : data_type(data_type), name(name), parameters(parameters) {}
   bool is_constant();
-  std::string get_data_type(const char *data) {
-    return data_type->get_text(data);
-  }
+  std::string get_data_type() { return data_type->get_text(); }
   void add_child(std::shared_ptr<Operation> child) { body.push_back(child); }
   size_t get_n_children() { return body.size(); }
   std::shared_ptr<Operation> get_child(size_t index) { return body[index]; }
@@ -138,9 +132,7 @@ struct OperationFunctionCall : Operation {
                         std::shared_ptr<OperationFunctionDefinition> function)
       : name(name), parameters(parameters), function(function) {}
   bool is_constant();
-  std::string get_data_type(const char *data) {
-    return function->get_data_type(data);
-  }
+  std::string get_data_type() { return function->get_data_type(); }
   std::string to_string() { return "FUNCTION_CALL"; }
 };
 
@@ -152,9 +144,7 @@ struct OperationReturn : Operation {
                   std::shared_ptr<OperationFunctionDefinition> function)
       : value(value), function(function) {}
   bool is_constant() { return value == nullptr || value->is_constant(); }
-  std::string get_data_type(const char *data) {
-    return function->get_data_type(data);
-  }
+  std::string get_data_type() { return function->get_data_type(); }
   std::string to_string() { return "RETURN(" + value->to_string() + ")"; }
 };
 
@@ -176,7 +166,7 @@ struct OperationBooleanConstant : Operation {
 
   OperationBooleanConstant(std::shared_ptr<Token> value) : value(value) {}
   bool is_constant() { return true; }
-  std::string get_data_type(const char *data) { return "bool"; }
+  std::string get_data_type() { return "bool"; }
   std::string to_string() {
     return "BOOLEAN_CONSTANT(" + value->to_string() + ")";
   }
@@ -187,7 +177,7 @@ struct OperationNumberConstant : Operation {
 
   OperationNumberConstant(std::shared_ptr<Token> value) : value(value) {}
   bool is_constant() { return true; }
-  std::string get_data_type(const char *data);
+  std::string get_data_type();
   std::string to_string() {
     return "NUMBER_CONSTANT(" + value->to_string() + ")";
   }
@@ -198,7 +188,7 @@ struct OperationTextConstant : Operation {
 
   OperationTextConstant(std::shared_ptr<Token> value) : value(value) {}
   bool is_constant() { return true; }
-  std::string get_data_type(const char *data) { return "utf8"; }
+  std::string get_data_type() { return "utf8"; }
   std::string to_string() {
     return "TEXT_CONSTANT(" + value->to_string() + ")";
   }
@@ -212,9 +202,7 @@ struct OperationVariableValue : Operation {
                          std::shared_ptr<OperationVariableDefinition> variable)
       : name(name), variable(variable) {}
   bool is_constant();
-  std::string get_data_type(const char *data) {
-    return variable->get_data_type(data);
-  }
+  std::string get_data_type() { return variable->get_data_type(); }
   std::string to_string() { return "VARIABLE_VALUE"; }
 };
 
@@ -228,7 +216,7 @@ struct OperationMemberValue : Operation {
                        std::vector<std::shared_ptr<Operation>> parameters)
       : object(object), member(member), parameters(parameters) {}
   bool is_constant();
-  std::string get_data_type(const char *data);
+  std::string get_data_type();
   std::string to_string() {
     return "MEMBER_VALUE(" + member->to_string() + ")";
   }
@@ -243,6 +231,6 @@ struct OperationBinary : Operation {
                   std::shared_ptr<Operation> b)
       : op(op), a(a), b(b) {}
   bool is_constant() { return a->is_constant() && b->is_constant(); }
-  std::string get_data_type(const char *data);
+  std::string get_data_type();
   std::string to_string() { return "BINARY"; }
 };

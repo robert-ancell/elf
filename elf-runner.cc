@@ -171,7 +171,7 @@ std::shared_ptr<DataValue> ProgramState::run_function(
 
 std::shared_ptr<DataValue>
 ProgramState::make_default_value(std::shared_ptr<Token> data_type) {
-  auto type_name = data_type->get_text(data);
+  auto type_name = data_type->get_text();
 
   if (type_name == "bool")
     return std::make_shared<DataValueBool>(false);
@@ -196,7 +196,7 @@ void ProgramState::add_variable(std::string name,
 
 std::shared_ptr<DataValue> ProgramState::run_variable_definition(
     std::shared_ptr<OperationVariableDefinition> operation) {
-  auto variable_name = operation->name->get_text(data);
+  auto variable_name = operation->name->get_text();
 
   if (operation->value != nullptr) {
     auto value = run_operation(operation->value);
@@ -211,7 +211,7 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
 
 std::shared_ptr<DataValue> ProgramState::run_variable_assignment(
     std::shared_ptr<OperationVariableAssignment> operation) {
-  auto variable_name = operation->name->get_text(data);
+  auto variable_name = operation->name->get_text();
 
   auto value = run_operation(operation->value);
 
@@ -268,14 +268,14 @@ std::shared_ptr<DataValue> ProgramState::run_function_call(
       auto value = run_operation(*i);
       auto parameter_definition =
           operation->function->parameters[i - operation->parameters.begin()];
-      auto variable_name = parameter_definition->name->get_text(data);
+      auto variable_name = parameter_definition->name->get_text();
       add_variable(variable_name, value);
     }
 
     return run_function(operation->function);
   }
 
-  std::string function_name = operation->name->get_text(data);
+  std::string function_name = operation->name->get_text();
 
   if (function_name == "print") {
     auto value = run_operation(operation->parameters[0]);
@@ -303,13 +303,13 @@ ProgramState::run_assert(std::shared_ptr<OperationAssert> operation) {
 
 std::shared_ptr<DataValue> ProgramState::run_boolean_constant(
     std::shared_ptr<OperationBooleanConstant> operation) {
-  bool value = operation->value->parse_boolean_constant(data);
+  bool value = operation->value->parse_boolean_constant();
   return std::make_shared<DataValueBool>(value);
 }
 
 std::shared_ptr<DataValue> ProgramState::run_number_constant(
     std::shared_ptr<OperationNumberConstant> operation) {
-  uint64_t value = operation->value->parse_number_constant(data);
+  uint64_t value = operation->value->parse_number_constant();
   // FIXME: Catch overflow (numbers > 64 bit not supported)
 
   if (value <= UINT8_MAX)
@@ -324,13 +324,13 @@ std::shared_ptr<DataValue> ProgramState::run_number_constant(
 
 std::shared_ptr<DataValue> ProgramState::run_text_constant(
     std::shared_ptr<OperationTextConstant> operation) {
-  auto value = operation->value->parse_text_constant(data);
+  auto value = operation->value->parse_text_constant();
   return std::make_shared<DataValueUtf8>(value);
 }
 
 std::shared_ptr<DataValue> ProgramState::run_variable_value(
     std::shared_ptr<OperationVariableValue> operation) {
-  auto variable_name = operation->name->get_text(data);
+  auto variable_name = operation->name->get_text();
 
   for (auto i = variables.begin(); i != variables.end(); i++) {
     auto variable = *i;
@@ -349,11 +349,11 @@ std::shared_ptr<DataValue> ProgramState::run_member_value(
   std::shared_ptr<DataValue> result = NULL;
   auto utf8_value = std::dynamic_pointer_cast<DataValueUtf8>(object);
   if (utf8_value != nullptr) {
-    if (operation->member->has_text(data, ".length"))
+    if (operation->member->has_text(".length"))
       return std::make_shared<DataValueUint8>(utf8_value->value.size());
-    else if (operation->member->has_text(data, ".upper"))
+    else if (operation->member->has_text(".upper"))
       return std::make_shared<DataValueUtf8>("FOO"); // FIXME: Total hack
-    else if (operation->member->has_text(data, ".lower"))
+    else if (operation->member->has_text(".lower"))
       return std::make_shared<DataValueUtf8>("foo"); // FIXME: Total hack
   }
 

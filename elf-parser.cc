@@ -219,7 +219,7 @@ static std::vector<std::shared_ptr<Token>> elf_lex(const char *data,
       else if (is_symbol_char(c))
         type = TOKEN_TYPE_WORD;
 
-      auto token = std::make_shared<Token>(type, offset, 1);
+      auto token = std::make_shared<Token>(type, offset, 1, data);
       tokens.push_back(token);
 
       current_token = token;
@@ -251,7 +251,7 @@ bool Parser::is_data_type(std::shared_ptr<Token> token) {
     return false;
 
   for (int i = 0; builtin_types[i] != nullptr; i++)
-    if (token->has_text(data, builtin_types[i]))
+    if (token->has_text(builtin_types[i]))
       return true;
 
   return false;
@@ -279,7 +279,7 @@ bool Parser::token_text_matches(std::shared_ptr<Token> a,
 }
 
 bool Parser::is_boolean(std::shared_ptr<Token> token) {
-  return token->has_text(data, "true") || token->has_text(data, "false");
+  return token->has_text("true") || token->has_text("false");
 }
 
 std::shared_ptr<OperationVariableDefinition>
@@ -329,7 +329,7 @@ bool Parser::is_builtin_function(std::shared_ptr<Token> token) {
     return false;
 
   for (int i = 0; builtin_functions[i] != nullptr; i++)
-    if (token->has_text(data, builtin_functions[i]))
+    if (token->has_text(builtin_functions[i]))
       return true;
 
   return false;
@@ -337,13 +337,13 @@ bool Parser::is_builtin_function(std::shared_ptr<Token> token) {
 
 bool Parser::has_member(std::shared_ptr<Operation> value,
                         std::shared_ptr<Token> member) {
-  auto data_type = value->get_data_type(data);
+  auto data_type = value->get_data_type();
 
   // FIXME: Super hacky. The nullptr is because Elf can't determine the return
   // value of a member yet i.e. "foo".upper.length
   if (data_type == "" || data_type == "utf8") {
-    return member->has_text(data, ".length") ||
-           member->has_text(data, ".upper") || member->has_text(data, ".lower");
+    return member->has_text(".length") || member->has_text(".upper") ||
+           member->has_text(".lower");
   }
 
   return false;
@@ -483,8 +483,8 @@ std::shared_ptr<Operation> Parser::parse_expression() {
     return nullptr;
   }
 
-  auto a_type = a->get_data_type(data);
-  auto b_type = b->get_data_type(data);
+  auto a_type = a->get_data_type();
+  auto b_type = b->get_data_type();
   if (a_type != b_type) {
     print_token_error(op,
                       "Can't combine " + a_type + " and " + b_type + " types");
@@ -561,8 +561,8 @@ bool Parser::parse_sequence() {
           return false;
         }
 
-        auto variable_type = data_type->get_text(data);
-        auto value_type = value->get_data_type(data);
+        auto variable_type = data_type->get_text();
+        auto value_type = value->get_data_type();
         if (!can_assign(variable_type, value_type)) {
           auto message = "Variable is of type " + variable_type +
                          ", but value is of type " + value_type;
@@ -650,7 +650,7 @@ bool Parser::parse_sequence() {
         add_stack_variable(definition);
         op = definition;
       }
-    } else if (token->has_text(data, "if")) {
+    } else if (token->has_text("if")) {
       next_token();
 
       auto condition = parse_expression();
@@ -679,7 +679,7 @@ bool Parser::parse_sequence() {
       next_token();
 
       pop_stack();
-    } else if (token->has_text(data, "else")) {
+    } else if (token->has_text("else")) {
       std::shared_ptr<Operation> last_operation = parent->get_last_child();
       auto if_operation =
           std::dynamic_pointer_cast<OperationIf>(last_operation);
@@ -712,7 +712,7 @@ bool Parser::parse_sequence() {
       next_token();
 
       pop_stack();
-    } else if (token->has_text(data, "while")) {
+    } else if (token->has_text("while")) {
       next_token();
 
       auto condition = parse_expression();
@@ -741,7 +741,7 @@ bool Parser::parse_sequence() {
       next_token();
 
       pop_stack();
-    } else if (token->has_text(data, "return")) {
+    } else if (token->has_text("return")) {
       next_token();
 
       std::shared_ptr<Operation> value = parse_expression();
@@ -751,7 +751,7 @@ bool Parser::parse_sequence() {
       }
 
       op = std::make_shared<OperationReturn>(value, get_current_function());
-    } else if (token->has_text(data, "assert")) {
+    } else if (token->has_text("assert")) {
       next_token();
 
       auto expression = parse_expression();
@@ -778,8 +778,8 @@ bool Parser::parse_sequence() {
         return false;
       }
 
-      auto variable_type = v->get_data_type(data);
-      auto value_type = value->get_data_type(data);
+      auto variable_type = v->get_data_type();
+      auto value_type = value->get_data_type();
       if (!can_assign(variable_type, value_type)) {
         print_token_error(name, "Variable is of type " + variable_type +
                                     ", but value is of type " +
