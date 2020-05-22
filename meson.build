@@ -19,6 +19,8 @@ test_runner = executable ('test-runner',
                           ])
 
 tests = [ 'empty-file',
+          'comment',
+          'trailing-comment',
           'bool-variable',
           'bool-variable-constant-false',
           'bool-variable-constant-true',

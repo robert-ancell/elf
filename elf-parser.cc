@@ -184,7 +184,9 @@ static std::vector<std::shared_ptr<Token>> elf_lex(const char *data,
         continue;
 
       TokenType type;
-      if (c == '(')
+      if (c == '#')
+        type = TOKEN_TYPE_COMMENT;
+      else if (c == '(')
         type = TOKEN_TYPE_OPEN_PAREN;
       else if (c == ')')
         type = TOKEN_TYPE_CLOSE_PAREN;
