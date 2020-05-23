@@ -30,6 +30,9 @@ struct Parser {
 
   std::vector<StackFrame *> stack;
 
+  std::shared_ptr<Token> error_token;
+  std::string error_message;
+
   Parser(const char *data, size_t data_length)
       : data(data), data_length(data_length), offset(0) {}
 
@@ -37,7 +40,8 @@ struct Parser {
   void
   add_stack_variable(std::shared_ptr<OperationVariableDefinition> definition);
   void pop_stack();
-  void print_token_error(std::shared_ptr<Token> token, std::string message);
+  void set_error(std::shared_ptr<Token> token, const std::string &message);
+  void print_error();
   bool is_data_type(std::shared_ptr<Token> token);
   bool is_parameter_name(std::shared_ptr<Token> token);
   bool token_text_matches(std::shared_ptr<Token> a, std::shared_ptr<Token> b);
@@ -70,11 +74,19 @@ void Parser::add_stack_variable(
 
 void Parser::pop_stack() { stack.pop_back(); }
 
-void Parser::print_token_error(std::shared_ptr<Token> token,
-                               std::string message) {
+void Parser::set_error(std::shared_ptr<Token> token,
+                       const std::string &message) {
+  if (error_token)
+    return;
+
+  error_token = token;
+  error_message = message;
+}
+
+void Parser::print_error() {
   size_t line_offset = 0;
   size_t line_number = 1;
-  for (size_t i = 0; i < token->offset; i++) {
+  for (size_t i = 0; i < error_token->offset; i++) {
     if (data[i] == '\n') {
       line_offset = i + 1;
       line_number++;
@@ -85,12 +97,12 @@ void Parser::print_token_error(std::shared_ptr<Token> token,
   for (size_t i = line_offset; data[i] != '\0' && data[i] != '\n'; i++)
     printf("%c", data[i]);
   printf("\n");
-  for (size_t i = line_offset; i < token->offset; i++)
+  for (size_t i = line_offset; i < error_token->offset; i++)
     printf(" ");
-  for (size_t i = 0; i < token->length; i++)
+  for (size_t i = 0; i < error_token->length; i++)
     printf("^");
   printf("\n");
-  printf("%s\n", message.c_str());
+  printf("%s\n", error_message.c_str());
 }
 
 static bool is_number_char(char c) { return c >= '0' && c <= '9'; }
@@ -377,7 +389,7 @@ bool Parser::parse_parameters(
 
     if (parameters.size() > 0) {
       if (t->type != TOKEN_TYPE_COMMA) {
-        print_token_error(current_token(), "Missing comma");
+        set_error(current_token(), "Missing comma");
         return false;
       }
       next_token();
@@ -386,7 +398,7 @@ bool Parser::parse_parameters(
 
     auto value = parse_expression();
     if (value == nullptr) {
-      print_token_error(current_token(), "Invalid parameter");
+      set_error(current_token(), "Invalid parameter");
       return false;
     }
 
@@ -394,7 +406,7 @@ bool Parser::parse_parameters(
   }
 
   if (!closed) {
-    print_token_error(current_token(), "Unclosed paren");
+    set_error(current_token(), "Unclosed paren");
     return false;
   }
 
@@ -439,7 +451,7 @@ std::shared_ptr<Operation> Parser::parse_value() {
   token = current_token();
   while (token != nullptr && token->type == TOKEN_TYPE_MEMBER) {
     if (!has_member(value, token)) {
-      print_token_error(token, "Member not available");
+      set_error(token, "Member not available");
       return nullptr;
     }
     next_token();
@@ -491,16 +503,14 @@ std::shared_ptr<Operation> Parser::parse_expression() {
 
   auto b = parse_value();
   if (b == nullptr) {
-    print_token_error(current_token(),
-                      "Missing second value in binary operation");
+    set_error(current_token(), "Missing second value in binary operation");
     return nullptr;
   }
 
   auto a_type = a->get_data_type();
   auto b_type = b->get_data_type();
   if (a_type != b_type) {
-    print_token_error(op,
-                      "Can't combine " + a_type + " and " + b_type + " types");
+    set_error(op, "Can't combine " + a_type + " and " + b_type + " types");
     return nullptr;
   }
 
@@ -570,7 +580,7 @@ bool Parser::parse_sequence() {
 
         auto value = parse_expression();
         if (value == nullptr) {
-          print_token_error(current_token(), "Invalid value for variable");
+          set_error(current_token(), "Invalid value for variable");
           return false;
         }
 
@@ -579,7 +589,7 @@ bool Parser::parse_sequence() {
         if (!can_assign(variable_type, value_type)) {
           auto message = "Variable is of type " + variable_type +
                          ", but value is of type " + value_type;
-          print_token_error(name, message);
+          set_error(name, message);
           return false;
         }
 
@@ -602,7 +612,7 @@ bool Parser::parse_sequence() {
 
           if (parameters.size() > 0) {
             if (t->type != TOKEN_TYPE_COMMA) {
-              print_token_error(current_token(), "Missing comma");
+              set_error(current_token(), "Missing comma");
               return false;
             }
             next_token();
@@ -610,7 +620,7 @@ bool Parser::parse_sequence() {
           }
 
           if (!is_data_type(t)) {
-            print_token_error(current_token(), "Parameter not a data type");
+            set_error(current_token(), "Parameter not a data type");
             return false;
           }
           data_type = t;
@@ -618,7 +628,7 @@ bool Parser::parse_sequence() {
 
           auto name = current_token();
           if (!is_parameter_name(name)) {
-            print_token_error(current_token(), "Not a parameter name");
+            set_error(current_token(), "Not a parameter name");
             return false;
           }
           next_token();
@@ -628,13 +638,13 @@ bool Parser::parse_sequence() {
         }
 
         if (!closed) {
-          print_token_error(current_token(), "Unclosed paren");
+          set_error(current_token(), "Unclosed paren");
           return false;
         }
 
         auto open_brace = current_token();
         if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-          print_token_error(current_token(), "Missing function open brace");
+          set_error(current_token(), "Missing function open brace");
           return false;
         }
         next_token();
@@ -651,7 +661,7 @@ bool Parser::parse_sequence() {
 
         auto close_brace = current_token();
         if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-          print_token_error(current_token(), "Missing function close brace");
+          set_error(current_token(), "Missing function close brace");
           return false;
         }
         next_token();
@@ -668,13 +678,13 @@ bool Parser::parse_sequence() {
 
       auto condition = parse_expression();
       if (condition == nullptr) {
-        print_token_error(current_token(), "Not valid if condition");
+        set_error(current_token(), "Not valid if condition");
         return false;
       }
 
       auto open_brace = current_token();
       if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-        print_token_error(current_token(), "Missing if open brace");
+        set_error(current_token(), "Missing if open brace");
         return false;
       }
       next_token();
@@ -686,7 +696,7 @@ bool Parser::parse_sequence() {
 
       auto close_brace = current_token();
       if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-        print_token_error(current_token(), "Missing if close brace");
+        set_error(current_token(), "Missing if close brace");
         return false;
       }
       next_token();
@@ -697,7 +707,7 @@ bool Parser::parse_sequence() {
       auto if_operation =
           std::dynamic_pointer_cast<OperationIf>(last_operation);
       if (if_operation == nullptr) {
-        print_token_error(current_token(), "else must follow if");
+        set_error(current_token(), "else must follow if");
         return false;
       }
 
@@ -705,7 +715,7 @@ bool Parser::parse_sequence() {
 
       auto open_brace = current_token();
       if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-        print_token_error(current_token(), "Missing else open brace");
+        set_error(current_token(), "Missing else open brace");
         return false;
       }
       next_token();
@@ -719,7 +729,7 @@ bool Parser::parse_sequence() {
 
       auto close_brace = current_token();
       if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-        print_token_error(current_token(), "Missing else close brace");
+        set_error(current_token(), "Missing else close brace");
         return false;
       }
       next_token();
@@ -730,13 +740,13 @@ bool Parser::parse_sequence() {
 
       auto condition = parse_expression();
       if (condition == nullptr) {
-        print_token_error(current_token(), "Not valid while condition");
+        set_error(current_token(), "Not valid while condition");
         return false;
       }
 
       auto open_brace = current_token();
       if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-        print_token_error(current_token(), "Missing while open brace");
+        set_error(current_token(), "Missing while open brace");
         return false;
       }
       next_token();
@@ -748,7 +758,7 @@ bool Parser::parse_sequence() {
 
       auto close_brace = current_token();
       if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-        print_token_error(current_token(), "Missing while close brace");
+        set_error(current_token(), "Missing while close brace");
         return false;
       }
       next_token();
@@ -759,7 +769,7 @@ bool Parser::parse_sequence() {
 
       std::shared_ptr<Operation> value = parse_expression();
       if (value == nullptr) {
-        print_token_error(current_token(), "Not valid return value");
+        set_error(current_token(), "Not valid return value");
         return false;
       }
 
@@ -769,7 +779,7 @@ bool Parser::parse_sequence() {
 
       auto expression = parse_expression();
       if (expression == nullptr) {
-        print_token_error(current_token(), "Not valid assertion expression");
+        set_error(current_token(), "Not valid assertion expression");
         return false;
       }
 
@@ -780,23 +790,22 @@ bool Parser::parse_sequence() {
 
       auto assignment_token = current_token();
       if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
-        print_token_error(current_token(), "Missing assignment token");
+        set_error(current_token(), "Missing assignment token");
         return false;
       }
       next_token();
 
       auto value = parse_expression();
       if (value == nullptr) {
-        print_token_error(current_token(), "Invalid value for variable");
+        set_error(current_token(), "Invalid value for variable");
         return false;
       }
 
       auto variable_type = v->get_data_type();
       auto value_type = value->get_data_type();
       if (!can_assign(variable_type, value_type)) {
-        print_token_error(name, "Variable is of type " + variable_type +
-                                    ", but value is of type " +
-                                    value_type.c_str());
+        set_error(name, "Variable is of type " + variable_type +
+                            ", but value is of type " + value_type.c_str());
         return false;
       }
 
@@ -804,7 +813,7 @@ bool Parser::parse_sequence() {
     } else if ((op = parse_value()) != nullptr) {
       // FIXME: Only allow functions and variable values
     } else {
-      print_token_error(current_token(), "Unexpected token");
+      set_error(current_token(), "Unexpected token");
       return false;
     }
 
@@ -823,10 +832,12 @@ std::shared_ptr<OperationModule> elf_parse(const char *data,
   auto module = std::make_shared<OperationModule>();
   parser.push_stack(module);
 
-  if (!parser.parse_sequence())
+  if (!parser.parse_sequence()) {
+    parser.print_error();
     return nullptr;
+  }
 
-  if (parser.current_token() != nullptr) {
+  if (parser.current_token()) {
     printf("Expected end of input\n");
     return nullptr;
   }
