@@ -157,6 +157,9 @@ binary_operation
     expression '-' expression
     expression '/' expression
     expression '*' expression
+    expression "and" expression
+    expression "or" expression
+    expression "xor" expression
 
 function_defintion
     type_name ws function_name ws statement_block

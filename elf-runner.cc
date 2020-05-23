@@ -94,51 +94,51 @@ struct ProgramState {
 
   void run_sequence(std::vector<std::shared_ptr<Operation>> &body);
   std::shared_ptr<DataValue>
-  run_module(std::shared_ptr<OperationModule> module);
+  run_module(std::shared_ptr<OperationModule> &module);
   std::shared_ptr<DataValue>
-  run_function(std::shared_ptr<OperationFunctionDefinition> function);
+  run_function(std::shared_ptr<OperationFunctionDefinition> &function);
   std::shared_ptr<DataValue>
-  make_default_value(std::shared_ptr<Token> data_type);
-  void add_variable(std::string name, std::shared_ptr<DataValue> value);
+  make_default_value(std::shared_ptr<Token> &data_type);
+  void add_variable(std::string name, std::shared_ptr<DataValue> &value);
   std::shared_ptr<DataValue> run_variable_definition(
-      std::shared_ptr<OperationVariableDefinition> operation);
+      std::shared_ptr<OperationVariableDefinition> &operation);
   std::shared_ptr<DataValue> run_variable_assignment(
-      std::shared_ptr<OperationVariableAssignment> operation);
-  std::shared_ptr<DataValue> run_if(std::shared_ptr<OperationIf> operation);
+      std::shared_ptr<OperationVariableAssignment> &operation);
+  std::shared_ptr<DataValue> run_if(std::shared_ptr<OperationIf> &operation);
   std::shared_ptr<DataValue>
-  run_while(std::shared_ptr<OperationWhile> operation);
+  run_while(std::shared_ptr<OperationWhile> &operation);
   std::shared_ptr<DataValue>
-  run_function_call(std::shared_ptr<OperationFunctionCall> operation);
+  run_function_call(std::shared_ptr<OperationFunctionCall> &operation);
   std::shared_ptr<DataValue>
-  run_return(std::shared_ptr<OperationReturn> operation);
+  run_return(std::shared_ptr<OperationReturn> &operation);
   std::shared_ptr<DataValue>
-  run_assert(std::shared_ptr<OperationAssert> operation);
+  run_assert(std::shared_ptr<OperationAssert> &operation);
   std::shared_ptr<DataValue>
-  run_boolean_constant(std::shared_ptr<OperationBooleanConstant> operation);
+  run_boolean_constant(std::shared_ptr<OperationBooleanConstant> &operation);
   std::shared_ptr<DataValue>
-  run_number_constant(std::shared_ptr<OperationNumberConstant> operation);
+  run_number_constant(std::shared_ptr<OperationNumberConstant> &operation);
   std::shared_ptr<DataValue>
-  run_text_constant(std::shared_ptr<OperationTextConstant> operation);
+  run_text_constant(std::shared_ptr<OperationTextConstant> &operation);
   std::shared_ptr<DataValue>
-  run_variable_value(std::shared_ptr<OperationVariableValue> operation);
+  run_variable_value(std::shared_ptr<OperationVariableValue> &operation);
   std::shared_ptr<DataValue>
-  run_member_value(std::shared_ptr<OperationMemberValue> operation);
+  run_member_value(std::shared_ptr<OperationMemberValue> &operation);
   std::shared_ptr<DataValue>
-  run_binary_boolean(std::shared_ptr<OperationBinary> operation,
-                     std::shared_ptr<DataValueBool> a,
-                     std::shared_ptr<DataValueBool> b);
+  run_binary_boolean(std::shared_ptr<OperationBinary> &operation,
+                     std::shared_ptr<DataValueBool> &a,
+                     std::shared_ptr<DataValueBool> &b);
   std::shared_ptr<DataValue>
-  run_binary_integer(std::shared_ptr<OperationBinary> operation,
-                     std::shared_ptr<DataValueUint8> a,
-                     std::shared_ptr<DataValueUint8> b);
+  run_binary_integer(std::shared_ptr<OperationBinary> &operation,
+                     std::shared_ptr<DataValueUint8> &a,
+                     std::shared_ptr<DataValueUint8> &b);
   std::shared_ptr<DataValue>
-  run_binary_text(std::shared_ptr<OperationBinary> operation,
-                  std::shared_ptr<DataValueUtf8> a,
-                  std::shared_ptr<DataValueUtf8> b);
+  run_binary_text(std::shared_ptr<OperationBinary> &operation,
+                  std::shared_ptr<DataValueUtf8> &a,
+                  std::shared_ptr<DataValueUtf8> &b);
   std::shared_ptr<DataValue>
-  run_binary(std::shared_ptr<OperationBinary> operation);
+  run_binary(std::shared_ptr<OperationBinary> &operation);
   std::shared_ptr<DataValue>
-  run_operation(std::shared_ptr<Operation> operation);
+  run_operation(std::shared_ptr<Operation> &operation);
 };
 
 void ProgramState::run_sequence(std::vector<std::shared_ptr<Operation>> &body) {
@@ -150,14 +150,13 @@ void ProgramState::run_sequence(std::vector<std::shared_ptr<Operation>> &body) {
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_module(std::shared_ptr<OperationModule> module) {
+ProgramState::run_module(std::shared_ptr<OperationModule> &module) {
   run_sequence(module->body);
-
   return none_value;
 }
 
 std::shared_ptr<DataValue> ProgramState::run_function(
-    std::shared_ptr<OperationFunctionDefinition> function) {
+    std::shared_ptr<OperationFunctionDefinition> &function) {
   run_sequence(function->body);
 
   auto result = return_value;
@@ -170,7 +169,7 @@ std::shared_ptr<DataValue> ProgramState::run_function(
 }
 
 std::shared_ptr<DataValue>
-ProgramState::make_default_value(std::shared_ptr<Token> data_type) {
+ProgramState::make_default_value(std::shared_ptr<Token> &data_type) {
   auto type_name = data_type->get_text();
 
   if (type_name == "bool")
@@ -190,12 +189,12 @@ ProgramState::make_default_value(std::shared_ptr<Token> data_type) {
 }
 
 void ProgramState::add_variable(std::string name,
-                                std::shared_ptr<DataValue> value) {
+                                std::shared_ptr<DataValue> &value) {
   variables.push_back(new Variable(name, value));
 }
 
 std::shared_ptr<DataValue> ProgramState::run_variable_definition(
-    std::shared_ptr<OperationVariableDefinition> operation) {
+    std::shared_ptr<OperationVariableDefinition> &operation) {
   auto variable_name = operation->name->get_text();
 
   if (operation->value != nullptr) {
@@ -210,7 +209,7 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
 }
 
 std::shared_ptr<DataValue> ProgramState::run_variable_assignment(
-    std::shared_ptr<OperationVariableAssignment> operation) {
+    std::shared_ptr<OperationVariableAssignment> &operation) {
   auto variable_name = operation->name->get_text();
 
   auto value = run_operation(operation->value);
@@ -228,7 +227,7 @@ std::shared_ptr<DataValue> ProgramState::run_variable_assignment(
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_if(std::shared_ptr<OperationIf> operation) {
+ProgramState::run_if(std::shared_ptr<OperationIf> &operation) {
   auto value = run_operation(operation->condition);
   auto bool_value = std::dynamic_pointer_cast<DataValueBool>(value);
   if (bool_value == nullptr)
@@ -245,7 +244,7 @@ ProgramState::run_if(std::shared_ptr<OperationIf> operation) {
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_while(std::shared_ptr<OperationWhile> operation) {
+ProgramState::run_while(std::shared_ptr<OperationWhile> &operation) {
   while (true) {
     auto value = run_operation(operation->condition);
     auto bool_value = std::dynamic_pointer_cast<DataValueBool>(value);
@@ -260,7 +259,7 @@ ProgramState::run_while(std::shared_ptr<OperationWhile> operation) {
 }
 
 std::shared_ptr<DataValue> ProgramState::run_function_call(
-    std::shared_ptr<OperationFunctionCall> operation) {
+    std::shared_ptr<OperationFunctionCall> &operation) {
   if (operation->function != NULL) {
     // FIXME: Use a stack, these variables shouldn't remain after the call
     for (auto i = operation->parameters.begin();
@@ -286,14 +285,14 @@ std::shared_ptr<DataValue> ProgramState::run_function_call(
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_return(std::shared_ptr<OperationReturn> operation) {
+ProgramState::run_return(std::shared_ptr<OperationReturn> &operation) {
   auto value = run_operation(operation->value);
   return_value = value;
   return value;
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_assert(std::shared_ptr<OperationAssert> operation) {
+ProgramState::run_assert(std::shared_ptr<OperationAssert> &operation) {
   auto value = run_operation(operation->expression);
   auto bool_value = std::dynamic_pointer_cast<DataValueBool>(value);
   if (bool_value == nullptr || !bool_value->value)
@@ -302,13 +301,13 @@ ProgramState::run_assert(std::shared_ptr<OperationAssert> operation) {
 }
 
 std::shared_ptr<DataValue> ProgramState::run_boolean_constant(
-    std::shared_ptr<OperationBooleanConstant> operation) {
+    std::shared_ptr<OperationBooleanConstant> &operation) {
   bool value = operation->value->parse_boolean_constant();
   return std::make_shared<DataValueBool>(value);
 }
 
 std::shared_ptr<DataValue> ProgramState::run_number_constant(
-    std::shared_ptr<OperationNumberConstant> operation) {
+    std::shared_ptr<OperationNumberConstant> &operation) {
   uint64_t value = operation->value->parse_number_constant();
   // FIXME: Catch overflow (numbers > 64 bit not supported)
 
@@ -323,13 +322,13 @@ std::shared_ptr<DataValue> ProgramState::run_number_constant(
 }
 
 std::shared_ptr<DataValue> ProgramState::run_text_constant(
-    std::shared_ptr<OperationTextConstant> operation) {
+    std::shared_ptr<OperationTextConstant> &operation) {
   auto value = operation->value->parse_text_constant();
   return std::make_shared<DataValueUtf8>(value);
 }
 
 std::shared_ptr<DataValue> ProgramState::run_variable_value(
-    std::shared_ptr<OperationVariableValue> operation) {
+    std::shared_ptr<OperationVariableValue> &operation) {
   auto variable_name = operation->name->get_text();
 
   for (auto i = variables.begin(); i != variables.end(); i++) {
@@ -343,8 +342,8 @@ std::shared_ptr<DataValue> ProgramState::run_variable_value(
 }
 
 std::shared_ptr<DataValue> ProgramState::run_member_value(
-    std::shared_ptr<OperationMemberValue> operation) {
-  std::shared_ptr<DataValue> object = run_operation(operation->object);
+    std::shared_ptr<OperationMemberValue> &operation) {
+  auto object = run_operation(operation->object);
 
   std::shared_ptr<DataValue> result = NULL;
   auto utf8_value = std::dynamic_pointer_cast<DataValueUtf8>(object);
@@ -361,10 +360,19 @@ std::shared_ptr<DataValue> ProgramState::run_member_value(
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_binary_boolean(std::shared_ptr<OperationBinary> operation,
-                                 std::shared_ptr<DataValueBool> a,
-                                 std::shared_ptr<DataValueBool> b) {
+ProgramState::run_binary_boolean(std::shared_ptr<OperationBinary> &operation,
+                                 std::shared_ptr<DataValueBool> &a,
+                                 std::shared_ptr<DataValueBool> &b) {
   switch (operation->op->type) {
+  case TOKEN_TYPE_WORD:
+    if (operation->op->has_text("and"))
+      return std::make_shared<DataValueBool>(a->value && b->value);
+    else if (operation->op->has_text("or"))
+      return std::make_shared<DataValueBool>(a->value || b->value);
+    else if (operation->op->has_text("xor"))
+      return std::make_shared<DataValueBool>(a->value ^ b->value);
+    else
+      return none_value;
   case TOKEN_TYPE_EQUAL:
     return std::make_shared<DataValueBool>(a->value == b->value);
   case TOKEN_TYPE_NOT_EQUAL:
@@ -375,9 +383,9 @@ ProgramState::run_binary_boolean(std::shared_ptr<OperationBinary> operation,
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_binary_integer(std::shared_ptr<OperationBinary> operation,
-                                 std::shared_ptr<DataValueUint8> a,
-                                 std::shared_ptr<DataValueUint8> b) {
+ProgramState::run_binary_integer(std::shared_ptr<OperationBinary> &operation,
+                                 std::shared_ptr<DataValueUint8> &a,
+                                 std::shared_ptr<DataValueUint8> &b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
     return std::make_shared<DataValueBool>(a->value == b->value);
@@ -405,9 +413,9 @@ ProgramState::run_binary_integer(std::shared_ptr<OperationBinary> operation,
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_binary_text(std::shared_ptr<OperationBinary> operation,
-                              std::shared_ptr<DataValueUtf8> a,
-                              std::shared_ptr<DataValueUtf8> b) {
+ProgramState::run_binary_text(std::shared_ptr<OperationBinary> &operation,
+                              std::shared_ptr<DataValueUtf8> &a,
+                              std::shared_ptr<DataValueUtf8> &b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
     return std::make_shared<DataValueBool>(a->value == b->value);
@@ -421,9 +429,9 @@ ProgramState::run_binary_text(std::shared_ptr<OperationBinary> operation,
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_binary(std::shared_ptr<OperationBinary> operation) {
-  std::shared_ptr<DataValue> a = run_operation(operation->a);
-  std::shared_ptr<DataValue> b = run_operation(operation->b);
+ProgramState::run_binary(std::shared_ptr<OperationBinary> &operation) {
+  auto a = run_operation(operation->a);
+  auto b = run_operation(operation->b);
 
   // FIXME: Support string multiply "*" * 5 == "*****"
   // FIXME: Have compile tell us the data types in advance
@@ -444,7 +452,7 @@ ProgramState::run_binary(std::shared_ptr<OperationBinary> operation) {
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_operation(std::shared_ptr<Operation> operation) {
+ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
   auto op_module = std::dynamic_pointer_cast<OperationModule>(operation);
   if (op_module != nullptr)
     return run_module(op_module);

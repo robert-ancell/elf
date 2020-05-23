@@ -245,6 +245,7 @@ static std::vector<std::shared_ptr<Token>> elf_lex(const char *data,
 }
 
 bool Parser::is_data_type(std::shared_ptr<Token> token) {
+  // FIXME: Use a .elf file that defines these so they're like all types
   const char *builtin_types[] = {"bool",  "uint8",  "int8",  "uint16",
                                  "int16", "uint32", "int32", "uint64",
                                  "int64", "utf8",   nullptr};
@@ -454,7 +455,15 @@ std::shared_ptr<Operation> Parser::parse_value() {
   return value;
 }
 
-static bool token_is_binary_operator(std::shared_ptr<Token> token) {
+static bool token_is_binary_boolean_operator(std::shared_ptr<Token> &token) {
+  if (token->type != TOKEN_TYPE_WORD)
+    return false;
+
+  return token->has_text("and") || token->has_text("or") ||
+         token->has_text("xor");
+}
+
+static bool token_is_binary_operator(std::shared_ptr<Token> &token) {
   return token->type == TOKEN_TYPE_EQUAL ||
          token->type == TOKEN_TYPE_NOT_EQUAL ||
          token->type == TOKEN_TYPE_GREATER ||
@@ -462,7 +471,9 @@ static bool token_is_binary_operator(std::shared_ptr<Token> token) {
          token->type == TOKEN_TYPE_LESS ||
          token->type == TOKEN_TYPE_LESS_EQUAL ||
          token->type == TOKEN_TYPE_ADD || token->type == TOKEN_TYPE_SUBTRACT ||
-         token->type == TOKEN_TYPE_MULTIPLY || token->type == TOKEN_TYPE_DIVIDE;
+         token->type == TOKEN_TYPE_MULTIPLY ||
+         token->type == TOKEN_TYPE_DIVIDE ||
+         token_is_binary_boolean_operator(token);
 }
 
 std::shared_ptr<Operation> Parser::parse_expression() {
