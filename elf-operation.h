@@ -234,3 +234,14 @@ struct OperationBinary : Operation {
   std::string get_data_type();
   std::string to_string() { return "BINARY"; }
 };
+
+struct OperationConvert : Operation {
+  std::shared_ptr<Operation> op;
+  std::string data_type;
+
+  OperationConvert(std::shared_ptr<Operation> &op, const std::string &data_type)
+      : op(op), data_type(data_type) {}
+  bool is_constant() { return op->is_constant(); }
+  std::string get_data_type() { return data_type; }
+  std::string to_string() { return "CONVERT"; }
+};

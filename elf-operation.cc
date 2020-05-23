@@ -35,7 +35,15 @@ bool OperationFunctionDefinition::is_constant() {
 }
 
 std::string OperationNumberConstant::get_data_type() {
-  return "uint8"; // FIXME: Find minimum size
+  uint64_t number = value->parse_number_constant();
+  if (number <= UINT8_MAX)
+    return "uint8";
+  else if (number <= UINT16_MAX)
+    return "uint16";
+  else if (number <= UINT32_MAX)
+    return "uint32";
+  else
+    return "uint64";
 }
 
 std::string OperationBinary::get_data_type() {

@@ -15,6 +15,7 @@
 
 struct DataValue {
   virtual ~DataValue() {}
+  virtual std::shared_ptr<DataValue> convert_to(const std::string &data_type);
   virtual void print() = 0;
 };
 
@@ -34,6 +35,7 @@ struct DataValueUint8 : DataValue {
   uint8_t value;
 
   DataValueUint8(uint8_t value) : value(value) {}
+  std::shared_ptr<DataValue> convert_to(const std::string &data_type);
   void print() { printf("%d\n", value); }
 };
 
@@ -41,6 +43,7 @@ struct DataValueUint16 : DataValue {
   uint16_t value;
 
   DataValueUint16(uint16_t value) : value(value) {}
+  std::shared_ptr<DataValue> convert_to(const std::string &data_type);
   void print() { printf("%d\n", value); }
 };
 
@@ -48,6 +51,7 @@ struct DataValueUint32 : DataValue {
   uint32_t value;
 
   DataValueUint32(uint32_t value) : value(value) {}
+  std::shared_ptr<DataValue> convert_to(const std::string &data_type);
   void print() { printf("%d\n", value); }
 };
 
@@ -64,6 +68,40 @@ struct DataValueUtf8 : DataValue {
   DataValueUtf8(std::string value) : value(value) {}
   void print() { printf("%s\n", value.c_str()); }
 };
+
+std::shared_ptr<DataValue> DataValue::convert_to(const std::string &data_type) {
+  return std::make_shared<DataValueNone>();
+};
+
+std::shared_ptr<DataValue>
+DataValueUint8::convert_to(const std::string &data_type) {
+  if (data_type == "uint16")
+    return std::make_shared<DataValueUint16>(value);
+  else if (data_type == "uint32")
+    return std::make_shared<DataValueUint32>(value);
+  else if (data_type == "uint64")
+    return std::make_shared<DataValueUint64>(value);
+  else
+    return std::make_shared<DataValueNone>();
+}
+
+std::shared_ptr<DataValue>
+DataValueUint16::convert_to(const std::string &data_type) {
+  if (data_type == "uint32")
+    return std::make_shared<DataValueUint32>(value);
+  else if (data_type == "uint64")
+    return std::make_shared<DataValueUint64>(value);
+  else
+    return std::make_shared<DataValueNone>();
+}
+
+std::shared_ptr<DataValue>
+DataValueUint32::convert_to(const std::string &data_type) {
+  if (data_type == "uint64")
+    return std::make_shared<DataValueUint64>(value);
+  else
+    return std::make_shared<DataValueNone>();
+}
 
 struct Variable {
   std::string name;
@@ -137,6 +175,8 @@ struct ProgramState {
                   std::shared_ptr<DataValueUtf8> &b);
   std::shared_ptr<DataValue>
   run_binary(std::shared_ptr<OperationBinary> &operation);
+  std::shared_ptr<DataValue>
+  run_convert(std::shared_ptr<OperationConvert> &operation);
   std::shared_ptr<DataValue>
   run_operation(std::shared_ptr<Operation> &operation);
 };
@@ -337,7 +377,6 @@ std::shared_ptr<DataValue> ProgramState::run_variable_value(
       return variable->value;
   }
 
-  printf("variable value %s\n", variable_name.c_str());
   return none_value;
 }
 
@@ -452,6 +491,12 @@ ProgramState::run_binary(std::shared_ptr<OperationBinary> &operation) {
 }
 
 std::shared_ptr<DataValue>
+ProgramState::run_convert(std::shared_ptr<OperationConvert> &operation) {
+  auto value = run_operation(operation->op);
+  return value->convert_to(operation->data_type);
+}
+
+std::shared_ptr<DataValue>
 ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
   auto op_module = std::dynamic_pointer_cast<OperationModule>(operation);
   if (op_module != nullptr)
@@ -525,6 +570,10 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
   auto op_binary = std::dynamic_pointer_cast<OperationBinary>(operation);
   if (op_binary != nullptr)
     return run_binary(op_binary);
+
+  auto op_convert = std::dynamic_pointer_cast<OperationConvert>(operation);
+  if (op_convert != nullptr)
+    return run_convert(op_convert);
 
   return none_value;
 }

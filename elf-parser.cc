@@ -58,6 +58,8 @@ struct Parser {
   bool parse_parameters(std::vector<std::shared_ptr<Operation>> &parameters);
   std::shared_ptr<Operation> parse_value();
   std::shared_ptr<Operation> parse_expression();
+  std::shared_ptr<Operation> parse_variable_value(std::shared_ptr<Token> &token,
+                                                  const std::string &data_type);
   std::shared_ptr<OperationFunctionDefinition> get_current_function();
   bool parse_sequence();
 };
@@ -422,6 +424,7 @@ std::shared_ptr<Operation> Parser::parse_value() {
   std::shared_ptr<OperationVariableDefinition> v;
   std::shared_ptr<Operation> value = nullptr;
   if (token->type == TOKEN_TYPE_NUMBER) {
+    // FIXME Check if can fit into 64 bit
     next_token();
     value = std::make_shared<OperationNumberConstant>(token);
   } else if (token->type == TOKEN_TYPE_TEXT) {
@@ -488,6 +491,19 @@ static bool token_is_binary_operator(std::shared_ptr<Token> &token) {
          token_is_binary_boolean_operator(token);
 }
 
+// Returns true if from_type can be run-time converted to to_type
+static bool can_convert(const std::string &from_type,
+                        const std::string &to_type) {
+  // FIXME: Signed integers
+  if (from_type == "uint8")
+    return to_type == "uint16" || to_type == "uint32" || to_type == "uint64";
+  if (from_type == "uint16")
+    return to_type == "uint32" || to_type == "uint64";
+  if (from_type == "uint32")
+    return to_type == "uint64";
+  return false;
+}
+
 std::shared_ptr<Operation> Parser::parse_expression() {
   auto a = parse_value();
   if (a == nullptr)
@@ -510,11 +526,40 @@ std::shared_ptr<Operation> Parser::parse_expression() {
   auto a_type = a->get_data_type();
   auto b_type = b->get_data_type();
   if (a_type != b_type) {
-    set_error(op, "Can't combine " + a_type + " and " + b_type + " types");
-    return nullptr;
+    if (can_convert(a_type, b_type))
+      a = std::make_shared<OperationConvert>(a, b_type);
+    else if (can_convert(b_type, a_type))
+      b = std::make_shared<OperationConvert>(b, a_type);
+    else {
+      set_error(op, "Can't combine " + a_type + " and " + b_type + " types");
+      return nullptr;
+    }
   }
 
   return std::make_shared<OperationBinary>(op, a, b);
+}
+
+std::shared_ptr<Operation>
+Parser::parse_variable_value(std::shared_ptr<Token> &token,
+                             const std::string &data_type) {
+  auto value = parse_expression();
+  if (value == nullptr) {
+    set_error(current_token(), "Invalid value for variable");
+    return nullptr;
+  }
+
+  // If types match, then nothing to do
+  auto value_type = value->get_data_type();
+  if (value_type == data_type)
+    return value;
+
+  // If can be converted, do that first
+  if (can_convert(value_type, data_type))
+    return std::make_shared<OperationConvert>(value, data_type);
+
+  set_error(token, "Variable is of type " + data_type +
+                       ", but value is of type " + value_type);
+  return nullptr;
 }
 
 std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
@@ -526,22 +571,6 @@ std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
   }
 
   return nullptr;
-}
-
-static bool can_assign(std::string variable_type, std::string value_type) {
-  if (variable_type == value_type)
-    return true;
-
-  // Integers that can fit inside their parent type
-  if (variable_type == "uint16")
-    return value_type == "uint8";
-  else if (variable_type == "uint32")
-    return value_type == "uint16" || value_type == "uint8";
-  else if (variable_type == "uint64")
-    return value_type == "uint32" || value_type == "uint16" ||
-           value_type == "uint8";
-  else
-    return false;
 }
 
 bool Parser::parse_sequence() {
@@ -578,20 +607,9 @@ bool Parser::parse_sequence() {
       } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
         next_token();
 
-        auto value = parse_expression();
-        if (value == nullptr) {
-          set_error(current_token(), "Invalid value for variable");
+        auto value = parse_variable_value(name, data_type->get_text());
+        if (value == nullptr)
           return false;
-        }
-
-        auto variable_type = data_type->get_text();
-        auto value_type = value->get_data_type();
-        if (!can_assign(variable_type, value_type)) {
-          auto message = "Variable is of type " + variable_type +
-                         ", but value is of type " + value_type;
-          set_error(name, message);
-          return false;
-        }
 
         auto definition = std::make_shared<OperationVariableDefinition>(
             data_type, name, value);
@@ -795,19 +813,9 @@ bool Parser::parse_sequence() {
       }
       next_token();
 
-      auto value = parse_expression();
-      if (value == nullptr) {
-        set_error(current_token(), "Invalid value for variable");
+      auto value = parse_variable_value(name, v->get_data_type());
+      if (value == nullptr)
         return false;
-      }
-
-      auto variable_type = v->get_data_type();
-      auto value_type = value->get_data_type();
-      if (!can_assign(variable_type, value_type)) {
-        set_error(name, "Variable is of type " + variable_type +
-                            ", but value is of type " + value_type.c_str());
-        return false;
-      }
 
       op = std::make_shared<OperationVariableAssignment>(name, value, v);
     } else if ((op = parse_value()) != nullptr) {
