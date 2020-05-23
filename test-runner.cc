@@ -8,6 +8,7 @@
  */
 
 #include <fcntl.h>
+#include <fstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -48,6 +49,7 @@ int main(int argc, char **argv) {
   const char *elf_path = argv[1];
   const char *source_path = argv[2];
   auto expected_stdout_path = std::string(source_path) + ".stdout";
+  auto expected_exit_status_path = std::string(source_path) + ".exit_status";
 
   // Make pipe to capture stdout
   int stdout_pipe[2];
@@ -73,6 +75,13 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+  // Get expected result
+  std::vector<uint8_t> expected_stdout_data;
+  file_readall(expected_stdout_path, expected_stdout_data);
+  int expected_exit_status = 0;
+  std::ifstream s(expected_exit_status_path);
+  s >> expected_exit_status;
+
   // Wait for Elf to complete
   int status;
   if (waitpid(pid, &status, 0) < 0) {
@@ -81,7 +90,7 @@ int main(int argc, char **argv) {
   }
   if (WIFEXITED(status)) {
     int exit_status = WEXITSTATUS(status);
-    if (exit_status != 0) {
+    if (exit_status != expected_exit_status) {
       printf("Elf exited with status %d\n", exit_status);
       return EXIT_FAILURE;
     }
@@ -91,10 +100,6 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   } else
     return EXIT_FAILURE;
-
-  // Get expected result
-  std::vector<uint8_t> expected_stdout_data;
-  file_readall(expected_stdout_path, expected_stdout_data);
 
   if (stdout_data != expected_stdout_data) {
     printf("stdout does not match expected\n");

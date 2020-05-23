@@ -1,0 +1,4 @@
+Line 2:
+uint16 value = v
+       ^^^^^
+Variable is of type uint16, but value is of type uint32

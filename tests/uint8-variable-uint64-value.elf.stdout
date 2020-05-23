@@ -1,0 +1,4 @@
+Line 2:
+uint8 value = v
+      ^^^^^
+Variable is of type uint8, but value is of type uint64
