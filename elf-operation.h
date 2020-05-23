@@ -162,36 +162,42 @@ struct OperationAssert : Operation {
 };
 
 struct OperationBooleanConstant : Operation {
-  std::shared_ptr<Token> value;
+  std::shared_ptr<Token> token;
+  bool value;
 
-  OperationBooleanConstant(std::shared_ptr<Token> value) : value(value) {}
+  OperationBooleanConstant(std::shared_ptr<Token> &token, bool value)
+      : token(token), value(value) {}
   bool is_constant() { return true; }
   std::string get_data_type() { return "bool"; }
   std::string to_string() {
-    return "BOOLEAN_CONSTANT(" + value->to_string() + ")";
+    return "BOOLEAN_CONSTANT(" + std::to_string(value) + ")";
   }
 };
 
 struct OperationNumberConstant : Operation {
-  std::shared_ptr<Token> value;
+  std::string data_type;
+  std::shared_ptr<Token> token;
+  uint64_t value;
 
-  OperationNumberConstant(std::shared_ptr<Token> value) : value(value) {}
+  OperationNumberConstant(const std::string &data_type,
+                          std::shared_ptr<Token> &token, uint64_t value)
+      : data_type(data_type), token(token), value(value) {}
   bool is_constant() { return true; }
-  std::string get_data_type();
+  std::string get_data_type() { return data_type; }
   std::string to_string() {
-    return "NUMBER_CONSTANT(" + value->to_string() + ")";
+    return "NUMBER_CONSTANT(" + std::to_string(value) + ")";
   }
 };
 
 struct OperationTextConstant : Operation {
-  std::shared_ptr<Token> value;
+  std::shared_ptr<Token> token;
+  std::string value;
 
-  OperationTextConstant(std::shared_ptr<Token> value) : value(value) {}
+  OperationTextConstant(std::shared_ptr<Token> &token, const std::string &value)
+      : token(token), value(value) {}
   bool is_constant() { return true; }
   std::string get_data_type() { return "utf8"; }
-  std::string to_string() {
-    return "TEXT_CONSTANT(" + value->to_string() + ")";
-  }
+  std::string to_string() { return "TEXT_CONSTANT(" + value + ")"; }
 };
 
 struct OperationVariableValue : Operation {

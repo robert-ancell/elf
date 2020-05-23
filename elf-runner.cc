@@ -342,29 +342,26 @@ ProgramState::run_assert(std::shared_ptr<OperationAssert> &operation) {
 
 std::shared_ptr<DataValue> ProgramState::run_boolean_constant(
     std::shared_ptr<OperationBooleanConstant> &operation) {
-  bool value = operation->value->parse_boolean_constant();
-  return std::make_shared<DataValueBool>(value);
+  return std::make_shared<DataValueBool>(operation->value);
 }
 
 std::shared_ptr<DataValue> ProgramState::run_number_constant(
     std::shared_ptr<OperationNumberConstant> &operation) {
-  uint64_t value = operation->value->parse_number_constant();
   // FIXME: Catch overflow (numbers > 64 bit not supported)
 
-  if (value <= UINT8_MAX)
-    return std::make_shared<DataValueUint8>(value);
-  else if (value <= UINT16_MAX)
-    return std::make_shared<DataValueUint16>(value);
-  else if (value <= UINT32_MAX)
-    return std::make_shared<DataValueUint32>(value);
+  if (operation->data_type == "uint8")
+    return std::make_shared<DataValueUint8>(operation->value);
+  else if (operation->data_type == "uint16")
+    return std::make_shared<DataValueUint16>(operation->value);
+  else if (operation->data_type == "uint32")
+    return std::make_shared<DataValueUint32>(operation->value);
   else
-    return std::make_shared<DataValueUint64>(value);
+    return std::make_shared<DataValueUint64>(operation->value);
 }
 
 std::shared_ptr<DataValue> ProgramState::run_text_constant(
     std::shared_ptr<OperationTextConstant> &operation) {
-  auto value = operation->value->parse_text_constant();
-  return std::make_shared<DataValueUtf8>(value);
+  return std::make_shared<DataValueUtf8>(operation->value);
 }
 
 std::shared_ptr<DataValue> ProgramState::run_variable_value(

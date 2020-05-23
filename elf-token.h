@@ -49,11 +49,5 @@ struct Token {
 
   bool has_text(std::string value);
 
-  bool parse_boolean_constant();
-
-  uint64_t parse_number_constant();
-
-  std::string parse_text_constant();
-
   std::string to_string();
 };

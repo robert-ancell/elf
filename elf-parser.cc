@@ -45,7 +45,6 @@ struct Parser {
   bool is_data_type(std::shared_ptr<Token> token);
   bool is_parameter_name(std::shared_ptr<Token> token);
   bool token_text_matches(std::shared_ptr<Token> a, std::shared_ptr<Token> b);
-  bool is_boolean(std::shared_ptr<Token> token);
   std::shared_ptr<OperationVariableDefinition>
   find_variable(std::shared_ptr<Token> token);
   std::shared_ptr<OperationFunctionDefinition>
@@ -57,6 +56,8 @@ struct Parser {
   void next_token();
   bool parse_parameters(std::vector<std::shared_ptr<Operation>> &parameters);
   std::shared_ptr<Operation> parse_value();
+  std::shared_ptr<Operation> parse_number_value();
+  std::shared_ptr<Operation> parse_text_value();
   std::shared_ptr<Operation> parse_expression();
   std::shared_ptr<Operation> parse_variable_value(std::shared_ptr<Token> &token,
                                                   const std::string &data_type);
@@ -295,10 +296,6 @@ bool Parser::token_text_matches(std::shared_ptr<Token> a,
   return true;
 }
 
-bool Parser::is_boolean(std::shared_ptr<Token> token) {
-  return token->has_text("true") || token->has_text("false");
-}
-
 std::shared_ptr<OperationVariableDefinition>
 Parser::find_variable(std::shared_ptr<Token> token) {
   if (token->type != TOKEN_TYPE_WORD)
@@ -424,15 +421,19 @@ std::shared_ptr<Operation> Parser::parse_value() {
   std::shared_ptr<OperationVariableDefinition> v;
   std::shared_ptr<Operation> value = nullptr;
   if (token->type == TOKEN_TYPE_NUMBER) {
-    // FIXME Check if can fit into 64 bit
-    next_token();
-    value = std::make_shared<OperationNumberConstant>(token);
+    value = parse_number_value();
+    if (value == nullptr)
+      return nullptr;
   } else if (token->type == TOKEN_TYPE_TEXT) {
+    value = parse_text_value();
+    if (value == nullptr)
+      return nullptr;
+  } else if (token->has_text("true")) {
     next_token();
-    value = std::make_shared<OperationTextConstant>(token);
-  } else if (is_boolean(token)) {
+    value = std::make_shared<OperationBooleanConstant>(token, true);
+  } else if (token->has_text("false")) {
     next_token();
-    value = std::make_shared<OperationBooleanConstant>(token);
+    value = std::make_shared<OperationBooleanConstant>(token, false);
   } else if ((v = find_variable(token)) != nullptr) {
     next_token();
     value = std::make_shared<OperationVariableValue>(token, v);
@@ -468,6 +469,131 @@ std::shared_ptr<Operation> Parser::parse_value() {
   }
 
   return value;
+}
+
+std::shared_ptr<Operation> Parser::parse_number_value() {
+  auto token = current_token();
+
+  uint64_t number = 0;
+  for (size_t i = 0; i < token->length; i++) {
+    auto new_number = number * 10 + token->data[token->offset + i] - '0';
+    if (new_number < number) {
+      set_error(token, "Number too large");
+      return nullptr;
+    }
+    number = new_number;
+  }
+  std::string data_type;
+  if (number <= UINT8_MAX)
+    data_type = "uint8";
+  else if (number <= UINT16_MAX)
+    data_type = "uint16";
+  else if (number <= UINT32_MAX)
+    data_type = "uint32";
+  else
+    data_type = "uint64";
+  next_token();
+
+  return std::make_shared<OperationNumberConstant>(data_type, token, number);
+}
+
+static int hex_digit(char c) {
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  else if (c >= 'a' && c <= 'f')
+    return c - 'a' + 10;
+  else if (c >= 'A' && c <= 'F')
+    return c - 'A' + 10;
+  else
+    return -1;
+}
+
+std::shared_ptr<Operation> Parser::parse_text_value() {
+  auto token = current_token();
+
+  std::string value;
+  // Iterate over the characters inside the quotes
+  bool in_escape = false;
+  for (size_t i = 1; i < (token->length - 1); i++) {
+    char c = data[token->offset + i];
+    size_t n_remaining = token->length - 1;
+
+    if (!in_escape && c == '\\') {
+      in_escape = true;
+      continue;
+    }
+
+    if (in_escape) {
+      in_escape = false;
+      if (c == '\"')
+        c = '\"';
+      if (c == '\'')
+        c = '\'';
+      if (c == '\\')
+        c = '\\';
+      if (c == 'n')
+        c = '\n';
+      else if (c == 'r')
+        c = '\r';
+      else if (c == 't')
+        c = '\t';
+      else if (c == 'x') {
+        if (n_remaining < 3)
+          break;
+
+        int digit0 = hex_digit(token->data[token->offset + i + 1]);
+        int digit1 = hex_digit(token->data[token->offset + i + 2]);
+        i += 2;
+        if (digit0 >= 0 && digit1 >= 0)
+          value += digit0 << 4 | digit1;
+        else
+          value += '?';
+        continue;
+      } else if (c == 'u' || c == 'U') {
+        size_t length = c == 'u' ? 4 : 8;
+
+        if (n_remaining < 1 + length)
+          break;
+
+        uint32_t unichar = 0;
+        bool valid = true;
+        for (size_t j = 0; j < length; j++) {
+          int digit = hex_digit(token->data[token->offset + i + 1 + j]);
+          if (digit < 0)
+            valid = false;
+          else
+            unichar = unichar << 4 | digit;
+        }
+        i += length;
+        if (valid) {
+          if (unichar < (1 << 7)) {
+            value += unichar;
+          } else if (unichar < (1 << 11)) {
+            value += 0xC0 | (unichar >> 6);
+            value += 0x80 | ((unichar >> 0) & 0x3F);
+          } else if (unichar < (1 << 16)) {
+            value += 0xE0 | (unichar >> 12);
+            value += 0x80 | ((unichar >> 6) & 0x3F);
+            value += 0x80 | ((unichar >> 0) & 0x3F);
+          } else if (unichar < (1 << 21)) {
+            value += 0xF0 | (unichar >> 18);
+            value += 0x80 | ((unichar >> 12) & 0x3F);
+            value += 0x80 | ((unichar >> 6) & 0x3F);
+            value += 0x80 | ((unichar >> 0) & 0x3F);
+          } else {
+            value += '?';
+          }
+        } else
+          value += '?';
+        continue;
+      }
+    }
+
+    value += c;
+  }
+  next_token();
+
+  return std::make_shared<OperationTextConstant>(token, value);
 }
 
 static bool token_is_binary_boolean_operator(std::shared_ptr<Token> &token) {
