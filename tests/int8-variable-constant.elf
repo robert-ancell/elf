@@ -1,0 +1,2 @@
+int8 value = -128
+print (value)

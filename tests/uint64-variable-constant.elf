@@ -1,2 +1,2 @@
-uint64 value = 42
+uint64 value = 18446744073709551615
 print (value)

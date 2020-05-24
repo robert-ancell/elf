@@ -1,0 +1,3 @@
+int32 v = -128
+int8 value = v
+print (value)

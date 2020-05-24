@@ -1,2 +1,2 @@
-uint32 value = 42
+uint32 value = 4294967295
 print (value)

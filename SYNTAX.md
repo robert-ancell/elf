@@ -54,9 +54,9 @@ variable_defintion
 
 expression
     constant
-    expression
     variable_name
     function_call
+    unary_operation
     binary_operation
 
 constant
@@ -151,6 +151,9 @@ function_call
 
 function_name
     name
+
+unary_operation
+    '-' expression
 
 binary_operation
     expression '+' expression

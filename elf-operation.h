@@ -176,16 +176,27 @@ struct OperationBooleanConstant : Operation {
 
 struct OperationNumberConstant : Operation {
   std::string data_type;
-  std::shared_ptr<Token> token;
-  uint64_t value;
+  std::shared_ptr<Token> sign_token;
+  std::shared_ptr<Token> magnitude_token;
+  uint64_t magnitude;
 
   OperationNumberConstant(const std::string &data_type,
-                          std::shared_ptr<Token> &token, uint64_t value)
-      : data_type(data_type), token(token), value(value) {}
+                          std::shared_ptr<Token> &magnitude_token,
+                          uint64_t magnitude)
+      : data_type(data_type), sign_token(nullptr),
+        magnitude_token(magnitude_token), magnitude(magnitude) {}
+  OperationNumberConstant(const std::string &data_type,
+                          std::shared_ptr<Token> &sign_token,
+                          std::shared_ptr<Token> &magnitude_token,
+                          uint64_t magnitude)
+      : data_type(data_type), sign_token(sign_token),
+        magnitude_token(magnitude_token), magnitude(magnitude) {}
   bool is_constant() { return true; }
   std::string get_data_type() { return data_type; }
   std::string to_string() {
-    return "NUMBER_CONSTANT(" + std::to_string(value) + ")";
+    return "NUMBER_CONSTANT(" + (sign_token != nullptr)
+               ? "-"
+               : "" + std::to_string(magnitude) + ")";
   }
 };
 
@@ -226,6 +237,17 @@ struct OperationMemberValue : Operation {
   std::string to_string() {
     return "MEMBER_VALUE(" + member->to_string() + ")";
   }
+};
+
+struct OperationUnary : Operation {
+  std::shared_ptr<Token> op;
+  std::shared_ptr<Operation> value;
+
+  OperationUnary(std::shared_ptr<Token> op, std::shared_ptr<Operation> value)
+      : op(op), value(value) {}
+  bool is_constant() { return value->is_constant(); }
+  std::string get_data_type();
+  std::string to_string() { return "UNARY"; }
 };
 
 struct OperationBinary : Operation {

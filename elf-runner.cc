@@ -36,6 +36,14 @@ struct DataValueUint8 : DataValue {
 
   DataValueUint8(uint8_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
+  void print() { printf("%u\n", value); }
+};
+
+struct DataValueInt8 : DataValue {
+  int8_t value;
+
+  DataValueInt8(int8_t value) : value(value) {}
+  std::shared_ptr<DataValue> convert_to(const std::string &data_type);
   void print() { printf("%d\n", value); }
 };
 
@@ -44,6 +52,14 @@ struct DataValueUint16 : DataValue {
 
   DataValueUint16(uint16_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
+  void print() { printf("%u\n", value); }
+};
+
+struct DataValueInt16 : DataValue {
+  int16_t value;
+
+  DataValueInt16(int16_t value) : value(value) {}
+  std::shared_ptr<DataValue> convert_to(const std::string &data_type);
   void print() { printf("%d\n", value); }
 };
 
@@ -51,6 +67,14 @@ struct DataValueUint32 : DataValue {
   uint32_t value;
 
   DataValueUint32(uint32_t value) : value(value) {}
+  std::shared_ptr<DataValue> convert_to(const std::string &data_type);
+  void print() { printf("%u\n", value); }
+};
+
+struct DataValueInt32 : DataValue {
+  int32_t value;
+
+  DataValueInt32(int32_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
   void print() { printf("%d\n", value); }
 };
@@ -62,6 +86,13 @@ struct DataValueUint64 : DataValue {
   void print() { printf("%lu\n", value); }
 };
 
+struct DataValueInt64 : DataValue {
+  int64_t value;
+
+  DataValueInt64(int64_t value) : value(value) {}
+  void print() { printf("%li\n", value); }
+};
+
 struct DataValueUtf8 : DataValue {
   std::string value;
 
@@ -69,13 +100,11 @@ struct DataValueUtf8 : DataValue {
   void print() { printf("%s\n", value.c_str()); }
 };
 
-std::shared_ptr<DataValue> DataValue::convert_to(const std::string &data_type) {
-  return std::make_shared<DataValueNone>();
-};
-
-std::shared_ptr<DataValue>
-DataValueUint8::convert_to(const std::string &data_type) {
-  if (data_type == "uint16")
+static std::shared_ptr<DataValue>
+make_unsigned_integer_value(const std::string &data_type, uint64_t value) {
+  if (data_type == "uint8")
+    return std::make_shared<DataValueUint8>(value);
+  else if (data_type == "uint16")
     return std::make_shared<DataValueUint16>(value);
   else if (data_type == "uint32")
     return std::make_shared<DataValueUint32>(value);
@@ -85,12 +114,72 @@ DataValueUint8::convert_to(const std::string &data_type) {
     return std::make_shared<DataValueNone>();
 }
 
+static std::shared_ptr<DataValue>
+make_signed_integer_value(const std::string &data_type, int64_t value) {
+  if (data_type == "int8")
+    return std::make_shared<DataValueInt8>(value);
+  else if (data_type == "int16")
+    return std::make_shared<DataValueInt16>(value);
+  else if (data_type == "int32")
+    return std::make_shared<DataValueInt32>(value);
+  else if (data_type == "int64")
+    return std::make_shared<DataValueInt64>(value);
+  else
+    return std::make_shared<DataValueNone>();
+}
+
+static std::shared_ptr<DataValue>
+make_default_value(const std::string &data_type) {
+  if (data_type == "bool")
+    return std::make_shared<DataValueBool>(false);
+  else if (data_type == "uint8" || data_type == "uint16" ||
+           data_type == "uint32" || data_type == "uint64")
+    return make_unsigned_integer_value(data_type, 0);
+  else if (data_type == "int8" || data_type == "int16" ||
+           data_type == "int32" || data_type == "int64")
+    return make_signed_integer_value(data_type, 0);
+  else if (data_type == "utf8")
+    return std::make_shared<DataValueUtf8>("");
+  else
+    return std::make_shared<DataValueNone>();
+}
+
+std::shared_ptr<DataValue> DataValue::convert_to(const std::string &data_type) {
+  return std::make_shared<DataValueNone>();
+};
+
+std::shared_ptr<DataValue>
+DataValueUint8::convert_to(const std::string &data_type) {
+  if (data_type == "uint16" || data_type == "uint32" || data_type == "uint64")
+    return make_unsigned_integer_value(data_type, value);
+  else if (data_type == "int16" || data_type == "int32" || data_type == "int64")
+    return make_signed_integer_value(data_type, value);
+  else
+    return std::make_shared<DataValueNone>();
+}
+
+std::shared_ptr<DataValue>
+DataValueInt8::convert_to(const std::string &data_type) {
+  if (data_type == "int16" || data_type == "int32" || data_type == "int64")
+    return make_signed_integer_value(data_type, value);
+  else
+    return std::make_shared<DataValueNone>();
+}
+
 std::shared_ptr<DataValue>
 DataValueUint16::convert_to(const std::string &data_type) {
-  if (data_type == "uint32")
-    return std::make_shared<DataValueUint32>(value);
-  else if (data_type == "uint64")
-    return std::make_shared<DataValueUint64>(value);
+  if (data_type == "uint32" || data_type == "uint64")
+    return make_unsigned_integer_value(data_type, value);
+  else if (data_type == "int32" || data_type == "int64")
+    return make_signed_integer_value(data_type, value);
+  else
+    return std::make_shared<DataValueNone>();
+}
+
+std::shared_ptr<DataValue>
+DataValueInt16::convert_to(const std::string &data_type) {
+  if (data_type == "int32" || data_type == "int64")
+    return make_signed_integer_value(data_type, value);
   else
     return std::make_shared<DataValueNone>();
 }
@@ -98,7 +187,17 @@ DataValueUint16::convert_to(const std::string &data_type) {
 std::shared_ptr<DataValue>
 DataValueUint32::convert_to(const std::string &data_type) {
   if (data_type == "uint64")
-    return std::make_shared<DataValueUint64>(value);
+    return make_unsigned_integer_value(data_type, value);
+  else if (data_type == "int64")
+    return make_signed_integer_value(data_type, value);
+  else
+    return std::make_shared<DataValueNone>();
+}
+
+std::shared_ptr<DataValue>
+DataValueInt32::convert_to(const std::string &data_type) {
+  if (data_type == "int64")
+    return make_signed_integer_value(data_type, value);
   else
     return std::make_shared<DataValueNone>();
 }
@@ -113,8 +212,6 @@ struct Variable {
 
 struct ProgramState {
   const char *data;
-
-  std::shared_ptr<DataValueNone> none_value;
 
   std::vector<Variable *> variables;
 
@@ -135,8 +232,6 @@ struct ProgramState {
   run_module(std::shared_ptr<OperationModule> &module);
   std::shared_ptr<DataValue>
   run_function(std::shared_ptr<OperationFunctionDefinition> &function);
-  std::shared_ptr<DataValue>
-  make_default_value(std::shared_ptr<Token> &data_type);
   void add_variable(std::string name, std::shared_ptr<DataValue> &value);
   std::shared_ptr<DataValue> run_variable_definition(
       std::shared_ptr<OperationVariableDefinition> &operation);
@@ -192,7 +287,7 @@ void ProgramState::run_sequence(std::vector<std::shared_ptr<Operation>> &body) {
 std::shared_ptr<DataValue>
 ProgramState::run_module(std::shared_ptr<OperationModule> &module) {
   run_sequence(module->body);
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue> ProgramState::run_function(
@@ -203,29 +298,9 @@ std::shared_ptr<DataValue> ProgramState::run_function(
   return_value = nullptr;
 
   if (result == nullptr)
-    return none_value;
+    return std::make_shared<DataValueNone>();
 
   return result;
-}
-
-std::shared_ptr<DataValue>
-ProgramState::make_default_value(std::shared_ptr<Token> &data_type) {
-  auto type_name = data_type->get_text();
-
-  if (type_name == "bool")
-    return std::make_shared<DataValueBool>(false);
-  else if (type_name == "uint8")
-    return std::make_shared<DataValueUint8>(0);
-  else if (type_name == "uint16")
-    return std::make_shared<DataValueUint16>(0);
-  else if (type_name == "uint32")
-    return std::make_shared<DataValueUint32>(0);
-  else if (type_name == "uint64")
-    return std::make_shared<DataValueUint64>(0);
-  else if (type_name == "utf8")
-    return std::make_shared<DataValueUtf8>("");
-  else
-    return none_value;
 }
 
 void ProgramState::add_variable(std::string name,
@@ -241,11 +316,11 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
     auto value = run_operation(operation->value);
     add_variable(variable_name, value);
   } else {
-    auto value = make_default_value(operation->data_type);
+    auto value = make_default_value(operation->data_type->get_text());
     add_variable(variable_name, value);
   }
 
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue> ProgramState::run_variable_assignment(
@@ -263,7 +338,7 @@ std::shared_ptr<DataValue> ProgramState::run_variable_assignment(
     }
   }
 
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue>
@@ -271,7 +346,7 @@ ProgramState::run_if(std::shared_ptr<OperationIf> &operation) {
   auto value = run_operation(operation->condition);
   auto bool_value = std::dynamic_pointer_cast<DataValueBool>(value);
   if (bool_value == nullptr)
-    return none_value;
+    return std::make_shared<DataValueNone>();
   bool condition = bool_value->value;
 
   if (condition) {
@@ -280,7 +355,7 @@ ProgramState::run_if(std::shared_ptr<OperationIf> &operation) {
     run_sequence(operation->else_operation->body);
   }
 
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue>
@@ -289,10 +364,10 @@ ProgramState::run_while(std::shared_ptr<OperationWhile> &operation) {
     auto value = run_operation(operation->condition);
     auto bool_value = std::dynamic_pointer_cast<DataValueBool>(value);
     if (bool_value == nullptr)
-      return none_value;
+      return std::make_shared<DataValueNone>();
 
     if (!bool_value->value)
-      return none_value;
+      return std::make_shared<DataValueNone>();
 
     run_sequence(operation->body);
   }
@@ -321,7 +396,7 @@ std::shared_ptr<DataValue> ProgramState::run_function_call(
     value->print();
   }
 
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue>
@@ -349,14 +424,26 @@ std::shared_ptr<DataValue> ProgramState::run_number_constant(
     std::shared_ptr<OperationNumberConstant> &operation) {
   // FIXME: Catch overflow (numbers > 64 bit not supported)
 
+  int64_t sign = operation->sign_token != nullptr ? -1 : 1;
+
   if (operation->data_type == "uint8")
-    return std::make_shared<DataValueUint8>(operation->value);
+    return std::make_shared<DataValueUint8>(operation->magnitude);
+  else if (operation->data_type == "int8")
+    return std::make_shared<DataValueInt8>(sign * operation->magnitude);
   else if (operation->data_type == "uint16")
-    return std::make_shared<DataValueUint16>(operation->value);
+    return std::make_shared<DataValueUint16>(operation->magnitude);
+  else if (operation->data_type == "int16")
+    return std::make_shared<DataValueInt16>(sign * operation->magnitude);
   else if (operation->data_type == "uint32")
-    return std::make_shared<DataValueUint32>(operation->value);
+    return std::make_shared<DataValueUint32>(operation->magnitude);
+  else if (operation->data_type == "int32")
+    return std::make_shared<DataValueInt32>(sign * operation->magnitude);
+  else if (operation->data_type == "uint64")
+    return std::make_shared<DataValueUint64>(operation->magnitude);
+  else if (operation->data_type == "int64")
+    return std::make_shared<DataValueInt64>(sign * operation->magnitude);
   else
-    return std::make_shared<DataValueUint64>(operation->value);
+    return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue> ProgramState::run_text_constant(
@@ -374,7 +461,7 @@ std::shared_ptr<DataValue> ProgramState::run_variable_value(
       return variable->value;
   }
 
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue> ProgramState::run_member_value(
@@ -392,7 +479,7 @@ std::shared_ptr<DataValue> ProgramState::run_member_value(
       return std::make_shared<DataValueUtf8>("foo"); // FIXME: Total hack
   }
 
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue>
@@ -408,13 +495,13 @@ ProgramState::run_binary_boolean(std::shared_ptr<OperationBinary> &operation,
     else if (operation->op->has_text("xor"))
       return std::make_shared<DataValueBool>(a->value ^ b->value);
     else
-      return none_value;
+      return std::make_shared<DataValueNone>();
   case TOKEN_TYPE_EQUAL:
     return std::make_shared<DataValueBool>(a->value == b->value);
   case TOKEN_TYPE_NOT_EQUAL:
     return std::make_shared<DataValueBool>(a->value != b->value);
   default:
-    return none_value;
+    return std::make_shared<DataValueNone>();
   }
 }
 
@@ -444,7 +531,7 @@ ProgramState::run_binary_integer(std::shared_ptr<OperationBinary> &operation,
   case TOKEN_TYPE_DIVIDE:
     return std::make_shared<DataValueUint8>(a->value / b->value);
   default:
-    return none_value;
+    return std::make_shared<DataValueNone>();
   }
 }
 
@@ -460,7 +547,7 @@ ProgramState::run_binary_text(std::shared_ptr<OperationBinary> &operation,
   case TOKEN_TYPE_ADD:
     return std::make_shared<DataValueUtf8>(a->value + b->value);
   default:
-    return none_value;
+    return std::make_shared<DataValueNone>();
   }
 }
 
@@ -484,7 +571,7 @@ ProgramState::run_binary(std::shared_ptr<OperationBinary> &operation) {
   if (utf8_a != nullptr && utf8_b != nullptr)
     return run_binary_text(operation, utf8_a, utf8_b);
 
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue>
@@ -515,7 +602,7 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
 
   auto op_else = std::dynamic_pointer_cast<OperationElse>(operation);
   if (op_else != nullptr)
-    return none_value; // Resolved in IF
+    return std::make_shared<DataValueNone>(); // Resolved in IF
 
   auto op_while = std::dynamic_pointer_cast<OperationWhile>(operation);
   if (op_while != nullptr)
@@ -524,7 +611,7 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
   auto op_function_definition =
       std::dynamic_pointer_cast<OperationFunctionDefinition>(operation);
   if (op_function_definition != nullptr)
-    return none_value; // Resolved at compile time
+    return std::make_shared<DataValueNone>(); // Resolved at compile time
 
   auto op_function_call =
       std::dynamic_pointer_cast<OperationFunctionCall>(operation);
@@ -572,7 +659,7 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
   if (op_convert != nullptr)
     return run_convert(op_convert);
 
-  return none_value;
+  return std::make_shared<DataValueNone>();
 }
 
 void elf_run(const char *data, std::shared_ptr<OperationModule> module) {

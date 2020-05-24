@@ -1,2 +1,2 @@
-uint16 value = 42
+uint16 value = 32767
 print (value)

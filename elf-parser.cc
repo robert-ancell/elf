@@ -478,7 +478,7 @@ std::shared_ptr<Operation> Parser::parse_number_value() {
   for (size_t i = 0; i < token->length; i++) {
     auto new_number = number * 10 + token->data[token->offset + i] - '0';
     if (new_number < number) {
-      set_error(token, "Number too large");
+      set_error(token, "Number too large for 64 bit integer");
       return nullptr;
     }
     number = new_number;
@@ -620,17 +620,74 @@ static bool token_is_binary_operator(std::shared_ptr<Token> &token) {
 // Returns true if from_type can be run-time converted to to_type
 static bool can_convert(const std::string &from_type,
                         const std::string &to_type) {
-  // FIXME: Signed integers
   if (from_type == "uint8")
     return to_type == "uint16" || to_type == "uint32" || to_type == "uint64";
-  if (from_type == "uint16")
+  else if (from_type == "int8")
+    return to_type == "int16" || to_type == "int32" || to_type == "int64";
+  else if (from_type == "uint16")
     return to_type == "uint32" || to_type == "uint64";
-  if (from_type == "uint32")
+  else if (from_type == "int16")
+    return to_type == "int32" || to_type == "int64";
+  else if (from_type == "uint32")
     return to_type == "uint64";
-  return false;
+  else if (from_type == "int32")
+    return to_type == "int64";
+  else
+    return false;
+}
+
+static bool is_signed(const std::string &data_type) {
+  return data_type == "int8" || data_type == "int16" || data_type == "int32" ||
+         data_type == "int64";
 }
 
 std::shared_ptr<Operation> Parser::parse_expression() {
+  auto unary_operation = current_token();
+  if (unary_operation == nullptr)
+    return nullptr;
+  if (unary_operation->type == TOKEN_TYPE_SUBTRACT) {
+    next_token();
+    auto value_token = current_token(); // FIXME: Get the token(s) from 'value'
+    auto value = parse_value();
+    if (value == nullptr) {
+      set_error(unary_operation, "Missing second value in unary operation");
+      return nullptr;
+    }
+
+    auto number_constant =
+        std::dynamic_pointer_cast<OperationNumberConstant>(value);
+    if (number_constant != nullptr) {
+      std::string data_type;
+      if (number_constant->magnitude <= -INT8_MIN)
+        data_type = "int8";
+      else if (number_constant->magnitude <= -static_cast<int64_t>(INT16_MIN))
+        data_type = "int16";
+      else if (number_constant->magnitude <= -static_cast<int64_t>(INT32_MIN))
+        data_type = "int32";
+      else if (number_constant->magnitude <=
+               9223372036854775808U) // NOTE: Can't use INT64_MIN as it can't be
+                                     // inverted without overflowing
+        data_type = "int64";
+      else {
+        set_error(number_constant->magnitude_token,
+                  "Number too large for 64 bit signed integer");
+        return nullptr;
+      }
+
+      return std::make_shared<OperationNumberConstant>(
+          data_type, unary_operation, number_constant->magnitude_token,
+          number_constant->magnitude);
+    }
+
+    auto data_type = value->get_data_type();
+    if (!is_signed(data_type)) {
+      set_error(value_token, "Cannot invert " + data_type);
+      return nullptr;
+    }
+
+    return std::make_shared<OperationUnary>(unary_operation, value);
+  }
+
   auto a = parse_value();
   if (a == nullptr)
     return nullptr;
@@ -645,7 +702,7 @@ std::shared_ptr<Operation> Parser::parse_expression() {
 
   auto b = parse_value();
   if (b == nullptr) {
-    set_error(current_token(), "Missing second value in binary operation");
+    set_error(op, "Missing second value in binary operation");
     return nullptr;
   }
 

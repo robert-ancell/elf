@@ -1,0 +1,3 @@
+int16 v = -32768
+int32 value = v
+print (value)

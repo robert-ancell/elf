@@ -1,0 +1,2 @@
+int16 value = -32768
+print (value)

@@ -1,2 +1,2 @@
-uint8 value = 42
+uint8 value = 255
 print (value)

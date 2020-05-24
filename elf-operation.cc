@@ -34,6 +34,11 @@ bool OperationFunctionDefinition::is_constant() {
   return false;
 }
 
+std::string OperationUnary::get_data_type() {
+  // FIXME: Type depends on operation
+  return value->get_data_type();
+}
+
 std::string OperationBinary::get_data_type() {
   // FIXME: Need to combine data type
   return a->get_data_type();
