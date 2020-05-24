@@ -1,0 +1,4 @@
+Line 1:
+int64 v = 4294967295
+      ^
+Variable is of type int64, but value is of type uint32

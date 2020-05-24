@@ -1,0 +1,4 @@
+Line 1:
+int8 v = 18446744073709551615
+     ^
+Variable is of type int8, but value is of type uint64

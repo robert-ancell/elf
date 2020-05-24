@@ -1,0 +1,3 @@
+int64 v = 65535
+uint16 value = v
+print (value)

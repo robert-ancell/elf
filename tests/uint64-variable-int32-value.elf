@@ -1,0 +1,3 @@
+int32 v = 18446744073709551615
+uint64 value = v
+print (value)

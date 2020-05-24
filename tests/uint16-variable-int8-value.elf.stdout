@@ -1,0 +1,4 @@
+Line 1:
+int8 v = 65535
+     ^
+Variable is of type int8, but value is of type uint16
