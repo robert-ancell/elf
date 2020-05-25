@@ -1,4 +1,4 @@
-Line 1:
-int16 v = 255
-      ^
-Variable is of type int16, but value is of type uint8
+Line 2:
+uint8 value = v
+      ^^^^^
+Variable is of type uint8, but value is of type int16

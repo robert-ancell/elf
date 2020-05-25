@@ -1,4 +1,4 @@
-Line 1:
-int32 v = 65535
-      ^
-Variable is of type int32, but value is of type uint16
+Line 2:
+uint16 value = v
+       ^^^^^
+Variable is of type uint16, but value is of type int32

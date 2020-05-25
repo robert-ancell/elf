@@ -617,23 +617,55 @@ static bool token_is_binary_operator(std::shared_ptr<Token> &token) {
          token_is_binary_boolean_operator(token);
 }
 
-// Returns true if from_type can be run-time converted to to_type
-static bool can_convert(const std::string &from_type,
-                        const std::string &to_type) {
+// Returns operation with the requested data type or nullptr if cannot
+static std::shared_ptr<Operation>
+convert_to_data_type(std::shared_ptr<Operation> &operation,
+                     const std::string &to_type) {
+  // Convert unsigned constant numbers to signed ones
+  auto number_constant =
+      std::dynamic_pointer_cast<OperationNumberConstant>(operation);
+  if (number_constant != nullptr && number_constant->sign_token == nullptr) {
+    uint64_t max_magnitude = 0;
+    if (to_type == "int8")
+      max_magnitude = INT8_MAX;
+    else if (to_type == "int16")
+      max_magnitude = INT16_MAX;
+    else if (to_type == "int32")
+      max_magnitude = INT32_MAX;
+    else if (to_type == "int64")
+      max_magnitude = INT64_MAX;
+
+    if (max_magnitude > 0) {
+      if (number_constant->magnitude > max_magnitude)
+        return nullptr;
+
+      return std::make_shared<OperationNumberConstant>(
+          to_type, number_constant->magnitude_token,
+          number_constant->magnitude);
+    }
+  }
+
+  bool can_convert = false;
+  auto from_type = operation->get_data_type();
   if (from_type == "uint8")
-    return to_type == "uint16" || to_type == "uint32" || to_type == "uint64";
+    can_convert =
+        to_type == "uint16" || to_type == "uint32" || to_type == "uint64";
   else if (from_type == "int8")
-    return to_type == "int16" || to_type == "int32" || to_type == "int64";
+    can_convert =
+        to_type == "int16" || to_type == "int32" || to_type == "int64";
   else if (from_type == "uint16")
-    return to_type == "uint32" || to_type == "uint64";
+    can_convert = to_type == "uint32" || to_type == "uint64";
   else if (from_type == "int16")
-    return to_type == "int32" || to_type == "int64";
+    can_convert = to_type == "int32" || to_type == "int64";
   else if (from_type == "uint32")
-    return to_type == "uint64";
+    can_convert = to_type == "uint64";
   else if (from_type == "int32")
-    return to_type == "int64";
-  else
-    return false;
+    can_convert = to_type == "int64";
+
+  if (!can_convert)
+    return nullptr;
+
+  return std::make_shared<OperationConvert>(operation, to_type);
 }
 
 static bool is_signed(const std::string &data_type) {
@@ -709,10 +741,12 @@ std::shared_ptr<Operation> Parser::parse_expression() {
   auto a_type = a->get_data_type();
   auto b_type = b->get_data_type();
   if (a_type != b_type) {
-    if (can_convert(a_type, b_type))
-      a = std::make_shared<OperationConvert>(a, b_type);
-    else if (can_convert(b_type, a_type))
-      b = std::make_shared<OperationConvert>(b, a_type);
+    auto converted_a = convert_to_data_type(a, b_type);
+    auto converted_b = convert_to_data_type(b, a_type);
+    if (converted_a != nullptr)
+      a = converted_a;
+    else if (converted_b != nullptr)
+      b = converted_b;
     else {
       set_error(op, "Can't combine " + a_type + " and " + b_type + " types");
       return nullptr;
@@ -737,8 +771,9 @@ Parser::parse_variable_value(std::shared_ptr<Token> &token,
     return value;
 
   // If can be converted, do that first
-  if (can_convert(value_type, data_type))
-    return std::make_shared<OperationConvert>(value, data_type);
+  auto converted_value = convert_to_data_type(value, data_type);
+  if (converted_value != nullptr)
+    return converted_value;
 
   set_error(token, "Variable is of type " + data_type +
                        ", but value is of type " + value_type);
