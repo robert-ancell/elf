@@ -1,0 +1,4 @@
+bool foo (bool value) {
+   return value
+}
+print (foo (true))
