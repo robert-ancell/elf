@@ -43,6 +43,7 @@ struct Parser {
   void set_error(std::shared_ptr<Token> token, const std::string &message);
   void print_error();
   bool token_text_matches(std::shared_ptr<Token> a, std::shared_ptr<Token> b);
+  std::shared_ptr<OperationTypeDefinition> find_type(std::string name);
   std::shared_ptr<OperationVariableDefinition>
   find_variable(std::shared_ptr<Token> token);
   std::shared_ptr<OperationFunctionDefinition>
@@ -65,6 +66,7 @@ struct Parser {
   std::shared_ptr<OperationWhile> parse_while();
   std::shared_ptr<OperationReturn> parse_return();
   std::shared_ptr<OperationAssert> parse_assert();
+  std::shared_ptr<OperationTypeDefinition> parse_type_definition();
   std::shared_ptr<OperationVariableDefinition> parse_variable_definition();
   std::shared_ptr<OperationFunctionDefinition> parse_function_definition();
   std::shared_ptr<Operation> parse_expression_or_assignment();
@@ -84,6 +86,8 @@ struct Parser {
   bool resolve_call(std::shared_ptr<OperationCall> &operation);
   bool resolve_function_definition(
       std::shared_ptr<OperationFunctionDefinition> &operation);
+  bool
+  resolve_type_definition(std::shared_ptr<OperationTypeDefinition> &operation);
   bool resolve_return(std::shared_ptr<OperationReturn> &operation);
   bool resolve_assert(std::shared_ptr<OperationAssert> &operation);
   bool resolve_member(std::shared_ptr<OperationMember> &operation);
@@ -299,6 +303,23 @@ bool Parser::token_text_matches(std::shared_ptr<Token> a,
       return false;
 
   return true;
+}
+
+std::shared_ptr<OperationTypeDefinition> Parser::find_type(std::string name) {
+  for (auto i = stack.rbegin(); i != stack.rend(); i++) {
+    auto operation = (*i)->operation;
+
+    size_t n_children = operation->get_n_children();
+    for (size_t j = 0; j < n_children; j++) {
+      auto child = operation->get_child(j);
+
+      auto op = std::dynamic_pointer_cast<OperationTypeDefinition>(child);
+      if (op != nullptr && op->name->has_text(name))
+        return op;
+    }
+  }
+
+  return nullptr;
 }
 
 std::shared_ptr<OperationVariableDefinition>
@@ -853,6 +874,54 @@ std::shared_ptr<OperationAssert> Parser::parse_assert() {
   return std::make_shared<OperationAssert>(token, expression);
 }
 
+std::shared_ptr<OperationTypeDefinition> Parser::parse_type_definition() {
+  if (!current_token()->has_text("type"))
+    return nullptr;
+  next_token();
+
+  auto name = current_token(); // FIXME: Check valid name
+  if (name->type != TOKEN_TYPE_WORD) {
+    set_error(name, "Expected type name");
+    return nullptr;
+  }
+  next_token();
+
+  auto open_brace = current_token();
+  if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
+    set_error(current_token(), "Missing type open brace");
+    return nullptr;
+  }
+  next_token();
+
+  auto op = std::make_shared<OperationTypeDefinition>(name);
+  push_stack(op);
+
+  while (current_token() != nullptr) {
+    auto token = current_token();
+
+    // Stop when sequence ends
+    if (token->type == TOKEN_TYPE_CLOSE_BRACE) {
+      next_token();
+      break;
+    }
+
+    // Ignore comments
+    if (token->type == TOKEN_TYPE_COMMENT) {
+      next_token();
+      continue;
+    }
+
+    auto variable_definition = parse_variable_definition();
+    if (variable_definition == nullptr) {
+      set_error(current_token(), "Expected variable or function definition");
+      return nullptr;
+    }
+    op->add_child(variable_definition);
+  }
+
+  return op;
+}
+
 std::shared_ptr<OperationVariableDefinition>
 Parser::parse_variable_definition() {
   auto start_offset = offset;
@@ -1032,6 +1101,8 @@ bool Parser::parse_sequence() {
     if (op == nullptr)
       op = parse_assert();
     if (op == nullptr)
+      op = parse_type_definition();
+    if (op == nullptr)
       op = parse_variable_definition();
     if (op == nullptr)
       op = parse_function_definition();
@@ -1082,6 +1153,11 @@ bool Parser::resolve_operation(std::shared_ptr<Operation> operation) {
       std::dynamic_pointer_cast<OperationFunctionDefinition>(operation);
   if (op_function_definition != nullptr)
     return resolve_function_definition(op_function_definition);
+
+  auto op_type_definition =
+      std::dynamic_pointer_cast<OperationTypeDefinition>(operation);
+  if (op_type_definition != nullptr)
+    return resolve_type_definition(op_type_definition);
 
   auto op_call = std::dynamic_pointer_cast<OperationCall>(operation);
   if (op_call != nullptr)
@@ -1187,6 +1263,13 @@ bool Parser::resolve_data_type(std::shared_ptr<OperationDataType> &operation) {
     if (operation->name->has_text(builtin_types[i]))
       return true;
 
+  auto data_type = operation->name->get_text();
+  auto type_definition = find_type(data_type);
+  if (type_definition != nullptr) {
+    operation->type_definition = type_definition;
+    return true;
+  }
+
   set_error(operation->name, "Unknown data type");
   return false;
 }
@@ -1228,6 +1311,12 @@ bool Parser::resolve_function_definition(
   return resolve_sequence(operation->body);
 }
 
+bool Parser::resolve_type_definition(
+    std::shared_ptr<OperationTypeDefinition> &operation) {
+  push_stack(operation);
+  return resolve_sequence(operation->body);
+}
+
 bool Parser::resolve_return(std::shared_ptr<OperationReturn> &operation) {
   return resolve_operation(operation->value);
 }
@@ -1241,11 +1330,25 @@ bool Parser::resolve_member(std::shared_ptr<OperationMember> &operation) {
     return false;
 
   auto data_type = operation->value->get_data_type();
+
+  auto type_definition = find_type(data_type);
+  if (type_definition == nullptr) {
+    set_error(operation->member,
+              "Can't access members of data type " + data_type);
+    return false;
+  }
+  operation->type_definition = type_definition;
+
   auto member_name = operation->get_member_name();
-  set_error(operation->member, "Data type " + data_type +
-                                   " doesn't have a member named " +
-                                   member_name);
-  return false;
+  auto definition = type_definition->find_member(member_name);
+  if (definition == nullptr) {
+    set_error(operation->member, "Data type " + data_type +
+                                     " doesn't have a member named " +
+                                     member_name);
+    return false;
+  }
+
+  return true;
 }
 
 bool Parser::resolve_binary(std::shared_ptr<OperationBinary> &operation) {

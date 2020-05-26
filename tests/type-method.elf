@@ -1,0 +1,12 @@
+type Foo {
+  uint8 value
+
+  uint8 double() {
+    return value * 2
+  }
+}
+
+Foo foo
+foo.value = 2
+
+print (foo.double ())

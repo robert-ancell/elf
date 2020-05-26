@@ -1,22 +1,23 @@
 ```
 # FIXME: Specify when newlines are allowed
 # FIXME: Arrays
-# FIXME: Member access
 
 module
     statements
 
 statements
     statement
-    statement nl statement
+    statement nl statements
 
 statement
     comment
     use_statement
     variable_definition
     function_definition
+    type_definition
     variable_assignment
     function_call
+    method_call
     if_statement
     while_statement
     return_statement
@@ -52,10 +53,15 @@ variable_defintion
     type_name ws variable_name
     type_name ws variable_name ws '=' ws expression
 
+type_name
+    name
+
 expression
     constant
     variable_name
+    variable_member
     function_call
+    method_call
     unary_operation
     binary_operation
 
@@ -146,11 +152,20 @@ escape
 variable_name
     name
 
+variable_member
+    expression '.' member_name
+
+member_name
+    name
+
 function_call
     function_name ws '(' arguments ')'
 
 function_name
     name
+
+method_call
+    expression '.' member_name ws '(' arguments ')'
 
 unary_operation
     '-' expression
@@ -170,15 +185,27 @@ function_defintion
 statement_block
     '{' ws nl statements '}'
 
+type_defintion
+    "type" ws type_name ws '{' type_statements '}'
+
+type_statements
+    type_statement
+    type_statement nl type_statements
+
+type_statement
+    variable_definition # Note, assignment not supported
+    function_definition
+
 variable_assignment
-    variable_name ws '=' ws expression
+    variable ws '=' ws expression
+    variable_member ws '=' ws expression
 
 function_call
     function_name ws '(' arguments ')'
 
 arguments
     argument
-    argument ',' argument
+    argument ',' arguments
 
 if_statement
     "if" condition ws statement_block

@@ -100,6 +100,13 @@ struct DataValueUtf8 : DataValue {
   void print() { printf("%s\n", value.c_str()); }
 };
 
+struct DataValueObject : DataValue {
+  std::vector<std::shared_ptr<DataValue>> values;
+
+  DataValueObject() {}
+  void print() { printf("[FIXME]\n"); }
+};
+
 struct DataValueFunction : DataValue {
   std::shared_ptr<OperationFunctionDefinition> function;
 
@@ -327,7 +334,22 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
     std::shared_ptr<OperationVariableDefinition> &operation) {
   auto variable_name = operation->name->get_text();
 
-  if (operation->value != nullptr) {
+  auto type_definition = operation->data_type->type_definition;
+  if (type_definition != nullptr) {
+    auto value = std::make_shared<DataValueObject>();
+    for (auto i = type_definition->body.begin();
+         i != type_definition->body.end(); i++) {
+      auto variable_definition =
+          std::dynamic_pointer_cast<OperationVariableDefinition>(*i);
+      if (variable_definition == nullptr)
+        continue;
+
+      auto v = make_default_value(variable_definition->get_data_type());
+      value->values.push_back(v);
+    }
+
+    add_variable(variable_name, value);
+  } else if (operation->value != nullptr) {
     auto value = run_operation(operation->value);
     add_variable(variable_name, value);
   } else {
@@ -506,6 +528,27 @@ std::shared_ptr<DataValue>
 ProgramState::run_member(std::shared_ptr<OperationMember> &operation) {
   auto value = run_operation(operation->value);
 
+  auto object_value = std::dynamic_pointer_cast<DataValueObject>(value);
+  if (object_value == nullptr)
+    return std::make_shared<DataValueNone>();
+
+  auto type_definition = operation->type_definition;
+  auto member_name = operation->get_member_name();
+  size_t index = 0;
+  for (auto i = type_definition->body.begin(); i != type_definition->body.end();
+       i++) {
+    auto vd = std::dynamic_pointer_cast<OperationVariableDefinition>(*i);
+    if (vd == nullptr)
+      continue;
+
+    if (vd->name->has_text(member_name))
+      return object_value->values[index];
+
+    index++;
+    if (index >= object_value->values.size())
+      break;
+  }
+
   return std::make_shared<DataValueNone>();
 }
 
@@ -638,6 +681,11 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
   auto op_function_definition =
       std::dynamic_pointer_cast<OperationFunctionDefinition>(operation);
   if (op_function_definition != nullptr)
+    return std::make_shared<DataValueNone>(); // Resolved at compile time
+
+  auto op_type_definition =
+      std::dynamic_pointer_cast<OperationTypeDefinition>(operation);
+  if (op_type_definition != nullptr)
     return std::make_shared<DataValueNone>(); // Resolved at compile time
 
   auto op_symbol = std::dynamic_pointer_cast<OperationSymbol>(operation);
