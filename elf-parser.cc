@@ -175,6 +175,7 @@ static bool token_is_complete(const char *data, std::shared_ptr<Token> token,
   case TOKEN_TYPE_COMMA:
   case TOKEN_TYPE_OPEN_BRACE:
   case TOKEN_TYPE_CLOSE_BRACE:
+  case TOKEN_TYPE_EOF:
     return true;
   }
 
@@ -255,6 +256,9 @@ static std::vector<std::shared_ptr<Token>> elf_lex(const char *data,
       current_token->length++;
     }
   }
+
+  auto token = std::make_shared<Token>(TOKEN_TYPE_EOF, data_length, 0, data);
+  tokens.push_back(token);
 
   return tokens;
 }
@@ -372,13 +376,12 @@ void Parser::next_token() { offset++; }
 bool Parser::parse_parameters(
     std::vector<std::shared_ptr<Operation>> &parameters) {
   auto open_paren_token = current_token();
-  if (open_paren_token == nullptr ||
-      open_paren_token->type != TOKEN_TYPE_OPEN_PAREN)
+  if (open_paren_token->type != TOKEN_TYPE_OPEN_PAREN)
     return true;
   next_token();
 
   bool closed = false;
-  while (current_token() != nullptr) {
+  while (current_token()->type != TOKEN_TYPE_EOF) {
     auto t = current_token();
     if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
       next_token();
@@ -414,7 +417,7 @@ bool Parser::parse_parameters(
 
 std::shared_ptr<Operation> Parser::parse_value() {
   auto token = current_token();
-  if (token == nullptr)
+  if (token->type == TOKEN_TYPE_EOF)
     return nullptr;
 
   std::shared_ptr<OperationFunctionDefinition> f;
@@ -453,7 +456,7 @@ std::shared_ptr<Operation> Parser::parse_value() {
     return nullptr;
 
   token = current_token();
-  while (token != nullptr && token->type == TOKEN_TYPE_MEMBER) {
+  while (token->type == TOKEN_TYPE_MEMBER) {
     if (!has_member(value, token)) {
       set_error(token, "Member not available");
       return nullptr;
@@ -675,8 +678,6 @@ static bool is_signed(const std::string &data_type) {
 
 std::shared_ptr<Operation> Parser::parse_expression() {
   auto unary_operation = current_token();
-  if (unary_operation == nullptr)
-    return nullptr;
   if (unary_operation->type == TOKEN_TYPE_SUBTRACT) {
     next_token();
     auto value_token = current_token(); // FIXME: Get the token(s) from 'value'
@@ -725,9 +726,6 @@ std::shared_ptr<Operation> Parser::parse_expression() {
     return nullptr;
 
   auto op = current_token();
-  if (op == nullptr)
-    return a;
-
   if (!token_is_binary_operator(op))
     return a;
   next_token();
@@ -794,7 +792,7 @@ std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
 bool Parser::parse_sequence() {
   std::shared_ptr<Operation> parent = stack.back()->operation;
 
-  while (current_token() != nullptr) {
+  while (current_token()->type != TOKEN_TYPE_EOF) {
     auto token = current_token();
 
     // Stop when sequence ends
@@ -817,7 +815,7 @@ bool Parser::parse_sequence() {
       next_token();
 
       auto assignment_token = current_token();
-      if (assignment_token == nullptr) {
+      if (assignment_token->type == TOKEN_TYPE_EOF) {
         auto definition = std::make_shared<OperationVariableDefinition>(
             data_type, name, nullptr);
         add_stack_variable(definition);
@@ -838,7 +836,7 @@ bool Parser::parse_sequence() {
 
         std::vector<std::shared_ptr<OperationVariableDefinition>> parameters;
         bool closed = false;
-        while (current_token() != nullptr) {
+        while (current_token()->type != TOKEN_TYPE_EOF) {
           auto t = current_token();
           if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
             next_token();
@@ -1003,7 +1001,7 @@ bool Parser::parse_sequence() {
     } else if (token->has_text("return")) {
       next_token();
 
-      std::shared_ptr<Operation> value = parse_expression();
+      auto value = parse_expression();
       if (value == nullptr) {
         set_error(current_token(), "Not valid return value");
         return false;
@@ -1063,7 +1061,7 @@ std::shared_ptr<OperationModule> elf_parse(const char *data,
     return nullptr;
   }
 
-  if (parser.current_token()) {
+  if (parser.current_token()->type != TOKEN_TYPE_EOF) {
     printf("Expected end of input\n");
     return nullptr;
   }
