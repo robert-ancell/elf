@@ -61,6 +61,14 @@ struct Parser {
   std::shared_ptr<Operation> parse_expression();
   std::shared_ptr<Operation> parse_variable_value(std::shared_ptr<Token> &token,
                                                   const std::string &data_type);
+  std::shared_ptr<OperationIf> parse_if();
+  std::shared_ptr<OperationElse> parse_else(std::shared_ptr<Operation> &parent);
+  std::shared_ptr<OperationWhile> parse_while();
+  std::shared_ptr<OperationReturn> parse_return();
+  std::shared_ptr<OperationAssert> parse_assert();
+  std::shared_ptr<OperationVariableDefinition> parse_variable_definition();
+  std::shared_ptr<OperationFunctionDefinition> parse_function_definition();
+  std::shared_ptr<OperationVariableAssignment> parse_variable_assignment();
   std::shared_ptr<OperationFunctionDefinition> get_current_function();
   bool parse_sequence();
 };
@@ -778,6 +786,288 @@ Parser::parse_variable_value(std::shared_ptr<Token> &token,
   return nullptr;
 }
 
+std::shared_ptr<OperationIf> Parser::parse_if() {
+  auto token = current_token();
+  if (!token->has_text("if"))
+    return nullptr;
+  next_token();
+
+  auto condition = parse_expression();
+  if (condition == nullptr) {
+    set_error(current_token(), "Not valid if condition");
+    return nullptr;
+  }
+
+  if (current_token()->type != TOKEN_TYPE_OPEN_BRACE) {
+    set_error(current_token(), "Missing if open brace");
+    return nullptr;
+  }
+  next_token();
+
+  auto op = std::make_shared<OperationIf>(token, condition);
+  push_stack(op);
+  if (!parse_sequence())
+    return nullptr;
+
+  if (current_token()->type != TOKEN_TYPE_CLOSE_BRACE) {
+    set_error(current_token(), "Missing if close brace");
+    return nullptr;
+  }
+  next_token();
+
+  return op;
+}
+
+std::shared_ptr<OperationElse>
+Parser::parse_else(std::shared_ptr<Operation> &parent) {
+  auto token = current_token();
+  if (!token->has_text("else"))
+    return nullptr;
+  next_token();
+
+  std::shared_ptr<Operation> last_operation = parent->get_last_child();
+  auto if_operation = std::dynamic_pointer_cast<OperationIf>(last_operation);
+  if (if_operation == nullptr) {
+    set_error(current_token(), "else must follow if");
+    return nullptr;
+  }
+
+  if (current_token()->type != TOKEN_TYPE_OPEN_BRACE) {
+    set_error(current_token(), "Missing else open brace");
+    return nullptr;
+  }
+  next_token();
+
+  auto op = std::make_shared<OperationElse>(token);
+  if_operation->else_operation = op;
+  push_stack(op);
+  if (!parse_sequence())
+    return nullptr;
+
+  if (current_token()->type != TOKEN_TYPE_CLOSE_BRACE) {
+    set_error(current_token(), "Missing else close brace");
+    return nullptr;
+  }
+  next_token();
+
+  pop_stack();
+
+  return op;
+}
+
+std::shared_ptr<OperationWhile> Parser::parse_while() {
+  auto token = current_token();
+  if (!token->has_text("while"))
+    return nullptr;
+  next_token();
+
+  auto condition = parse_expression();
+  if (condition == nullptr) {
+    set_error(current_token(), "Not valid while condition");
+    return nullptr;
+  }
+
+  if (current_token()->type != TOKEN_TYPE_OPEN_BRACE) {
+    set_error(current_token(), "Missing while open brace");
+    return nullptr;
+  }
+  next_token();
+
+  auto op = std::make_shared<OperationWhile>(condition);
+  push_stack(op);
+  if (!parse_sequence())
+    return nullptr;
+
+  if (current_token()->type != TOKEN_TYPE_CLOSE_BRACE) {
+    set_error(current_token(), "Missing while close brace");
+    return nullptr;
+  }
+  next_token();
+
+  pop_stack();
+
+  return op;
+}
+
+std::shared_ptr<OperationReturn> Parser::parse_return() {
+  if (!current_token()->has_text("return"))
+    return nullptr;
+  next_token();
+
+  auto value = parse_expression();
+  if (value == nullptr) {
+    set_error(current_token(), "Not valid return value");
+    return nullptr;
+  }
+
+  return std::make_shared<OperationReturn>(value, get_current_function());
+}
+
+std::shared_ptr<OperationAssert> Parser::parse_assert() {
+  auto token = current_token();
+  if (!token->has_text("assert"))
+    return nullptr;
+  next_token();
+
+  auto expression = parse_expression();
+  if (expression == nullptr) {
+    set_error(current_token(), "Not valid assertion expression");
+    return nullptr;
+  }
+
+  return std::make_shared<OperationAssert>(token, expression);
+}
+
+std::shared_ptr<OperationVariableDefinition>
+Parser::parse_variable_definition() {
+  auto start_offset = offset;
+
+  auto data_type = current_token();
+  if (data_type->type != TOKEN_TYPE_WORD)
+    return nullptr;
+  next_token();
+
+  auto name = current_token();
+  if (name->type != TOKEN_TYPE_WORD) {
+    offset = start_offset;
+    return nullptr;
+  }
+  next_token();
+
+  // This is actually a function call
+  if (current_token()->type == TOKEN_TYPE_OPEN_PAREN) {
+    offset = start_offset;
+    return nullptr;
+  }
+
+  std::shared_ptr<Operation> value;
+  if (current_token()->type == TOKEN_TYPE_ASSIGN) {
+    next_token();
+
+    value = parse_variable_value(name, data_type->get_text());
+    if (value == nullptr) {
+      offset = start_offset;
+      return nullptr;
+    }
+  }
+
+  auto op =
+      std::make_shared<OperationVariableDefinition>(data_type, name, value);
+  add_stack_variable(op);
+
+  return op;
+}
+
+std::shared_ptr<OperationFunctionDefinition>
+Parser::parse_function_definition() {
+  auto data_type = current_token();
+  if (!is_data_type(data_type))
+    return nullptr;
+  next_token();
+
+  auto name = current_token(); // FIXME: Check valid name
+  if (name->type != TOKEN_TYPE_WORD) {
+    set_error(current_token(), "Expected function name");
+    return nullptr;
+  }
+  next_token();
+
+  if (current_token()->type != TOKEN_TYPE_OPEN_PAREN) {
+    set_error(current_token(), "Missing open parenthesis");
+    return nullptr;
+  }
+  next_token();
+
+  std::vector<std::shared_ptr<OperationVariableDefinition>> parameters;
+  while (current_token()->type != TOKEN_TYPE_EOF) {
+    auto t = current_token();
+    if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
+      next_token();
+      break;
+    }
+
+    if (parameters.size() > 0) {
+      if (t->type != TOKEN_TYPE_COMMA) {
+        set_error(current_token(), "Missing comma");
+        return nullptr;
+      }
+      next_token();
+      t = current_token();
+    }
+
+    if (!is_data_type(t)) {
+      set_error(current_token(), "Parameter not a data type");
+      return nullptr;
+    }
+    data_type = t;
+    next_token();
+
+    auto name = current_token();
+    if (!is_parameter_name(name)) {
+      set_error(current_token(), "Not a parameter name");
+      return nullptr;
+    }
+    next_token();
+
+    parameters.push_back(std::make_shared<OperationVariableDefinition>(
+        data_type, name, nullptr));
+  }
+
+  if (current_token()->type == TOKEN_TYPE_EOF) {
+    set_error(current_token(), "Unclosed paren");
+    return nullptr;
+  }
+
+  if (current_token()->type != TOKEN_TYPE_OPEN_BRACE) {
+    set_error(current_token(), "Missing function open brace");
+    return nullptr;
+  }
+  next_token();
+
+  auto op = std::make_shared<OperationFunctionDefinition>(data_type, name,
+                                                          parameters);
+  push_stack(op);
+
+  for (auto i = parameters.begin(); i != parameters.end(); i++)
+    add_stack_variable(*i);
+
+  if (!parse_sequence())
+    return nullptr;
+
+  if (current_token()->type != TOKEN_TYPE_CLOSE_BRACE) {
+    set_error(current_token(), "Missing function close brace");
+    return nullptr;
+  }
+  next_token();
+
+  pop_stack();
+
+  return op;
+}
+
+std::shared_ptr<OperationVariableAssignment>
+Parser::parse_variable_assignment() {
+  auto v = find_variable(current_token());
+  if (v == nullptr)
+    return nullptr;
+
+  auto name = current_token();
+  next_token();
+
+  auto assignment_token = current_token();
+  if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
+    set_error(current_token(), "Missing assignment token");
+    return nullptr;
+  }
+  next_token();
+
+  auto value = parse_variable_value(name, v->get_data_type());
+  if (value == nullptr)
+    return nullptr;
+
+  return std::make_shared<OperationVariableAssignment>(name, value, v);
+}
+
 std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
   for (auto i = stack.rbegin(); i != stack.rend(); i++) {
     auto op =
@@ -790,261 +1080,45 @@ std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
 }
 
 bool Parser::parse_sequence() {
-  std::shared_ptr<Operation> parent = stack.back()->operation;
+  auto parent = stack.back()->operation;
 
-  while (current_token()->type != TOKEN_TYPE_EOF) {
-    auto token = current_token();
-
+  while (true) {
     // Stop when sequence ends
-    if (token->type == TOKEN_TYPE_CLOSE_BRACE)
-      break;
+    if (current_token()->type == TOKEN_TYPE_EOF ||
+        current_token()->type == TOKEN_TYPE_CLOSE_BRACE)
+      return true;
 
     // Ignore comments
-    if (token->type == TOKEN_TYPE_COMMENT) {
+    if (current_token()->type == TOKEN_TYPE_COMMENT) {
       next_token();
       continue;
     }
 
-    std::shared_ptr<Operation> op = nullptr;
-    std::shared_ptr<OperationVariableDefinition> v;
-    if (is_data_type(token)) {
-      auto data_type = token;
-      next_token();
+    std::shared_ptr<Operation> op = parse_if();
+    if (op == nullptr)
+      op = parse_else(parent);
+    if (op == nullptr)
+      op = parse_while();
+    if (op == nullptr)
+      op = parse_return();
+    if (op == nullptr)
+      op = parse_assert();
+    if (op == nullptr)
+      op = parse_variable_definition();
+    if (op == nullptr)
+      op = parse_function_definition();
+    if (op == nullptr)
+      op = parse_variable_assignment();
+    if (op == nullptr)
+      op = parse_value();
 
-      auto name = current_token(); // FIXME: Check valid name
-      next_token();
-
-      auto assignment_token = current_token();
-      if (assignment_token->type == TOKEN_TYPE_EOF) {
-        auto definition = std::make_shared<OperationVariableDefinition>(
-            data_type, name, nullptr);
-        add_stack_variable(definition);
-        op = definition;
-      } else if (assignment_token->type == TOKEN_TYPE_ASSIGN) {
-        next_token();
-
-        auto value = parse_variable_value(name, data_type->get_text());
-        if (value == nullptr)
-          return false;
-
-        auto definition = std::make_shared<OperationVariableDefinition>(
-            data_type, name, value);
-        add_stack_variable(definition);
-        op = definition;
-      } else if (assignment_token->type == TOKEN_TYPE_OPEN_PAREN) {
-        next_token();
-
-        std::vector<std::shared_ptr<OperationVariableDefinition>> parameters;
-        bool closed = false;
-        while (current_token()->type != TOKEN_TYPE_EOF) {
-          auto t = current_token();
-          if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
-            next_token();
-            closed = true;
-            break;
-          }
-
-          if (parameters.size() > 0) {
-            if (t->type != TOKEN_TYPE_COMMA) {
-              set_error(current_token(), "Missing comma");
-              return false;
-            }
-            next_token();
-            t = current_token();
-          }
-
-          if (!is_data_type(t)) {
-            set_error(current_token(), "Parameter not a data type");
-            return false;
-          }
-          data_type = t;
-          next_token();
-
-          auto name = current_token();
-          if (!is_parameter_name(name)) {
-            set_error(current_token(), "Not a parameter name");
-            return false;
-          }
-          next_token();
-
-          parameters.push_back(std::make_shared<OperationVariableDefinition>(
-              data_type, name, nullptr));
-        }
-
-        if (!closed) {
-          set_error(current_token(), "Unclosed paren");
-          return false;
-        }
-
-        auto open_brace = current_token();
-        if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-          set_error(current_token(), "Missing function open brace");
-          return false;
-        }
-        next_token();
-
-        op = std::make_shared<OperationFunctionDefinition>(data_type, name,
-                                                           parameters);
-        push_stack(op);
-
-        for (auto i = parameters.begin(); i != parameters.end(); i++)
-          add_stack_variable(*i);
-
-        if (!parse_sequence())
-          return false;
-
-        auto close_brace = current_token();
-        if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-          set_error(current_token(), "Missing function close brace");
-          return false;
-        }
-        next_token();
-
-        pop_stack();
-      } else {
-        auto definition = std::make_shared<OperationVariableDefinition>(
-            data_type, name, nullptr);
-        add_stack_variable(definition);
-        op = definition;
-      }
-    } else if (token->has_text("if")) {
-      next_token();
-
-      auto condition = parse_expression();
-      if (condition == nullptr) {
-        set_error(current_token(), "Not valid if condition");
-        return false;
-      }
-
-      auto open_brace = current_token();
-      if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-        set_error(current_token(), "Missing if open brace");
-        return false;
-      }
-      next_token();
-
-      op = std::make_shared<OperationIf>(token, condition);
-      push_stack(op);
-      if (!parse_sequence())
-        return false;
-
-      auto close_brace = current_token();
-      if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-        set_error(current_token(), "Missing if close brace");
-        return false;
-      }
-      next_token();
-
-      pop_stack();
-    } else if (token->has_text("else")) {
-      std::shared_ptr<Operation> last_operation = parent->get_last_child();
-      auto if_operation =
-          std::dynamic_pointer_cast<OperationIf>(last_operation);
-      if (if_operation == nullptr) {
-        set_error(current_token(), "else must follow if");
-        return false;
-      }
-
-      next_token();
-
-      auto open_brace = current_token();
-      if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-        set_error(current_token(), "Missing else open brace");
-        return false;
-      }
-      next_token();
-
-      auto else_op = std::make_shared<OperationElse>(token);
-      if_operation->else_operation = else_op;
-      op = else_op;
-      push_stack(op);
-      if (!parse_sequence())
-        return false;
-
-      auto close_brace = current_token();
-      if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-        set_error(current_token(), "Missing else close brace");
-        return false;
-      }
-      next_token();
-
-      pop_stack();
-    } else if (token->has_text("while")) {
-      next_token();
-
-      auto condition = parse_expression();
-      if (condition == nullptr) {
-        set_error(current_token(), "Not valid while condition");
-        return false;
-      }
-
-      auto open_brace = current_token();
-      if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
-        set_error(current_token(), "Missing while open brace");
-        return false;
-      }
-      next_token();
-
-      op = std::make_shared<OperationWhile>(condition);
-      push_stack(op);
-      if (!parse_sequence())
-        return false;
-
-      auto close_brace = current_token();
-      if (close_brace->type != TOKEN_TYPE_CLOSE_BRACE) {
-        set_error(current_token(), "Missing while close brace");
-        return false;
-      }
-      next_token();
-
-      pop_stack();
-    } else if (token->has_text("return")) {
-      next_token();
-
-      auto value = parse_expression();
-      if (value == nullptr) {
-        set_error(current_token(), "Not valid return value");
-        return false;
-      }
-
-      op = std::make_shared<OperationReturn>(value, get_current_function());
-    } else if (token->has_text("assert")) {
-      next_token();
-
-      auto expression = parse_expression();
-      if (expression == nullptr) {
-        set_error(current_token(), "Not valid assertion expression");
-        return false;
-      }
-
-      op = std::make_shared<OperationAssert>(token, expression);
-    } else if ((v = find_variable(token)) != nullptr) {
-      auto name = token;
-      next_token();
-
-      auto assignment_token = current_token();
-      if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
-        set_error(current_token(), "Missing assignment token");
-        return false;
-      }
-      next_token();
-
-      auto value = parse_variable_value(name, v->get_data_type());
-      if (value == nullptr)
-        return false;
-
-      op = std::make_shared<OperationVariableAssignment>(name, value, v);
-    } else if ((op = parse_value()) != nullptr) {
-      // FIXME: Only allow functions and variable values
-    } else {
+    if (op == nullptr) {
       set_error(current_token(), "Unexpected token");
       return false;
     }
 
     parent->add_child(op);
   }
-
-  return true;
 }
 
 std::shared_ptr<OperationModule> elf_parse(const char *data,
