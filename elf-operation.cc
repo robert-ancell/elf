@@ -9,6 +9,23 @@
 
 #include "elf-operation.h"
 
+std::shared_ptr<Operation>
+OperationTypeDefinition::find_member(const std::string &name) {
+  for (auto i = body.begin(); i != body.end(); i++) {
+    auto function_definition =
+        std::dynamic_pointer_cast<OperationFunctionDefinition>(*i);
+    if (function_definition != nullptr &&
+        function_definition->name->has_text(name))
+      return function_definition;
+    auto variable_definition =
+        std::dynamic_pointer_cast<OperationVariableDefinition>(*i);
+    if (variable_definition != nullptr &&
+        variable_definition->name->has_text(name))
+      return variable_definition;
+  }
+  return nullptr;
+}
+
 bool OperationCall::is_constant() {
   // FIXME: Check if parameters are constant
   return value->is_constant();

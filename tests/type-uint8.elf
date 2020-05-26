@@ -1,0 +1,8 @@
+type Foo {
+  uint8 value
+}
+
+Foo foo
+foo.value = 5
+
+print (foo.value)
