@@ -122,6 +122,16 @@ struct OperationFunctionDefinition : Operation {
   std::string to_string() { return "FUNCTION_DEFINITION"; }
 };
 
+struct OperationFunctionName : Operation {
+  std::shared_ptr<Token> name;
+  std::shared_ptr<OperationFunctionDefinition> function;
+
+  OperationFunctionName(std::shared_ptr<Token> name,
+                        std::shared_ptr<OperationFunctionDefinition> function)
+      : name(name), function(function) {}
+  std::string to_string() { return "FUNCTION_NAME"; }
+};
+
 struct OperationFunctionCall : Operation {
   std::shared_ptr<Token> name;
   std::vector<std::shared_ptr<Operation>> parameters;

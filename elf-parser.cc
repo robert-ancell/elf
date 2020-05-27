@@ -388,13 +388,11 @@ bool Parser::parse_parameters(
     return true;
   next_token();
 
-  bool closed = false;
   while (current_token()->type != TOKEN_TYPE_EOF) {
     auto t = current_token();
     if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
       next_token();
-      closed = true;
-      break;
+      return true;
     }
 
     if (parameters.size() > 0) {
@@ -415,12 +413,8 @@ bool Parser::parse_parameters(
     parameters.push_back(value);
   }
 
-  if (!closed) {
-    set_error(current_token(), "Unclosed paren");
-    return false;
-  }
-
-  return true;
+  set_error(current_token(), "Unclosed paren");
+  return false;
 }
 
 std::shared_ptr<Operation> Parser::parse_value() {
@@ -450,14 +444,8 @@ std::shared_ptr<Operation> Parser::parse_value() {
     value = std::make_shared<OperationVariableValue>(token, v);
   } else if ((f = find_function(token)) != nullptr ||
              is_builtin_function(token)) {
-    auto name = token;
     next_token();
-
-    std::vector<std::shared_ptr<Operation>> parameters;
-    if (!parse_parameters(parameters))
-      return nullptr;
-
-    value = std::make_shared<OperationFunctionCall>(name, parameters, f);
+    value = std::make_shared<OperationFunctionName>(token, f);
   }
 
   if (value == nullptr)
@@ -733,6 +721,21 @@ std::shared_ptr<Operation> Parser::parse_expression() {
   if (a == nullptr)
     return nullptr;
 
+  if (current_token()->type == TOKEN_TYPE_OPEN_PAREN) {
+    auto function_name = std::dynamic_pointer_cast<OperationFunctionName>(a);
+    if (function_name == nullptr) {
+      set_error(current_token(), "Can't call");
+      return nullptr;
+    }
+
+    std::vector<std::shared_ptr<Operation>> parameters;
+    if (!parse_parameters(parameters))
+      return nullptr;
+
+    return std::make_shared<OperationFunctionCall>(
+        function_name->name, parameters, function_name->function);
+  }
+
   auto op = current_token();
   if (!token_is_binary_operator(op))
     return a;
@@ -934,7 +937,7 @@ Parser::parse_variable_definition() {
   }
   next_token();
 
-  // This is actually a function call
+  // This is actually a function definition
   if (current_token()->type == TOKEN_TYPE_OPEN_PAREN) {
     offset = start_offset;
     return nullptr;
@@ -1110,7 +1113,7 @@ bool Parser::parse_sequence() {
     if (op == nullptr)
       op = parse_variable_assignment();
     if (op == nullptr)
-      op = parse_value();
+      op = parse_expression();
 
     if (op == nullptr) {
       set_error(current_token(), "Unexpected token");
