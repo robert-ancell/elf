@@ -36,31 +36,46 @@ struct OperationModule : Operation {
   std::string to_string() { return "MODULE"; }
 };
 
+struct OperationDataType : Operation {
+  std::shared_ptr<Token> name;
+
+  OperationDataType(std::shared_ptr<Token> name) : name(name) {}
+  std::string get_data_type() { return name->get_text(); }
+  std::string to_string() { return "DATA_TYPE"; }
+};
+
 struct OperationVariableDefinition : Operation {
-  std::shared_ptr<Token> data_type;
+  std::shared_ptr<OperationDataType> data_type;
   std::shared_ptr<Token> name;
   std::shared_ptr<Operation> value;
 
-  OperationVariableDefinition(std::shared_ptr<Token> data_type,
+  OperationVariableDefinition(std::shared_ptr<OperationDataType> data_type,
                               std::shared_ptr<Token> name,
                               std::shared_ptr<Operation> value)
       : data_type(data_type), name(name), value(value ? value : nullptr) {}
   bool is_constant() { return value == nullptr || value->is_constant(); }
-  std::string get_data_type() { return data_type->get_text(); }
+  std::string get_data_type() { return data_type->get_data_type(); }
   std::string to_string() { return "VARIABLE_DEFINITION"; }
 };
 
-struct OperationVariableAssignment : Operation {
+struct OperationSymbol : Operation {
   std::shared_ptr<Token> name;
-  std::shared_ptr<Operation> value;
-  std::shared_ptr<OperationVariableDefinition> variable;
+  std::shared_ptr<Operation> definition;
 
-  OperationVariableAssignment(
-      std::shared_ptr<Token> name, std::shared_ptr<Operation> value,
-      std::shared_ptr<OperationVariableDefinition> variable)
-      : name(name), value(value), variable(variable) {}
-  bool is_constant() { return value->is_constant(); }
-  std::string get_data_type() { return variable->get_data_type(); }
+  OperationSymbol(std::shared_ptr<Token> name) : name(name) {}
+  std::string get_data_type() { return definition->get_data_type(); }
+  std::string to_string() { return "SYMBOL"; }
+};
+
+struct OperationVariableAssignment : Operation {
+  std::shared_ptr<OperationSymbol> target;
+  std::shared_ptr<Operation> value;
+
+  OperationVariableAssignment(std::shared_ptr<OperationSymbol> &target,
+                              std::shared_ptr<Operation> &value)
+      : target(target), value(value) {}
+  bool is_constant() { return target->is_constant(); }
+  std::string get_data_type() { return target->get_data_type(); }
   std::string to_string() { return "VARIABLE_ASSIGNMENT"; }
 };
 
@@ -105,45 +120,33 @@ struct OperationWhile : Operation {
 
 struct OperationFunctionDefinition : Operation {
   std::shared_ptr<OperationFunctionDefinition> parent;
-  std::shared_ptr<Token> data_type;
+  std::shared_ptr<OperationDataType> data_type;
   std::shared_ptr<Token> name;
   std::vector<std::shared_ptr<OperationVariableDefinition>> parameters;
   std::vector<std::shared_ptr<Operation>> body;
 
   OperationFunctionDefinition(
-      std::shared_ptr<Token> data_type, std::shared_ptr<Token> name,
+      std::shared_ptr<OperationDataType> data_type, std::shared_ptr<Token> name,
       std::vector<std::shared_ptr<OperationVariableDefinition>> parameters)
       : data_type(data_type), name(name), parameters(parameters) {}
   bool is_constant();
-  std::string get_data_type() { return data_type->get_text(); }
+  std::string get_data_type() { return data_type->get_data_type(); }
   void add_child(std::shared_ptr<Operation> child) { body.push_back(child); }
   size_t get_n_children() { return body.size(); }
   std::shared_ptr<Operation> get_child(size_t index) { return body[index]; }
   std::string to_string() { return "FUNCTION_DEFINITION"; }
 };
 
-struct OperationFunctionName : Operation {
-  std::shared_ptr<Token> name;
-  std::shared_ptr<OperationFunctionDefinition> function;
-
-  OperationFunctionName(std::shared_ptr<Token> name,
-                        std::shared_ptr<OperationFunctionDefinition> function)
-      : name(name), function(function) {}
-  std::string to_string() { return "FUNCTION_NAME"; }
-};
-
-struct OperationFunctionCall : Operation {
-  std::shared_ptr<Token> name;
+struct OperationCall : Operation {
+  std::shared_ptr<Operation> value;
   std::vector<std::shared_ptr<Operation>> parameters;
-  std::shared_ptr<OperationFunctionDefinition> function;
 
-  OperationFunctionCall(std::shared_ptr<Token> name,
-                        std::vector<std::shared_ptr<Operation>> parameters,
-                        std::shared_ptr<OperationFunctionDefinition> function)
-      : name(name), parameters(parameters), function(function) {}
+  OperationCall(std::shared_ptr<Operation> &value,
+                std::vector<std::shared_ptr<Operation>> &parameters)
+      : value(value), parameters(parameters) {}
   bool is_constant();
-  std::string get_data_type() { return function->get_data_type(); }
-  std::string to_string() { return "FUNCTION_CALL"; }
+  std::string get_data_type() { return value->get_data_type(); }
+  std::string to_string() { return "CALL"; }
 };
 
 struct OperationReturn : Operation {
@@ -171,17 +174,22 @@ struct OperationAssert : Operation {
   std::string to_string() { return "ASSERT(" + expression->to_string() + ")"; }
 };
 
-struct OperationBooleanConstant : Operation {
+struct OperationTrue : Operation {
   std::shared_ptr<Token> token;
-  bool value;
 
-  OperationBooleanConstant(std::shared_ptr<Token> &token, bool value)
-      : token(token), value(value) {}
+  OperationTrue(std::shared_ptr<Token> &token) : token(token) {}
   bool is_constant() { return true; }
   std::string get_data_type() { return "bool"; }
-  std::string to_string() {
-    return "BOOLEAN_CONSTANT(" + std::to_string(value) + ")";
-  }
+  std::string to_string() { return "TRUE"; }
+};
+
+struct OperationFalse : Operation {
+  std::shared_ptr<Token> token;
+
+  OperationFalse(std::shared_ptr<Token> &token) : token(token) {}
+  bool is_constant() { return true; }
+  std::string get_data_type() { return "bool"; }
+  std::string to_string() { return "FALSE"; }
 };
 
 struct OperationNumberConstant : Operation {
@@ -221,32 +229,16 @@ struct OperationTextConstant : Operation {
   std::string to_string() { return "TEXT_CONSTANT(" + value + ")"; }
 };
 
-struct OperationVariableValue : Operation {
-  std::shared_ptr<Token> name;
-  std::shared_ptr<OperationVariableDefinition> variable;
-
-  OperationVariableValue(std::shared_ptr<Token> name,
-                         std::shared_ptr<OperationVariableDefinition> variable)
-      : name(name), variable(variable) {}
-  bool is_constant();
-  std::string get_data_type() { return variable->get_data_type(); }
-  std::string to_string() { return "VARIABLE_VALUE"; }
-};
-
-struct OperationMemberValue : Operation {
-  std::shared_ptr<Operation> object;
+struct OperationMember : Operation {
+  std::shared_ptr<Operation> value;
   std::shared_ptr<Token> member;
-  std::vector<std::shared_ptr<Operation>> parameters;
 
-  OperationMemberValue(std::shared_ptr<Operation> object,
-                       std::shared_ptr<Token> member,
-                       std::vector<std::shared_ptr<Operation>> parameters)
-      : object(object), member(member), parameters(parameters) {}
+  OperationMember(std::shared_ptr<Operation> value,
+                  std::shared_ptr<Token> member)
+      : value(value), member(member) {}
   bool is_constant();
   std::string get_data_type();
-  std::string to_string() {
-    return "MEMBER_VALUE(" + member->to_string() + ")";
-  }
+  std::string to_string() { return "MEMBER(" + member->to_string() + ")"; }
 };
 
 struct OperationUnary : Operation {

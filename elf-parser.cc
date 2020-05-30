@@ -42,22 +42,21 @@ struct Parser {
   void pop_stack();
   void set_error(std::shared_ptr<Token> token, const std::string &message);
   void print_error();
-  bool is_data_type(std::shared_ptr<Token> token);
-  bool is_parameter_name(std::shared_ptr<Token> token);
   bool token_text_matches(std::shared_ptr<Token> a, std::shared_ptr<Token> b);
   std::shared_ptr<OperationVariableDefinition>
   find_variable(std::shared_ptr<Token> token);
   std::shared_ptr<OperationFunctionDefinition>
   find_function(std::shared_ptr<Token> token);
-  bool is_builtin_function(std::shared_ptr<Token> token);
-  bool has_member(std::shared_ptr<Operation> value,
-                  std::shared_ptr<Token> member);
   std::shared_ptr<Token> current_token();
   void next_token();
   bool parse_parameters(std::vector<std::shared_ptr<Operation>> &parameters);
   std::shared_ptr<Operation> parse_value();
-  std::shared_ptr<Operation> parse_number_value();
-  std::shared_ptr<Operation> parse_text_value();
+  std::shared_ptr<OperationTrue> parse_true();
+  std::shared_ptr<OperationFalse> parse_false();
+  std::shared_ptr<OperationNumberConstant> parse_number_constant();
+  std::shared_ptr<OperationTextConstant> parse_text_constant();
+  std::shared_ptr<OperationDataType> parse_data_type();
+  std::shared_ptr<OperationSymbol> parse_symbol();
   std::shared_ptr<Operation> parse_expression();
   std::shared_ptr<Operation> parse_variable_value(std::shared_ptr<Token> &token,
                                                   const std::string &data_type);
@@ -71,6 +70,26 @@ struct Parser {
   std::shared_ptr<OperationVariableAssignment> parse_variable_assignment();
   std::shared_ptr<OperationFunctionDefinition> get_current_function();
   bool parse_sequence();
+  bool resolve_operation(std::shared_ptr<Operation> operation);
+  bool resolve_sequence(std::vector<std::shared_ptr<Operation>> &body);
+  bool resolve_module(std::shared_ptr<OperationModule> &oeration);
+  bool resolve_variable_definition(
+      std::shared_ptr<OperationVariableDefinition> &operation);
+  bool resolve_variable_assignment(
+      std::shared_ptr<OperationVariableAssignment> &operation);
+  bool resolve_if(std::shared_ptr<OperationIf> &operation);
+  bool resolve_else(std::shared_ptr<OperationElse> &operation);
+  bool resolve_while(std::shared_ptr<OperationWhile> &operation);
+  bool resolve_data_type(std::shared_ptr<OperationDataType> &operation);
+  bool resolve_symbol(std::shared_ptr<OperationSymbol> &operation);
+  bool resolve_call(std::shared_ptr<OperationCall> &operation);
+  bool resolve_function_definition(
+      std::shared_ptr<OperationFunctionDefinition> &operation);
+  bool resolve_return(std::shared_ptr<OperationReturn> &operation);
+  bool resolve_assert(std::shared_ptr<OperationAssert> &operation);
+  bool resolve_member(std::shared_ptr<OperationMember> &operation);
+  bool resolve_binary(std::shared_ptr<OperationBinary> &operation);
+  bool resolve_convert(std::shared_ptr<OperationConvert> &operation);
 };
 
 void Parser::push_stack(std::shared_ptr<Operation> operation) {
@@ -271,31 +290,6 @@ static std::vector<std::shared_ptr<Token>> elf_lex(const char *data,
   return tokens;
 }
 
-bool Parser::is_data_type(std::shared_ptr<Token> token) {
-  // FIXME: Use a .elf file that defines these so they're like all types
-  const char *builtin_types[] = {"bool",  "uint8",  "int8",  "uint16",
-                                 "int16", "uint32", "int32", "uint64",
-                                 "int64", "utf8",   nullptr};
-
-  if (token->type != TOKEN_TYPE_WORD)
-    return false;
-
-  for (int i = 0; builtin_types[i] != nullptr; i++)
-    if (token->has_text(builtin_types[i]))
-      return true;
-
-  return false;
-}
-
-bool Parser::is_parameter_name(std::shared_ptr<Token> token) {
-  if (token->type != TOKEN_TYPE_WORD)
-    return false;
-
-  // FIXME: Don't allow reserved words / data types
-
-  return true;
-}
-
 bool Parser::token_text_matches(std::shared_ptr<Token> a,
                                 std::shared_ptr<Token> b) {
   if (a->length != b->length)
@@ -348,33 +342,6 @@ Parser::find_function(std::shared_ptr<Token> token) {
   return nullptr;
 }
 
-bool Parser::is_builtin_function(std::shared_ptr<Token> token) {
-  const char *builtin_functions[] = {"print", nullptr};
-
-  if (token->type != TOKEN_TYPE_WORD)
-    return false;
-
-  for (int i = 0; builtin_functions[i] != nullptr; i++)
-    if (token->has_text(builtin_functions[i]))
-      return true;
-
-  return false;
-}
-
-bool Parser::has_member(std::shared_ptr<Operation> value,
-                        std::shared_ptr<Token> member) {
-  auto data_type = value->get_data_type();
-
-  // FIXME: Super hacky. The nullptr is because Elf can't determine the return
-  // value of a member yet i.e. "foo".upper.length
-  if (data_type == "" || data_type == "utf8") {
-    return member->has_text(".length") || member->has_text(".upper") ||
-           member->has_text(".lower");
-  }
-
-  return false;
-}
-
 std::shared_ptr<Token> Parser::current_token() {
   return offset < tokens.size() ? tokens[offset] : 0;
 }
@@ -418,60 +385,57 @@ bool Parser::parse_parameters(
 }
 
 std::shared_ptr<Operation> Parser::parse_value() {
-  auto token = current_token();
-  if (token->type == TOKEN_TYPE_EOF)
+  std::shared_ptr<Operation> op = parse_true();
+  if (op == nullptr)
+    op = parse_false();
+  if (op == nullptr)
+    op = parse_number_constant();
+  if (op == nullptr)
+    op = parse_text_constant();
+  if (op == nullptr)
+    op = parse_symbol();
+
+  if (op == nullptr)
     return nullptr;
 
-  std::shared_ptr<OperationFunctionDefinition> f;
-  std::shared_ptr<OperationVariableDefinition> v;
-  std::shared_ptr<Operation> value = nullptr;
-  if (token->type == TOKEN_TYPE_NUMBER) {
-    value = parse_number_value();
-    if (value == nullptr)
-      return nullptr;
-  } else if (token->type == TOKEN_TYPE_TEXT) {
-    value = parse_text_value();
-    if (value == nullptr)
-      return nullptr;
-  } else if (token->has_text("true")) {
-    next_token();
-    value = std::make_shared<OperationBooleanConstant>(token, true);
-  } else if (token->has_text("false")) {
-    next_token();
-    value = std::make_shared<OperationBooleanConstant>(token, false);
-  } else if ((v = find_variable(token)) != nullptr) {
-    next_token();
-    value = std::make_shared<OperationVariableValue>(token, v);
-  } else if ((f = find_function(token)) != nullptr ||
-             is_builtin_function(token)) {
-    next_token();
-    value = std::make_shared<OperationFunctionName>(token, f);
+  while (true) {
+    auto token = current_token();
+    if (token->type == TOKEN_TYPE_OPEN_PAREN) {
+      std::vector<std::shared_ptr<Operation>> parameters;
+      if (!parse_parameters(parameters))
+        return nullptr;
+
+      op = std::make_shared<OperationCall>(op, parameters);
+    } else if (token->type == TOKEN_TYPE_MEMBER) {
+      next_token();
+      op = std::make_shared<OperationMember>(op, token);
+    } else
+      return op;
   }
-
-  if (value == nullptr)
-    return nullptr;
-
-  token = current_token();
-  while (token->type == TOKEN_TYPE_MEMBER) {
-    if (!has_member(value, token)) {
-      set_error(token, "Member not available");
-      return nullptr;
-    }
-    next_token();
-
-    std::vector<std::shared_ptr<Operation>> parameters;
-    if (!parse_parameters(parameters))
-      return nullptr;
-
-    value = std::make_shared<OperationMemberValue>(value, token, parameters);
-    token = current_token();
-  }
-
-  return value;
 }
 
-std::shared_ptr<Operation> Parser::parse_number_value() {
+std::shared_ptr<OperationTrue> Parser::parse_true() {
   auto token = current_token();
+  if (!token->has_text("true"))
+    return nullptr;
+  next_token();
+
+  return std::make_shared<OperationTrue>(token);
+}
+
+std::shared_ptr<OperationFalse> Parser::parse_false() {
+  auto token = current_token();
+  if (!token->has_text("false"))
+    return nullptr;
+  next_token();
+
+  return std::make_shared<OperationFalse>(token);
+}
+
+std::shared_ptr<OperationNumberConstant> Parser::parse_number_constant() {
+  auto token = current_token();
+  if (token->type != TOKEN_TYPE_NUMBER)
+    return nullptr;
 
   uint64_t number = 0;
   for (size_t i = 0; i < token->length; i++) {
@@ -507,8 +471,10 @@ static int hex_digit(char c) {
     return -1;
 }
 
-std::shared_ptr<Operation> Parser::parse_text_value() {
+std::shared_ptr<OperationTextConstant> Parser::parse_text_constant() {
   auto token = current_token();
+  if (token->type != TOKEN_TYPE_TEXT)
+    return nullptr;
 
   std::string value;
   // Iterate over the characters inside the quotes
@@ -595,6 +561,24 @@ std::shared_ptr<Operation> Parser::parse_text_value() {
   return std::make_shared<OperationTextConstant>(token, value);
 }
 
+std::shared_ptr<OperationDataType> Parser::parse_data_type() {
+  auto token = current_token();
+  if (token->type != TOKEN_TYPE_WORD)
+    return nullptr;
+  next_token();
+
+  return std::make_shared<OperationDataType>(token);
+}
+
+std::shared_ptr<OperationSymbol> Parser::parse_symbol() {
+  auto token = current_token();
+  if (token->type != TOKEN_TYPE_WORD)
+    return nullptr;
+  next_token();
+
+  return std::make_shared<OperationSymbol>(token);
+}
+
 static bool token_is_binary_boolean_operator(std::shared_ptr<Token> &token) {
   if (token->type != TOKEN_TYPE_WORD)
     return false;
@@ -620,6 +604,10 @@ static bool token_is_binary_operator(std::shared_ptr<Token> &token) {
 static std::shared_ptr<Operation>
 convert_to_data_type(std::shared_ptr<Operation> &operation,
                      const std::string &to_type) {
+  auto from_type = operation->get_data_type();
+  if (from_type == to_type)
+    return operation;
+
   // Convert unsigned constant numbers to signed ones
   auto number_constant =
       std::dynamic_pointer_cast<OperationNumberConstant>(operation);
@@ -645,7 +633,6 @@ convert_to_data_type(std::shared_ptr<Operation> &operation,
   }
 
   bool can_convert = false;
-  auto from_type = operation->get_data_type();
   if (from_type == "uint8")
     can_convert =
         to_type == "uint16" || to_type == "uint32" || to_type == "uint64";
@@ -721,21 +708,6 @@ std::shared_ptr<Operation> Parser::parse_expression() {
   if (a == nullptr)
     return nullptr;
 
-  if (current_token()->type == TOKEN_TYPE_OPEN_PAREN) {
-    auto function_name = std::dynamic_pointer_cast<OperationFunctionName>(a);
-    if (function_name == nullptr) {
-      set_error(current_token(), "Can't call");
-      return nullptr;
-    }
-
-    std::vector<std::shared_ptr<Operation>> parameters;
-    if (!parse_parameters(parameters))
-      return nullptr;
-
-    return std::make_shared<OperationFunctionCall>(
-        function_name->name, parameters, function_name->function);
-  }
-
   auto op = current_token();
   if (!token_is_binary_operator(op))
     return a;
@@ -747,46 +719,7 @@ std::shared_ptr<Operation> Parser::parse_expression() {
     return nullptr;
   }
 
-  auto a_type = a->get_data_type();
-  auto b_type = b->get_data_type();
-  if (a_type != b_type) {
-    auto converted_a = convert_to_data_type(a, b_type);
-    auto converted_b = convert_to_data_type(b, a_type);
-    if (converted_a != nullptr)
-      a = converted_a;
-    else if (converted_b != nullptr)
-      b = converted_b;
-    else {
-      set_error(op, "Can't combine " + a_type + " and " + b_type + " types");
-      return nullptr;
-    }
-  }
-
   return std::make_shared<OperationBinary>(op, a, b);
-}
-
-std::shared_ptr<Operation>
-Parser::parse_variable_value(std::shared_ptr<Token> &token,
-                             const std::string &data_type) {
-  auto value = parse_expression();
-  if (value == nullptr) {
-    set_error(current_token(), "Invalid value for variable");
-    return nullptr;
-  }
-
-  // If types match, then nothing to do
-  auto value_type = value->get_data_type();
-  if (value_type == data_type)
-    return value;
-
-  // If can be converted, do that first
-  auto converted_value = convert_to_data_type(value, data_type);
-  if (converted_value != nullptr)
-    return converted_value;
-
-  set_error(token, "Variable is of type " + data_type +
-                       ", but value is of type " + value_type);
-  return nullptr;
 }
 
 std::shared_ptr<OperationIf> Parser::parse_if() {
@@ -925,10 +858,11 @@ std::shared_ptr<OperationVariableDefinition>
 Parser::parse_variable_definition() {
   auto start_offset = offset;
 
-  auto data_type = current_token();
-  if (data_type->type != TOKEN_TYPE_WORD)
+  auto data_type = parse_data_type();
+  if (data_type == nullptr) {
+    offset = start_offset;
     return nullptr;
-  next_token();
+  }
 
   auto name = current_token();
   if (name->type != TOKEN_TYPE_WORD) {
@@ -947,30 +881,29 @@ Parser::parse_variable_definition() {
   if (current_token()->type == TOKEN_TYPE_ASSIGN) {
     next_token();
 
-    value = parse_variable_value(name, data_type->get_text());
+    value = parse_expression();
     if (value == nullptr) {
       offset = start_offset;
       return nullptr;
     }
   }
 
-  auto op =
-      std::make_shared<OperationVariableDefinition>(data_type, name, value);
-  add_stack_variable(op);
-
-  return op;
+  return std::make_shared<OperationVariableDefinition>(data_type, name, value);
 }
 
 std::shared_ptr<OperationFunctionDefinition>
 Parser::parse_function_definition() {
-  auto data_type = current_token();
-  if (!is_data_type(data_type))
+  auto start_offset = offset;
+
+  auto data_type = parse_data_type();
+  if (data_type == nullptr) {
+    offset = start_offset;
     return nullptr;
-  next_token();
+  }
 
   auto name = current_token(); // FIXME: Check valid name
   if (name->type != TOKEN_TYPE_WORD) {
-    set_error(current_token(), "Expected function name");
+    offset = start_offset;
     return nullptr;
   }
   next_token();
@@ -998,22 +931,21 @@ Parser::parse_function_definition() {
       t = current_token();
     }
 
-    if (!is_data_type(t)) {
+    auto param_data_type = parse_data_type();
+    if (param_data_type == nullptr) {
       set_error(current_token(), "Parameter not a data type");
       return nullptr;
     }
-    data_type = t;
-    next_token();
 
     auto name = current_token();
-    if (!is_parameter_name(name)) {
+    if (name->type != TOKEN_TYPE_WORD) {
       set_error(current_token(), "Not a parameter name");
       return nullptr;
     }
     next_token();
 
     parameters.push_back(std::make_shared<OperationVariableDefinition>(
-        data_type, name, nullptr));
+        param_data_type, name, nullptr));
   }
 
   if (current_token()->type == TOKEN_TYPE_EOF) {
@@ -1031,9 +963,6 @@ Parser::parse_function_definition() {
                                                           parameters);
   push_stack(op);
 
-  for (auto i = parameters.begin(); i != parameters.end(); i++)
-    add_stack_variable(*i);
-
   if (!parse_sequence())
     return nullptr;
 
@@ -1050,25 +979,25 @@ Parser::parse_function_definition() {
 
 std::shared_ptr<OperationVariableAssignment>
 Parser::parse_variable_assignment() {
-  auto v = find_variable(current_token());
-  if (v == nullptr)
+  auto start_offset = offset;
+
+  auto target = parse_symbol();
+  if (target == nullptr)
     return nullptr;
 
-  auto name = current_token();
-  next_token();
-
-  auto assignment_token = current_token();
-  if (assignment_token->type != TOKEN_TYPE_ASSIGN) {
-    set_error(current_token(), "Missing assignment token");
+  if (current_token()->type != TOKEN_TYPE_ASSIGN) {
+    offset = start_offset;
     return nullptr;
   }
   next_token();
 
-  auto value = parse_variable_value(name, v->get_data_type());
-  if (value == nullptr)
+  auto value = parse_expression();
+  if (value == nullptr) {
+    offset = start_offset;
     return nullptr;
+  }
 
-  return std::make_shared<OperationVariableAssignment>(name, value, v);
+  return std::make_shared<OperationVariableAssignment>(target, value);
 }
 
 std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
@@ -1124,6 +1053,226 @@ bool Parser::parse_sequence() {
   }
 }
 
+bool Parser::resolve_operation(std::shared_ptr<Operation> operation) {
+  auto op_module = std::dynamic_pointer_cast<OperationModule>(operation);
+  if (op_module != nullptr)
+    return resolve_module(op_module);
+
+  auto op_variable_definition =
+      std::dynamic_pointer_cast<OperationVariableDefinition>(operation);
+  if (op_variable_definition != nullptr)
+    return resolve_variable_definition(op_variable_definition);
+
+  auto op_symbol = std::dynamic_pointer_cast<OperationSymbol>(operation);
+  if (op_symbol != nullptr)
+    return resolve_symbol(op_symbol);
+
+  auto op_variable_assignment =
+      std::dynamic_pointer_cast<OperationVariableAssignment>(operation);
+  if (op_variable_assignment != nullptr)
+    return resolve_variable_assignment(op_variable_assignment);
+
+  auto op_if = std::dynamic_pointer_cast<OperationIf>(operation);
+  if (op_if != nullptr)
+    return resolve_if(op_if);
+
+  auto op_else = std::dynamic_pointer_cast<OperationElse>(operation);
+  if (op_else != nullptr)
+    return resolve_else(op_else);
+
+  auto op_while = std::dynamic_pointer_cast<OperationWhile>(operation);
+  if (op_while != nullptr)
+    return resolve_while(op_while);
+
+  auto op_function_definition =
+      std::dynamic_pointer_cast<OperationFunctionDefinition>(operation);
+  if (op_function_definition != nullptr)
+    return resolve_function_definition(op_function_definition);
+
+  auto op_call = std::dynamic_pointer_cast<OperationCall>(operation);
+  if (op_call != nullptr)
+    return resolve_call(op_call);
+
+  auto op_return = std::dynamic_pointer_cast<OperationReturn>(operation);
+  if (op_return != nullptr)
+    return resolve_return(op_return);
+
+  auto op_assert = std::dynamic_pointer_cast<OperationAssert>(operation);
+  if (op_assert != nullptr)
+    return resolve_assert(op_assert);
+
+  auto op_member = std::dynamic_pointer_cast<OperationMember>(operation);
+  if (op_member != nullptr)
+    return resolve_member(op_member);
+
+  auto op_binary = std::dynamic_pointer_cast<OperationBinary>(operation);
+  if (op_binary != nullptr)
+    return resolve_binary(op_binary);
+
+  auto op_convert = std::dynamic_pointer_cast<OperationConvert>(operation);
+  if (op_convert != nullptr)
+    return resolve_convert(op_convert);
+
+  return true;
+}
+
+bool Parser::resolve_sequence(std::vector<std::shared_ptr<Operation>> &body) {
+  for (auto i = body.begin(); i != body.end(); i++) {
+    if (!resolve_operation(*i))
+      return false;
+  }
+  pop_stack();
+
+  return true;
+}
+
+bool Parser::resolve_module(std::shared_ptr<OperationModule> &operation) {
+  push_stack(operation);
+  return resolve_sequence(operation->body);
+}
+
+bool Parser::resolve_variable_definition(
+    std::shared_ptr<OperationVariableDefinition> &operation) {
+
+  if (!resolve_data_type(operation->data_type))
+    return false;
+
+  if (operation->value != nullptr) {
+    if (!resolve_operation(operation->value))
+      return false;
+
+    auto conversion =
+        convert_to_data_type(operation->value, operation->get_data_type());
+    if (conversion == nullptr) {
+      set_error(operation->name, "Variable is of type " +
+                                     operation->get_data_type() +
+                                     ", but value is of type " +
+                                     operation->value->get_data_type());
+      return false;
+    }
+    operation->value = conversion;
+  }
+
+  add_stack_variable(operation);
+
+  return true;
+}
+
+bool Parser::resolve_variable_assignment(
+    std::shared_ptr<OperationVariableAssignment> &operation) {
+  return resolve_operation(operation->target) &&
+         resolve_operation(operation->value);
+}
+
+bool Parser::resolve_if(std::shared_ptr<OperationIf> &operation) {
+  if (!resolve_operation(operation->condition))
+    return false;
+  push_stack(operation);
+  return resolve_sequence(operation->body);
+}
+
+bool Parser::resolve_else(std::shared_ptr<OperationElse> &operation) {
+  push_stack(operation);
+  return resolve_sequence(operation->body);
+}
+
+bool Parser::resolve_while(std::shared_ptr<OperationWhile> &operation) {
+  if (!resolve_operation(operation->condition))
+    return false;
+  push_stack(operation);
+  return resolve_sequence(operation->body);
+}
+
+bool Parser::resolve_data_type(std::shared_ptr<OperationDataType> &operation) {
+  // FIXME: Use a .elf file that defines these so they're like all types
+  const char *builtin_types[] = {"bool",  "uint8",  "int8",  "uint16",
+                                 "int16", "uint32", "int32", "uint64",
+                                 "int64", "utf8",   nullptr};
+
+  for (int i = 0; builtin_types[i] != nullptr; i++)
+    if (operation->name->has_text(builtin_types[i]))
+      return true;
+
+  return false;
+}
+
+bool Parser::resolve_symbol(std::shared_ptr<OperationSymbol> &operation) {
+  // TEMP: Hard coded function
+  if (operation->name->has_text("print"))
+    return true;
+
+  std::shared_ptr<Operation> definition = find_variable(operation->name);
+  if (definition == nullptr)
+    definition = find_function(operation->name);
+  if (definition == nullptr) {
+    set_error(operation->name, "Not a variable or function");
+    return false;
+  }
+
+  operation->definition = definition;
+
+  return true;
+}
+
+bool Parser::resolve_call(std::shared_ptr<OperationCall> &operation) {
+  if (!resolve_operation(operation->value))
+    return false;
+
+  return resolve_sequence(operation->parameters);
+}
+
+bool Parser::resolve_function_definition(
+    std::shared_ptr<OperationFunctionDefinition> &operation) {
+  if (!resolve_data_type(operation->data_type))
+    return false;
+
+  push_stack(operation);
+  for (auto i = operation->parameters.begin(); i != operation->parameters.end();
+       i++)
+    add_stack_variable(*i);
+  return resolve_sequence(operation->body);
+}
+
+bool Parser::resolve_return(std::shared_ptr<OperationReturn> &operation) {
+  return resolve_operation(operation->value);
+}
+
+bool Parser::resolve_assert(std::shared_ptr<OperationAssert> &operation) {
+  return resolve_operation(operation->expression);
+}
+
+bool Parser::resolve_member(std::shared_ptr<OperationMember> &operation) {
+  set_error(current_token(), "FIXME");
+  return false;
+}
+
+bool Parser::resolve_binary(std::shared_ptr<OperationBinary> &operation) {
+  if (!resolve_operation(operation->a) || !resolve_operation(operation->b))
+    return false;
+
+  auto a_type = operation->a->get_data_type();
+  auto b_type = operation->b->get_data_type();
+  if (a_type != b_type) {
+    auto converted_a = convert_to_data_type(operation->a, b_type);
+    auto converted_b = convert_to_data_type(operation->b, a_type);
+    if (converted_a != nullptr)
+      operation->a = converted_a;
+    else if (converted_b != nullptr)
+      operation->b = converted_b;
+    else {
+      set_error(operation->op,
+                "Can't combine " + a_type + " and " + b_type + " types");
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool Parser::resolve_convert(std::shared_ptr<OperationConvert> &operation) {
+  return resolve_operation(operation->op);
+}
+
 std::shared_ptr<OperationModule> elf_parse(const char *data,
                                            size_t data_length) {
   Parser parser(data, data_length);
@@ -1134,6 +1283,11 @@ std::shared_ptr<OperationModule> elf_parse(const char *data,
   parser.push_stack(module);
 
   if (!parser.parse_sequence()) {
+    parser.print_error();
+    return nullptr;
+  }
+
+  if (!parser.resolve_operation(module)) {
     parser.print_error();
     return nullptr;
   }

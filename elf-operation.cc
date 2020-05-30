@@ -9,22 +9,17 @@
 
 #include "elf-operation.h"
 
-bool OperationFunctionCall::is_constant() {
+bool OperationCall::is_constant() {
   // FIXME: Check if parameters are constant
-  return function->is_constant();
+  return value->is_constant();
 }
 
-bool OperationVariableValue::is_constant() {
-  // FIXME: Have to follow chain of variable assignment
-  return false;
-}
-
-std::string OperationMemberValue::get_data_type() {
+std::string OperationMember::get_data_type() {
   // FIXME
   return nullptr;
 }
 
-bool OperationMemberValue::is_constant() {
+bool OperationMember::is_constant() {
   // FIXME:
   return false;
 }
