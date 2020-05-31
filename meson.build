@@ -147,6 +147,7 @@ tests = [ 'empty-file',
           'function-return-uint64-parameter',
           'function-return-utf8-constant',
           'function-return-utf8-parameter',
+          'unknown-function',
           'assert-true',
           'assert-false',
         ]
