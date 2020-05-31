@@ -74,6 +74,8 @@ std::string Token::to_string() {
     return "OPEN_BRACE";
   case TOKEN_TYPE_CLOSE_BRACE:
     return "CLOSE_BRACE";
+  case TOKEN_TYPE_EOF:
+    return "EOF";
   }
 
   return "UNKNOWN(" + std::to_string(type) + ")";
