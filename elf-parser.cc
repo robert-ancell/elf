@@ -1193,6 +1193,7 @@ bool Parser::resolve_data_type(std::shared_ptr<OperationDataType> &operation) {
     if (operation->name->has_text(builtin_types[i]))
       return true;
 
+  set_error(operation->name, "Unknown data type");
   return false;
 }
 
