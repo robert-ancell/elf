@@ -100,6 +100,19 @@ struct DataValueUtf8 : DataValue {
   void print() { printf("%s\n", value.c_str()); }
 };
 
+struct DataValueFunction : DataValue {
+  std::shared_ptr<OperationFunctionDefinition> function;
+
+  DataValueFunction(std::shared_ptr<OperationFunctionDefinition> &function)
+      : function(function) {}
+  void print() { printf("<method>\n"); }
+};
+
+struct DataValuePrintFunction : DataValue {
+  DataValuePrintFunction() {}
+  void print() { printf("<print>\n"); }
+};
+
 static std::shared_ptr<DataValue>
 make_unsigned_integer_value(const std::string &data_type, uint64_t value) {
   if (data_type == "uint8")
@@ -232,11 +245,11 @@ struct ProgramState {
   run_module(std::shared_ptr<OperationModule> &module);
   std::shared_ptr<DataValue>
   run_function(std::shared_ptr<OperationFunctionDefinition> &function);
-  void add_variable(std::string name, std::shared_ptr<DataValue> &value);
+  void add_variable(std::string name, std::shared_ptr<DataValue> value);
   std::shared_ptr<DataValue> run_variable_definition(
       std::shared_ptr<OperationVariableDefinition> &operation);
-  std::shared_ptr<DataValue> run_variable_assignment(
-      std::shared_ptr<OperationVariableAssignment> &operation);
+  std::shared_ptr<DataValue>
+  run_assignment(std::shared_ptr<OperationAssignment> &operation);
   std::shared_ptr<DataValue> run_if(std::shared_ptr<OperationIf> &operation);
   std::shared_ptr<DataValue>
   run_while(std::shared_ptr<OperationWhile> &operation);
@@ -306,7 +319,7 @@ std::shared_ptr<DataValue> ProgramState::run_function(
 }
 
 void ProgramState::add_variable(std::string name,
-                                std::shared_ptr<DataValue> &value) {
+                                std::shared_ptr<DataValue> value) {
   variables.push_back(new Variable(name, value));
 }
 
@@ -325,20 +338,26 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
   return std::make_shared<DataValueNone>();
 }
 
-std::shared_ptr<DataValue> ProgramState::run_variable_assignment(
-    std::shared_ptr<OperationVariableAssignment> &operation) {
-  auto variable_name = operation->target->name->get_text();
-
+std::shared_ptr<DataValue>
+ProgramState::run_assignment(std::shared_ptr<OperationAssignment> &operation) {
+  auto target_value = run_operation(operation->target);
   auto value = run_operation(operation->value);
 
-  for (size_t i = 0; variables[i] != NULL; i++) {
-    Variable *variable = variables[i];
-
-    if (variable->name == variable_name) {
-      variable->value = value;
-      break;
-    }
-  }
+  auto target_value_bool =
+      std::dynamic_pointer_cast<DataValueBool>(target_value);
+  auto value_bool = std::dynamic_pointer_cast<DataValueBool>(value);
+  if (target_value_bool != nullptr && value_bool != nullptr)
+    target_value_bool->value = value_bool->value;
+  auto target_value_uint8 =
+      std::dynamic_pointer_cast<DataValueUint8>(target_value);
+  auto value_uint8 = std::dynamic_pointer_cast<DataValueUint8>(value);
+  if (target_value_uint8 != nullptr && value_uint8 != nullptr)
+    target_value_uint8->value = value_uint8->value;
+  auto target_value_utf8 =
+      std::dynamic_pointer_cast<DataValueUtf8>(target_value);
+  auto value_utf8 = std::dynamic_pointer_cast<DataValueUtf8>(value);
+  if (target_value_utf8 != nullptr && value_utf8 != nullptr)
+    target_value_utf8->value = value_utf8->value;
 
   return std::make_shared<DataValueNone>();
 }
@@ -377,11 +396,20 @@ ProgramState::run_while(std::shared_ptr<OperationWhile> &operation) {
 
 std::shared_ptr<DataValue>
 ProgramState::run_symbol(std::shared_ptr<OperationSymbol> &operation) {
-  auto variable_name = operation->name->get_text();
+  auto name = operation->name->get_text();
+
+  if (name == "print")
+    return std::make_shared<DataValuePrintFunction>();
+
+  auto function_definition =
+      std::dynamic_pointer_cast<OperationFunctionDefinition>(
+          operation->definition);
+  if (function_definition != nullptr)
+    return std::make_shared<DataValueFunction>(function_definition);
 
   for (auto i = variables.begin(); i != variables.end(); i++) {
     auto variable = *i;
-    if (variable->name == variable_name)
+    if (variable->name == name)
       return variable->value;
   }
 
@@ -390,33 +418,31 @@ ProgramState::run_symbol(std::shared_ptr<OperationSymbol> &operation) {
 
 std::shared_ptr<DataValue>
 ProgramState::run_call(std::shared_ptr<OperationCall> &operation) {
-  auto symbol = std::dynamic_pointer_cast<OperationSymbol>(operation->value);
-  if (symbol == nullptr)
+  auto value = run_operation(operation->value);
+
+  std::vector<std::shared_ptr<DataValue>> parameter_values;
+  for (auto i = operation->parameters.begin(); i != operation->parameters.end();
+       i++)
+    parameter_values.push_back(run_operation(*i));
+
+  if (std::dynamic_pointer_cast<DataValuePrintFunction>(value) != nullptr) {
+    parameter_values[0]->print();
+    return std::make_shared<DataValueNone>();
+  }
+
+  auto function_value = std::dynamic_pointer_cast<DataValueFunction>(value);
+  if (function_value == nullptr)
     return std::make_shared<DataValueNone>();
 
-  if (symbol->name->get_text() == "print") {
-    auto value = run_operation(operation->parameters[0]);
-    value->print();
+  // FIXME: Use a stack, these variables shouldn't remain after the call
+  for (auto i = parameter_values.begin(); i != parameter_values.end(); i++) {
+    auto parameter_definition =
+        function_value->function->parameters[i - parameter_values.begin()];
+    auto variable_name = parameter_definition->name->get_text();
+    add_variable(variable_name, *i);
   }
 
-  auto function_definition =
-      std::dynamic_pointer_cast<OperationFunctionDefinition>(
-          symbol->definition);
-  if (function_definition != nullptr) {
-    // FIXME: Use a stack, these variables shouldn't remain after the call
-    for (auto i = operation->parameters.begin();
-         i != operation->parameters.end(); i++) {
-      auto value = run_operation(*i);
-      auto parameter_definition =
-          function_definition->parameters[i - operation->parameters.begin()];
-      auto variable_name = parameter_definition->name->get_text();
-      add_variable(variable_name, value);
-    }
-
-    return run_function(function_definition);
-  }
-
-  return std::make_shared<DataValueNone>();
+  return run_function(function_value->function);
 }
 
 std::shared_ptr<DataValue>
@@ -479,17 +505,6 @@ std::shared_ptr<DataValue> ProgramState::run_text_constant(
 std::shared_ptr<DataValue>
 ProgramState::run_member(std::shared_ptr<OperationMember> &operation) {
   auto value = run_operation(operation->value);
-
-  std::shared_ptr<DataValue> result = NULL;
-  auto utf8_value = std::dynamic_pointer_cast<DataValueUtf8>(value);
-  if (utf8_value != nullptr) {
-    if (operation->member->has_text(".length"))
-      return std::make_shared<DataValueUint8>(utf8_value->value.size());
-    else if (operation->member->has_text(".upper"))
-      return std::make_shared<DataValueUtf8>("FOO"); // FIXME: Total hack
-    else if (operation->member->has_text(".lower"))
-      return std::make_shared<DataValueUtf8>("foo"); // FIXME: Total hack
-  }
 
   return std::make_shared<DataValueNone>();
 }
@@ -603,10 +618,10 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
   if (op_variable_definition != nullptr)
     return run_variable_definition(op_variable_definition);
 
-  auto op_variable_assignment =
-      std::dynamic_pointer_cast<OperationVariableAssignment>(operation);
-  if (op_variable_assignment != nullptr)
-    return run_variable_assignment(op_variable_assignment);
+  auto op_assignment =
+      std::dynamic_pointer_cast<OperationAssignment>(operation);
+  if (op_assignment != nullptr)
+    return run_assignment(op_assignment);
 
   auto op_if = std::dynamic_pointer_cast<OperationIf>(operation);
   if (op_if != nullptr)

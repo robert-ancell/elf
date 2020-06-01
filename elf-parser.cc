@@ -67,7 +67,7 @@ struct Parser {
   std::shared_ptr<OperationAssert> parse_assert();
   std::shared_ptr<OperationVariableDefinition> parse_variable_definition();
   std::shared_ptr<OperationFunctionDefinition> parse_function_definition();
-  std::shared_ptr<OperationVariableAssignment> parse_variable_assignment();
+  std::shared_ptr<Operation> parse_expression_or_assignment();
   std::shared_ptr<OperationFunctionDefinition> get_current_function();
   bool parse_sequence();
   bool resolve_operation(std::shared_ptr<Operation> operation);
@@ -75,8 +75,7 @@ struct Parser {
   bool resolve_module(std::shared_ptr<OperationModule> &oeration);
   bool resolve_variable_definition(
       std::shared_ptr<OperationVariableDefinition> &operation);
-  bool resolve_variable_assignment(
-      std::shared_ptr<OperationVariableAssignment> &operation);
+  bool resolve_assignment(std::shared_ptr<OperationAssignment> &operation);
   bool resolve_if(std::shared_ptr<OperationIf> &operation);
   bool resolve_else(std::shared_ptr<OperationElse> &operation);
   bool resolve_while(std::shared_ptr<OperationWhile> &operation);
@@ -977,18 +976,15 @@ Parser::parse_function_definition() {
   return op;
 }
 
-std::shared_ptr<OperationVariableAssignment>
-Parser::parse_variable_assignment() {
+std::shared_ptr<Operation> Parser::parse_expression_or_assignment() {
   auto start_offset = offset;
 
-  auto target = parse_symbol();
+  auto target = parse_expression();
   if (target == nullptr)
     return nullptr;
 
-  if (current_token()->type != TOKEN_TYPE_ASSIGN) {
-    offset = start_offset;
-    return nullptr;
-  }
+  if (current_token()->type != TOKEN_TYPE_ASSIGN)
+    return target;
   next_token();
 
   auto value = parse_expression();
@@ -997,7 +993,7 @@ Parser::parse_variable_assignment() {
     return nullptr;
   }
 
-  return std::make_shared<OperationVariableAssignment>(target, value);
+  return std::make_shared<OperationAssignment>(target, value);
 }
 
 std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
@@ -1040,9 +1036,7 @@ bool Parser::parse_sequence() {
     if (op == nullptr)
       op = parse_function_definition();
     if (op == nullptr)
-      op = parse_variable_assignment();
-    if (op == nullptr)
-      op = parse_expression();
+      op = parse_expression_or_assignment();
 
     if (op == nullptr) {
       set_error(current_token(), "Unexpected token");
@@ -1067,10 +1061,10 @@ bool Parser::resolve_operation(std::shared_ptr<Operation> operation) {
   if (op_symbol != nullptr)
     return resolve_symbol(op_symbol);
 
-  auto op_variable_assignment =
-      std::dynamic_pointer_cast<OperationVariableAssignment>(operation);
-  if (op_variable_assignment != nullptr)
-    return resolve_variable_assignment(op_variable_assignment);
+  auto op_assignment =
+      std::dynamic_pointer_cast<OperationAssignment>(operation);
+  if (op_assignment != nullptr)
+    return resolve_assignment(op_assignment);
 
   auto op_if = std::dynamic_pointer_cast<OperationIf>(operation);
   if (op_if != nullptr)
@@ -1158,8 +1152,8 @@ bool Parser::resolve_variable_definition(
   return true;
 }
 
-bool Parser::resolve_variable_assignment(
-    std::shared_ptr<OperationVariableAssignment> &operation) {
+bool Parser::resolve_assignment(
+    std::shared_ptr<OperationAssignment> &operation) {
   return resolve_operation(operation->target) &&
          resolve_operation(operation->value);
 }
@@ -1243,7 +1237,14 @@ bool Parser::resolve_assert(std::shared_ptr<OperationAssert> &operation) {
 }
 
 bool Parser::resolve_member(std::shared_ptr<OperationMember> &operation) {
-  set_error(current_token(), "FIXME");
+  if (!resolve_operation(operation->value))
+    return false;
+
+  auto data_type = operation->value->get_data_type();
+  auto member_name = operation->get_member_name();
+  set_error(operation->member, "Data type " + data_type +
+                                   " doesn't have a member named " +
+                                   member_name);
   return false;
 }
 

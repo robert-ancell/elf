@@ -52,7 +52,7 @@ struct OperationVariableDefinition : Operation {
   OperationVariableDefinition(std::shared_ptr<OperationDataType> data_type,
                               std::shared_ptr<Token> name,
                               std::shared_ptr<Operation> value)
-      : data_type(data_type), name(name), value(value ? value : nullptr) {}
+      : data_type(data_type), name(name), value(value) {}
   bool is_constant() { return value == nullptr || value->is_constant(); }
   std::string get_data_type() { return data_type->get_data_type(); }
   std::string to_string() { return "VARIABLE_DEFINITION"; }
@@ -63,20 +63,22 @@ struct OperationSymbol : Operation {
   std::shared_ptr<Operation> definition;
 
   OperationSymbol(std::shared_ptr<Token> name) : name(name) {}
-  std::string get_data_type() { return definition->get_data_type(); }
+  std::string get_data_type() {
+    return definition != nullptr ? definition->get_data_type() : nullptr;
+  }
   std::string to_string() { return "SYMBOL"; }
 };
 
-struct OperationVariableAssignment : Operation {
-  std::shared_ptr<OperationSymbol> target;
+struct OperationAssignment : Operation {
+  std::shared_ptr<Operation> target;
   std::shared_ptr<Operation> value;
 
-  OperationVariableAssignment(std::shared_ptr<OperationSymbol> &target,
-                              std::shared_ptr<Operation> &value)
+  OperationAssignment(std::shared_ptr<Operation> target,
+                      std::shared_ptr<Operation> &value)
       : target(target), value(value) {}
-  bool is_constant() { return target->is_constant(); }
+  bool is_constant() { return target->is_constant() && value->is_constant(); }
   std::string get_data_type() { return target->get_data_type(); }
-  std::string to_string() { return "VARIABLE_ASSIGNMENT"; }
+  std::string to_string() { return "ASSIGNMENT"; }
 };
 
 struct OperationElse;
@@ -239,6 +241,9 @@ struct OperationMember : Operation {
   bool is_constant();
   std::string get_data_type();
   std::string to_string() { return "MEMBER(" + member->to_string() + ")"; }
+  std::string get_member_name() {
+    return std::string(member->data + member->offset + 1, member->length - 1);
+  }
 };
 
 struct OperationUnary : Operation {
