@@ -12,12 +12,7 @@
 Token::Token(TokenType type, size_t offset, size_t length, const char *data)
     : type(type), offset(offset), length(length), data(data) {}
 
-std::string Token::get_text() {
-  std::string value;
-  for (size_t i = 0; i < length; i++)
-    value += data[offset + i];
-  return value;
-}
+std::string Token::get_text() { return std::string(data + offset, length); }
 
 bool Token::has_text(std::string value) {
   for (size_t i = 0; i < length; i++) {
