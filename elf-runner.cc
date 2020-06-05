@@ -334,7 +334,8 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
     std::shared_ptr<OperationVariableDefinition> &operation) {
   auto variable_name = operation->name->get_text();
 
-  auto type_definition = operation->data_type->type_definition;
+  auto type_definition = std::dynamic_pointer_cast<OperationTypeDefinition>(
+      operation->data_type->type_definition);
   if (type_definition != nullptr) {
     auto value = std::make_shared<DataValueObject>();
     for (auto i = type_definition->body.begin();
@@ -532,21 +533,31 @@ ProgramState::run_member(std::shared_ptr<OperationMember> &operation) {
   if (object_value == nullptr)
     return std::make_shared<DataValueNone>();
 
-  auto type_definition = operation->type_definition;
-  auto member_name = operation->get_member_name();
-  size_t index = 0;
-  for (auto i = type_definition->body.begin(); i != type_definition->body.end();
-       i++) {
-    auto vd = std::dynamic_pointer_cast<OperationVariableDefinition>(*i);
-    if (vd == nullptr)
-      continue;
+  auto primitive_definition =
+      std::dynamic_pointer_cast<OperationPrimitiveDefinition>(
+          operation->type_definition);
+  if (primitive_definition != nullptr) {
+    return std::make_shared<DataValueNone>();
+  }
 
-    if (vd->name->has_text(member_name))
-      return object_value->values[index];
+  auto type_definition = std::dynamic_pointer_cast<OperationTypeDefinition>(
+      operation->type_definition);
+  if (type_definition != nullptr) {
+    auto member_name = operation->get_member_name();
+    size_t index = 0;
+    for (auto i = type_definition->body.begin();
+         i != type_definition->body.end(); i++) {
+      auto vd = std::dynamic_pointer_cast<OperationVariableDefinition>(*i);
+      if (vd == nullptr)
+        continue;
 
-    index++;
-    if (index >= object_value->values.size())
-      break;
+      if (vd->name->has_text(member_name))
+        return object_value->values[index];
+
+      index++;
+      if (index >= object_value->values.size())
+        break;
+    }
   }
 
   return std::make_shared<DataValueNone>();

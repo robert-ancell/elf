@@ -33,6 +33,8 @@ struct Parser {
   std::shared_ptr<Token> error_token;
   std::string error_message;
 
+  std::shared_ptr<OperationModule> core_module;
+
   Parser(const char *data, size_t data_length)
       : data(data), data_length(data_length), offset(0) {}
 
@@ -43,7 +45,9 @@ struct Parser {
   void set_error(std::shared_ptr<Token> token, const std::string &message);
   void print_error();
   bool token_text_matches(std::shared_ptr<Token> a, std::shared_ptr<Token> b);
-  std::shared_ptr<OperationTypeDefinition> find_type(std::string name);
+  std::shared_ptr<Operation> find_type(std::string name);
+  std::shared_ptr<Operation> find_type(std::shared_ptr<Operation> operation,
+                                       std::string name);
   std::shared_ptr<OperationVariableDefinition>
   find_variable(std::shared_ptr<Token> token);
   std::shared_ptr<OperationFunctionDefinition>
@@ -66,6 +70,7 @@ struct Parser {
   std::shared_ptr<OperationWhile> parse_while();
   std::shared_ptr<OperationReturn> parse_return();
   std::shared_ptr<OperationAssert> parse_assert();
+  std::shared_ptr<OperationPrimitiveDefinition> parse_primitive_definition();
   std::shared_ptr<OperationTypeDefinition> parse_type_definition();
   std::shared_ptr<OperationVariableDefinition> parse_variable_definition();
   std::shared_ptr<OperationFunctionDefinition> parse_function_definition();
@@ -305,18 +310,37 @@ bool Parser::token_text_matches(std::shared_ptr<Token> a,
   return true;
 }
 
-std::shared_ptr<OperationTypeDefinition> Parser::find_type(std::string name) {
+std::shared_ptr<Operation> Parser::find_type(std::string name) {
+  if (core_module != nullptr) {
+    auto definition = find_type(core_module, name);
+    if (definition != nullptr)
+      return definition;
+  }
+
   for (auto i = stack.rbegin(); i != stack.rend(); i++) {
-    auto operation = (*i)->operation;
+    auto definition = find_type((*i)->operation, name);
+    if (definition != nullptr)
+      return definition;
+  }
 
-    size_t n_children = operation->get_n_children();
-    for (size_t j = 0; j < n_children; j++) {
-      auto child = operation->get_child(j);
+  return nullptr;
+}
 
-      auto op = std::dynamic_pointer_cast<OperationTypeDefinition>(child);
-      if (op != nullptr && op->name->has_text(name))
-        return op;
-    }
+std::shared_ptr<Operation>
+Parser::find_type(std::shared_ptr<Operation> operation, std::string name) {
+  size_t n_children = operation->get_n_children();
+  for (size_t i = 0; i < n_children; i++) {
+    auto child = operation->get_child(i);
+
+    auto primitive_definition =
+        std::dynamic_pointer_cast<OperationPrimitiveDefinition>(child);
+    if (primitive_definition != nullptr &&
+        primitive_definition->name->has_text(name))
+      return primitive_definition;
+    auto type_definition =
+        std::dynamic_pointer_cast<OperationTypeDefinition>(child);
+    if (type_definition != nullptr && type_definition->name->has_text(name))
+      return type_definition;
   }
 
   return nullptr;
@@ -874,6 +898,54 @@ std::shared_ptr<OperationAssert> Parser::parse_assert() {
   return std::make_shared<OperationAssert>(token, expression);
 }
 
+std::shared_ptr<OperationPrimitiveDefinition>
+Parser::parse_primitive_definition() {
+  if (!current_token()->has_text("primitive"))
+    return nullptr;
+  next_token();
+
+  auto name = current_token(); // FIXME: Check valid name
+  if (name->type != TOKEN_TYPE_WORD) {
+    set_error(name, "Expected type name");
+    return nullptr;
+  }
+  next_token();
+
+  if (current_token()->type != TOKEN_TYPE_OPEN_BRACE) {
+    set_error(current_token(), "Missing primitive open brace");
+    return nullptr;
+  }
+  next_token();
+
+  auto op = std::make_shared<OperationPrimitiveDefinition>(name);
+  push_stack(op);
+
+  while (current_token() != nullptr) {
+    auto token = current_token();
+
+    // Stop when sequence ends
+    if (token->type == TOKEN_TYPE_CLOSE_BRACE) {
+      next_token();
+      break;
+    }
+
+    // Ignore comments
+    if (token->type == TOKEN_TYPE_COMMENT) {
+      next_token();
+      continue;
+    }
+
+    auto function_definition = parse_function_definition();
+    if (function_definition == nullptr) {
+      set_error(current_token(), "Expected function definition");
+      return nullptr;
+    }
+    op->add_child(function_definition);
+  }
+
+  return op;
+}
+
 std::shared_ptr<OperationTypeDefinition> Parser::parse_type_definition() {
   if (!current_token()->has_text("type"))
     return nullptr;
@@ -886,8 +958,7 @@ std::shared_ptr<OperationTypeDefinition> Parser::parse_type_definition() {
   }
   next_token();
 
-  auto open_brace = current_token();
-  if (open_brace->type != TOKEN_TYPE_OPEN_BRACE) {
+  if (current_token()->type != TOKEN_TYPE_OPEN_BRACE) {
     set_error(current_token(), "Missing type open brace");
     return nullptr;
   }
@@ -1101,6 +1172,8 @@ bool Parser::parse_sequence() {
     if (op == nullptr)
       op = parse_assert();
     if (op == nullptr)
+      op = parse_primitive_definition();
+    if (op == nullptr)
       op = parse_type_definition();
     if (op == nullptr)
       op = parse_variable_definition();
@@ -1254,24 +1327,16 @@ bool Parser::resolve_while(std::shared_ptr<OperationWhile> &operation) {
 }
 
 bool Parser::resolve_data_type(std::shared_ptr<OperationDataType> &operation) {
-  // FIXME: Use a .elf file that defines these so they're like all types
-  const char *builtin_types[] = {"bool",  "uint8",  "int8",  "uint16",
-                                 "int16", "uint32", "int32", "uint64",
-                                 "int64", "utf8",   nullptr};
-
-  for (int i = 0; builtin_types[i] != nullptr; i++)
-    if (operation->name->has_text(builtin_types[i]))
-      return true;
-
   auto data_type = operation->name->get_text();
   auto type_definition = find_type(data_type);
-  if (type_definition != nullptr) {
-    operation->type_definition = type_definition;
-    return true;
+  if (type_definition == nullptr) {
+    set_error(operation->name, "Unknown data type");
+    return false;
   }
 
-  set_error(operation->name, "Unknown data type");
-  return false;
+  operation->type_definition = type_definition;
+
+  return true;
 }
 
 bool Parser::resolve_symbol(std::shared_ptr<OperationSymbol> &operation) {
@@ -1331,21 +1396,36 @@ bool Parser::resolve_member(std::shared_ptr<OperationMember> &operation) {
 
   auto data_type = operation->value->get_data_type();
 
-  auto type_definition = find_type(data_type);
-  if (type_definition == nullptr) {
+  auto definition = find_type(data_type);
+  if (definition == nullptr) { // FIXME: Should always resolve
     set_error(operation->member,
               "Can't access members of data type " + data_type);
     return false;
   }
-  operation->type_definition = type_definition;
+  operation->type_definition = definition;
 
   auto member_name = operation->get_member_name();
-  auto definition = type_definition->find_member(member_name);
-  if (definition == nullptr) {
-    set_error(operation->member, "Data type " + data_type +
-                                     " doesn't have a member named " +
-                                     member_name);
-    return false;
+
+  auto primitive_definition =
+      std::dynamic_pointer_cast<OperationPrimitiveDefinition>(definition);
+  if (primitive_definition != nullptr) {
+    if (primitive_definition->find_member(member_name) == nullptr) {
+      set_error(operation->member, "Primitive type " + data_type +
+                                       " doesn't have a member named " +
+                                       member_name);
+      return false;
+    }
+  }
+
+  auto type_definition =
+      std::dynamic_pointer_cast<OperationTypeDefinition>(definition);
+  if (type_definition != nullptr) {
+    if (type_definition->find_member(member_name) == nullptr) {
+      set_error(operation->member, "Data type " + data_type +
+                                       " doesn't have a member named " +
+                                       member_name);
+      return false;
+    }
   }
 
   return true;
@@ -1378,10 +1458,12 @@ bool Parser::resolve_convert(std::shared_ptr<OperationConvert> &operation) {
   return resolve_operation(operation->op);
 }
 
-std::shared_ptr<OperationModule> elf_parse(const char *data,
-                                           size_t data_length) {
+static std::shared_ptr<OperationModule>
+parse_module(std::shared_ptr<OperationModule> core_module, const char *data,
+             size_t data_length) {
   Parser parser(data, data_length);
 
+  parser.core_module = core_module;
   parser.tokens = elf_lex(data, data_length);
 
   auto module = std::make_shared<OperationModule>();
@@ -1403,4 +1485,26 @@ std::shared_ptr<OperationModule> elf_parse(const char *data,
   }
 
   return module;
+}
+
+std::shared_ptr<OperationModule> elf_parse(const char *data,
+                                           size_t data_length) {
+  std::string core_module_source =
+      "primitive bool {}\n"
+      "primitive uint8 {}\n"
+      "primitive int8 {}\n"
+      "primitive uint16 {}\n"
+      "primitive int16 {}\n"
+      "primitive uint32 {}\n"
+      "primitive int32 {}\n"
+      "primitive uint64 {}\n"
+      "primitive int64 {}\n"
+      "primitive utf8 {}\n"; // FIXME: Doesn't need to be primitive?
+
+  auto core_module = parse_module(nullptr, core_module_source.c_str(),
+                                  core_module_source.size());
+  if (core_module == nullptr)
+    return nullptr;
+
+  return parse_module(core_module, data, data_length);
 }

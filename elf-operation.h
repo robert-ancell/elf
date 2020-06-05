@@ -36,6 +36,20 @@ struct OperationModule : Operation {
   std::string to_string() { return "MODULE"; }
 };
 
+struct OperationPrimitiveDefinition : Operation {
+  std::shared_ptr<Token> name;
+  std::vector<std::shared_ptr<Operation>> body;
+
+  OperationPrimitiveDefinition(std::shared_ptr<Token> &name) : name(name) {}
+  std::string get_data_type() { return name->get_text(); }
+  void add_child(std::shared_ptr<Operation> child) { body.push_back(child); }
+  size_t get_n_children() { return body.size(); }
+  std::shared_ptr<Operation> get_child(size_t index) { return body[index]; }
+  std::string to_string() { return "PRIMITIVE_DEFINITION"; }
+
+  std::shared_ptr<Operation> find_member(const std::string &name);
+};
+
 struct OperationTypeDefinition : Operation {
   std::shared_ptr<Token> name;
   std::vector<std::shared_ptr<Operation>> body;
@@ -52,7 +66,7 @@ struct OperationTypeDefinition : Operation {
 
 struct OperationDataType : Operation {
   std::shared_ptr<Token> name;
-  std::shared_ptr<OperationTypeDefinition> type_definition;
+  std::shared_ptr<Operation> type_definition;
 
   OperationDataType(std::shared_ptr<Token> name) : name(name) {}
   std::string get_data_type() { return name->get_text(); }
@@ -249,7 +263,7 @@ struct OperationTextConstant : Operation {
 struct OperationMember : Operation {
   std::shared_ptr<Operation> value;
   std::shared_ptr<Token> member;
-  std::shared_ptr<OperationTypeDefinition> type_definition;
+  std::shared_ptr<Operation> type_definition;
 
   OperationMember(std::shared_ptr<Operation> value,
                   std::shared_ptr<Token> member)

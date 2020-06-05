@@ -185,6 +185,13 @@ function_defintion
 statement_block
     '{' ws nl statements '}'
 
+primitive_defintion
+    "primitive" ws type_name ws '{' function_definitions '}'
+
+function_definitions
+    function_definition
+    function_definition nl function_definitions
+
 type_defintion
     "type" ws type_name ws '{' type_statements '}'
 
