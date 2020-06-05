@@ -283,9 +283,37 @@ struct ProgramState {
                      std::shared_ptr<DataValueBool> &a,
                      std::shared_ptr<DataValueBool> &b);
   std::shared_ptr<DataValue>
-  run_binary_integer(std::shared_ptr<OperationBinary> &operation,
-                     std::shared_ptr<DataValueUint8> &a,
-                     std::shared_ptr<DataValueUint8> &b);
+  run_binary_uint8(std::shared_ptr<OperationBinary> &operation,
+                   std::shared_ptr<DataValueUint8> &a,
+                   std::shared_ptr<DataValueUint8> &b);
+  std::shared_ptr<DataValue>
+  run_binary_int8(std::shared_ptr<OperationBinary> &operation,
+                  std::shared_ptr<DataValueInt8> &a,
+                  std::shared_ptr<DataValueInt8> &b);
+  std::shared_ptr<DataValue>
+  run_binary_uint16(std::shared_ptr<OperationBinary> &operation,
+                    std::shared_ptr<DataValueUint16> &a,
+                    std::shared_ptr<DataValueUint16> &b);
+  std::shared_ptr<DataValue>
+  run_binary_int16(std::shared_ptr<OperationBinary> &operation,
+                   std::shared_ptr<DataValueInt16> &a,
+                   std::shared_ptr<DataValueInt16> &b);
+  std::shared_ptr<DataValue>
+  run_binary_uint32(std::shared_ptr<OperationBinary> &operation,
+                    std::shared_ptr<DataValueUint32> &a,
+                    std::shared_ptr<DataValueUint32> &b);
+  std::shared_ptr<DataValue>
+  run_binary_int32(std::shared_ptr<OperationBinary> &operation,
+                   std::shared_ptr<DataValueInt32> &a,
+                   std::shared_ptr<DataValueInt32> &b);
+  std::shared_ptr<DataValue>
+  run_binary_uint64(std::shared_ptr<OperationBinary> &operation,
+                    std::shared_ptr<DataValueUint64> &a,
+                    std::shared_ptr<DataValueUint64> &b);
+  std::shared_ptr<DataValue>
+  run_binary_int64(std::shared_ptr<OperationBinary> &operation,
+                   std::shared_ptr<DataValueInt64> &a,
+                   std::shared_ptr<DataValueInt64> &b);
   std::shared_ptr<DataValue>
   run_binary_text(std::shared_ptr<OperationBinary> &operation,
                   std::shared_ptr<DataValueUtf8> &a,
@@ -587,9 +615,9 @@ ProgramState::run_binary_boolean(std::shared_ptr<OperationBinary> &operation,
 }
 
 std::shared_ptr<DataValue>
-ProgramState::run_binary_integer(std::shared_ptr<OperationBinary> &operation,
-                                 std::shared_ptr<DataValueUint8> &a,
-                                 std::shared_ptr<DataValueUint8> &b) {
+ProgramState::run_binary_uint8(std::shared_ptr<OperationBinary> &operation,
+                               std::shared_ptr<DataValueUint8> &a,
+                               std::shared_ptr<DataValueUint8> &b) {
   switch (operation->op->type) {
   case TOKEN_TYPE_EQUAL:
     return std::make_shared<DataValueBool>(a->value == b->value);
@@ -611,6 +639,216 @@ ProgramState::run_binary_integer(std::shared_ptr<OperationBinary> &operation,
     return std::make_shared<DataValueUint8>(a->value * b->value);
   case TOKEN_TYPE_DIVIDE:
     return std::make_shared<DataValueUint8>(a->value / b->value);
+  default:
+    return std::make_shared<DataValueNone>();
+  }
+}
+
+std::shared_ptr<DataValue>
+ProgramState::run_binary_int8(std::shared_ptr<OperationBinary> &operation,
+                              std::shared_ptr<DataValueInt8> &a,
+                              std::shared_ptr<DataValueInt8> &b) {
+  switch (operation->op->type) {
+  case TOKEN_TYPE_EQUAL:
+    return std::make_shared<DataValueBool>(a->value == b->value);
+  case TOKEN_TYPE_NOT_EQUAL:
+    return std::make_shared<DataValueBool>(a->value != b->value);
+  case TOKEN_TYPE_GREATER:
+    return std::make_shared<DataValueBool>(a->value > b->value);
+  case TOKEN_TYPE_GREATER_EQUAL:
+    return std::make_shared<DataValueBool>(a->value >= b->value);
+  case TOKEN_TYPE_LESS:
+    return std::make_shared<DataValueBool>(a->value < b->value);
+  case TOKEN_TYPE_LESS_EQUAL:
+    return std::make_shared<DataValueBool>(a->value <= b->value);
+  case TOKEN_TYPE_ADD:
+    return std::make_shared<DataValueInt8>(a->value + b->value);
+  case TOKEN_TYPE_SUBTRACT:
+    return std::make_shared<DataValueInt8>(a->value - b->value);
+  case TOKEN_TYPE_MULTIPLY:
+    return std::make_shared<DataValueInt8>(a->value * b->value);
+  case TOKEN_TYPE_DIVIDE:
+    return std::make_shared<DataValueInt8>(a->value / b->value);
+  default:
+    return std::make_shared<DataValueNone>();
+  }
+}
+
+std::shared_ptr<DataValue>
+ProgramState::run_binary_uint16(std::shared_ptr<OperationBinary> &operation,
+                                std::shared_ptr<DataValueUint16> &a,
+                                std::shared_ptr<DataValueUint16> &b) {
+  switch (operation->op->type) {
+  case TOKEN_TYPE_EQUAL:
+    return std::make_shared<DataValueBool>(a->value == b->value);
+  case TOKEN_TYPE_NOT_EQUAL:
+    return std::make_shared<DataValueBool>(a->value != b->value);
+  case TOKEN_TYPE_GREATER:
+    return std::make_shared<DataValueBool>(a->value > b->value);
+  case TOKEN_TYPE_GREATER_EQUAL:
+    return std::make_shared<DataValueBool>(a->value >= b->value);
+  case TOKEN_TYPE_LESS:
+    return std::make_shared<DataValueBool>(a->value < b->value);
+  case TOKEN_TYPE_LESS_EQUAL:
+    return std::make_shared<DataValueBool>(a->value <= b->value);
+  case TOKEN_TYPE_ADD:
+    return std::make_shared<DataValueUint16>(a->value + b->value);
+  case TOKEN_TYPE_SUBTRACT:
+    return std::make_shared<DataValueUint16>(a->value - b->value);
+  case TOKEN_TYPE_MULTIPLY:
+    return std::make_shared<DataValueUint16>(a->value * b->value);
+  case TOKEN_TYPE_DIVIDE:
+    return std::make_shared<DataValueUint16>(a->value / b->value);
+  default:
+    return std::make_shared<DataValueNone>();
+  }
+}
+
+std::shared_ptr<DataValue>
+ProgramState::run_binary_int16(std::shared_ptr<OperationBinary> &operation,
+                               std::shared_ptr<DataValueInt16> &a,
+                               std::shared_ptr<DataValueInt16> &b) {
+  switch (operation->op->type) {
+  case TOKEN_TYPE_EQUAL:
+    return std::make_shared<DataValueBool>(a->value == b->value);
+  case TOKEN_TYPE_NOT_EQUAL:
+    return std::make_shared<DataValueBool>(a->value != b->value);
+  case TOKEN_TYPE_GREATER:
+    return std::make_shared<DataValueBool>(a->value > b->value);
+  case TOKEN_TYPE_GREATER_EQUAL:
+    return std::make_shared<DataValueBool>(a->value >= b->value);
+  case TOKEN_TYPE_LESS:
+    return std::make_shared<DataValueBool>(a->value < b->value);
+  case TOKEN_TYPE_LESS_EQUAL:
+    return std::make_shared<DataValueBool>(a->value <= b->value);
+  case TOKEN_TYPE_ADD:
+    return std::make_shared<DataValueInt16>(a->value + b->value);
+  case TOKEN_TYPE_SUBTRACT:
+    return std::make_shared<DataValueInt16>(a->value - b->value);
+  case TOKEN_TYPE_MULTIPLY:
+    return std::make_shared<DataValueInt16>(a->value * b->value);
+  case TOKEN_TYPE_DIVIDE:
+    return std::make_shared<DataValueInt16>(a->value / b->value);
+  default:
+    return std::make_shared<DataValueNone>();
+  }
+}
+
+std::shared_ptr<DataValue>
+ProgramState::run_binary_uint32(std::shared_ptr<OperationBinary> &operation,
+                                std::shared_ptr<DataValueUint32> &a,
+                                std::shared_ptr<DataValueUint32> &b) {
+  switch (operation->op->type) {
+  case TOKEN_TYPE_EQUAL:
+    return std::make_shared<DataValueBool>(a->value == b->value);
+  case TOKEN_TYPE_NOT_EQUAL:
+    return std::make_shared<DataValueBool>(a->value != b->value);
+  case TOKEN_TYPE_GREATER:
+    return std::make_shared<DataValueBool>(a->value > b->value);
+  case TOKEN_TYPE_GREATER_EQUAL:
+    return std::make_shared<DataValueBool>(a->value >= b->value);
+  case TOKEN_TYPE_LESS:
+    return std::make_shared<DataValueBool>(a->value < b->value);
+  case TOKEN_TYPE_LESS_EQUAL:
+    return std::make_shared<DataValueBool>(a->value <= b->value);
+  case TOKEN_TYPE_ADD:
+    return std::make_shared<DataValueUint32>(a->value + b->value);
+  case TOKEN_TYPE_SUBTRACT:
+    return std::make_shared<DataValueUint32>(a->value - b->value);
+  case TOKEN_TYPE_MULTIPLY:
+    return std::make_shared<DataValueUint32>(a->value * b->value);
+  case TOKEN_TYPE_DIVIDE:
+    return std::make_shared<DataValueUint32>(a->value / b->value);
+  default:
+    return std::make_shared<DataValueNone>();
+  }
+}
+
+std::shared_ptr<DataValue>
+ProgramState::run_binary_int32(std::shared_ptr<OperationBinary> &operation,
+                               std::shared_ptr<DataValueInt32> &a,
+                               std::shared_ptr<DataValueInt32> &b) {
+  switch (operation->op->type) {
+  case TOKEN_TYPE_EQUAL:
+    return std::make_shared<DataValueBool>(a->value == b->value);
+  case TOKEN_TYPE_NOT_EQUAL:
+    return std::make_shared<DataValueBool>(a->value != b->value);
+  case TOKEN_TYPE_GREATER:
+    return std::make_shared<DataValueBool>(a->value > b->value);
+  case TOKEN_TYPE_GREATER_EQUAL:
+    return std::make_shared<DataValueBool>(a->value >= b->value);
+  case TOKEN_TYPE_LESS:
+    return std::make_shared<DataValueBool>(a->value < b->value);
+  case TOKEN_TYPE_LESS_EQUAL:
+    return std::make_shared<DataValueBool>(a->value <= b->value);
+  case TOKEN_TYPE_ADD:
+    return std::make_shared<DataValueInt32>(a->value + b->value);
+  case TOKEN_TYPE_SUBTRACT:
+    return std::make_shared<DataValueInt32>(a->value - b->value);
+  case TOKEN_TYPE_MULTIPLY:
+    return std::make_shared<DataValueInt32>(a->value * b->value);
+  case TOKEN_TYPE_DIVIDE:
+    return std::make_shared<DataValueInt32>(a->value / b->value);
+  default:
+    return std::make_shared<DataValueNone>();
+  }
+}
+
+std::shared_ptr<DataValue>
+ProgramState::run_binary_uint64(std::shared_ptr<OperationBinary> &operation,
+                                std::shared_ptr<DataValueUint64> &a,
+                                std::shared_ptr<DataValueUint64> &b) {
+  switch (operation->op->type) {
+  case TOKEN_TYPE_EQUAL:
+    return std::make_shared<DataValueBool>(a->value == b->value);
+  case TOKEN_TYPE_NOT_EQUAL:
+    return std::make_shared<DataValueBool>(a->value != b->value);
+  case TOKEN_TYPE_GREATER:
+    return std::make_shared<DataValueBool>(a->value > b->value);
+  case TOKEN_TYPE_GREATER_EQUAL:
+    return std::make_shared<DataValueBool>(a->value >= b->value);
+  case TOKEN_TYPE_LESS:
+    return std::make_shared<DataValueBool>(a->value < b->value);
+  case TOKEN_TYPE_LESS_EQUAL:
+    return std::make_shared<DataValueBool>(a->value <= b->value);
+  case TOKEN_TYPE_ADD:
+    return std::make_shared<DataValueUint64>(a->value + b->value);
+  case TOKEN_TYPE_SUBTRACT:
+    return std::make_shared<DataValueUint64>(a->value - b->value);
+  case TOKEN_TYPE_MULTIPLY:
+    return std::make_shared<DataValueUint64>(a->value * b->value);
+  case TOKEN_TYPE_DIVIDE:
+    return std::make_shared<DataValueUint64>(a->value / b->value);
+  default:
+    return std::make_shared<DataValueNone>();
+  }
+}
+
+std::shared_ptr<DataValue>
+ProgramState::run_binary_int64(std::shared_ptr<OperationBinary> &operation,
+                               std::shared_ptr<DataValueInt64> &a,
+                               std::shared_ptr<DataValueInt64> &b) {
+  switch (operation->op->type) {
+  case TOKEN_TYPE_EQUAL:
+    return std::make_shared<DataValueBool>(a->value == b->value);
+  case TOKEN_TYPE_NOT_EQUAL:
+    return std::make_shared<DataValueBool>(a->value != b->value);
+  case TOKEN_TYPE_GREATER:
+    return std::make_shared<DataValueBool>(a->value > b->value);
+  case TOKEN_TYPE_GREATER_EQUAL:
+    return std::make_shared<DataValueBool>(a->value >= b->value);
+  case TOKEN_TYPE_LESS:
+    return std::make_shared<DataValueBool>(a->value < b->value);
+  case TOKEN_TYPE_LESS_EQUAL:
+    return std::make_shared<DataValueBool>(a->value <= b->value);
+  case TOKEN_TYPE_ADD:
+    return std::make_shared<DataValueInt64>(a->value + b->value);
+  case TOKEN_TYPE_SUBTRACT:
+    return std::make_shared<DataValueInt64>(a->value - b->value);
+  case TOKEN_TYPE_MULTIPLY:
+    return std::make_shared<DataValueInt64>(a->value * b->value);
+  case TOKEN_TYPE_DIVIDE:
+    return std::make_shared<DataValueInt64>(a->value / b->value);
   default:
     return std::make_shared<DataValueNone>();
   }
@@ -646,7 +884,35 @@ ProgramState::run_binary(std::shared_ptr<OperationBinary> &operation) {
   auto uint8_a = std::dynamic_pointer_cast<DataValueUint8>(a);
   auto uint8_b = std::dynamic_pointer_cast<DataValueUint8>(b);
   if (uint8_a != nullptr && uint8_b != nullptr)
-    return run_binary_integer(operation, uint8_a, uint8_b);
+    return run_binary_uint8(operation, uint8_a, uint8_b);
+  auto int8_a = std::dynamic_pointer_cast<DataValueInt8>(a);
+  auto int8_b = std::dynamic_pointer_cast<DataValueInt8>(b);
+  if (int8_a != nullptr && int8_b != nullptr)
+    return run_binary_int8(operation, int8_a, int8_b);
+  auto uint16_a = std::dynamic_pointer_cast<DataValueUint16>(a);
+  auto uint16_b = std::dynamic_pointer_cast<DataValueUint16>(b);
+  if (uint16_a != nullptr && uint16_b != nullptr)
+    return run_binary_uint16(operation, uint16_a, uint16_b);
+  auto int16_a = std::dynamic_pointer_cast<DataValueInt16>(a);
+  auto int16_b = std::dynamic_pointer_cast<DataValueInt16>(b);
+  if (int16_a != nullptr && int16_b != nullptr)
+    return run_binary_int16(operation, int16_a, int16_b);
+  auto uint32_a = std::dynamic_pointer_cast<DataValueUint32>(a);
+  auto uint32_b = std::dynamic_pointer_cast<DataValueUint32>(b);
+  if (uint32_a != nullptr && uint32_b != nullptr)
+    return run_binary_uint32(operation, uint32_a, uint32_b);
+  auto int32_a = std::dynamic_pointer_cast<DataValueInt32>(a);
+  auto int32_b = std::dynamic_pointer_cast<DataValueInt32>(b);
+  if (int32_a != nullptr && int32_b != nullptr)
+    return run_binary_int32(operation, int32_a, int32_b);
+  auto uint64_a = std::dynamic_pointer_cast<DataValueUint64>(a);
+  auto uint64_b = std::dynamic_pointer_cast<DataValueUint64>(b);
+  if (uint64_a != nullptr && uint64_b != nullptr)
+    return run_binary_uint64(operation, uint64_a, uint64_b);
+  auto int64_a = std::dynamic_pointer_cast<DataValueInt64>(a);
+  auto int64_b = std::dynamic_pointer_cast<DataValueInt64>(b);
+  if (int64_a != nullptr && int64_b != nullptr)
+    return run_binary_int64(operation, int64_a, int64_b);
   auto utf8_a = std::dynamic_pointer_cast<DataValueUtf8>(a);
   auto utf8_b = std::dynamic_pointer_cast<DataValueUtf8>(b);
   if (utf8_a != nullptr && utf8_b != nullptr)

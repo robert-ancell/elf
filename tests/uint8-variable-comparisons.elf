@@ -1,0 +1,24 @@
+uint8 value1 = 1
+uint8 value2 = 1
+uint8 value3 = 2
+
+print (value1 == value2)
+print (value1 == value3)
+
+print (value1 != value2)
+print (value1 != value3)
+
+print (value1 > value2)
+print (value1 >= value2)
+print (value1 < value2)
+print (value1 <= value2)
+
+print (value1 > value3)
+print (value1 >= value3)
+print (value1 < value3)
+print (value1 <= value3)
+
+print (value3 > value1)
+print (value3 >= value1)
+print (value3 < value1)
+print (value3 <= value1)
