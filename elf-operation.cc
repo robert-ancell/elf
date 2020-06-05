@@ -9,6 +9,47 @@
 
 #include "elf-operation.h"
 
+std::shared_ptr<Operation> Operation::get_last_child() {
+  size_t n_children = get_n_children();
+  if (n_children > 0)
+    return get_child(n_children - 1);
+  else
+    return nullptr;
+}
+
+bool OperationModule::is_constant() { return true; };
+
+void OperationModule::add_child(std::shared_ptr<Operation> child) {
+  body.push_back(child);
+}
+
+size_t OperationModule::get_n_children() { return body.size(); }
+
+std::shared_ptr<Operation> OperationModule::get_child(size_t index) {
+  return body[index];
+}
+
+std::string OperationModule::to_string() { return "MODULE"; }
+
+std::string OperationPrimitiveDefinition::get_data_type() {
+  return name->get_text();
+}
+
+void OperationPrimitiveDefinition::add_child(std::shared_ptr<Operation> child) {
+  body.push_back(child);
+}
+
+size_t OperationPrimitiveDefinition::get_n_children() { return body.size(); }
+
+std::shared_ptr<Operation>
+OperationPrimitiveDefinition::get_child(size_t index) {
+  return body[index];
+}
+
+std::string OperationPrimitiveDefinition::to_string() {
+  return "PRIMITIVE_DEFINITION";
+}
+
 std::shared_ptr<Operation>
 OperationPrimitiveDefinition::find_member(const std::string &name) {
   for (auto i = body.begin(); i != body.end(); i++) {
@@ -20,6 +61,22 @@ OperationPrimitiveDefinition::find_member(const std::string &name) {
   }
   return nullptr;
 }
+
+std::string OperationTypeDefinition::get_data_type() {
+  return name->get_text();
+}
+
+void OperationTypeDefinition::add_child(std::shared_ptr<Operation> child) {
+  body.push_back(child);
+}
+
+size_t OperationTypeDefinition::get_n_children() { return body.size(); }
+
+std::shared_ptr<Operation> OperationTypeDefinition::get_child(size_t index) {
+  return body[index];
+}
+
+std::string OperationTypeDefinition::to_string() { return "TYPE_DEFINITION"; }
 
 std::shared_ptr<Operation>
 OperationTypeDefinition::find_member(const std::string &name) {
@@ -38,14 +95,155 @@ OperationTypeDefinition::find_member(const std::string &name) {
   return nullptr;
 }
 
+std::string OperationDataType::get_data_type() { return name->get_text(); }
+
+std::string OperationDataType::to_string() { return "DATA_TYPE"; }
+
+bool OperationVariableDefinition::is_constant() {
+  return value == nullptr || value->is_constant();
+}
+
+std::string OperationVariableDefinition::get_data_type() {
+  return data_type->get_data_type();
+}
+
+std::string OperationVariableDefinition::to_string() {
+  return "VARIABLE_DEFINITION";
+}
+
+std::string OperationSymbol::get_data_type() {
+  return definition != nullptr ? definition->get_data_type() : nullptr;
+}
+
+std::string OperationSymbol::to_string() { return "SYMBOL"; }
+
+bool OperationAssignment::is_constant() {
+  return target->is_constant() && value->is_constant();
+}
+
+std::string OperationAssignment::get_data_type() {
+  return target->get_data_type();
+}
+
+std::string OperationAssignment::to_string() { return "ASSIGNMENT"; }
+
+void OperationIf::add_child(std::shared_ptr<Operation> child) {
+  body.push_back(child);
+}
+
+size_t OperationIf::get_n_children() { return body.size(); }
+
+std::shared_ptr<Operation> OperationIf::get_child(size_t index) {
+  return body[index];
+}
+
+std::string OperationIf::to_string() { return "IF"; }
+
+void OperationElse::add_child(std::shared_ptr<Operation> child) {
+  body.push_back(child);
+}
+
+size_t OperationElse::get_n_children() { return body.size(); }
+
+std::shared_ptr<Operation> OperationElse::get_child(size_t index) {
+  return body[index];
+}
+
+std::string OperationElse::to_string() { return "ELSE"; }
+
+void OperationWhile::add_child(std::shared_ptr<Operation> child) {
+  body.push_back(child);
+}
+
+size_t OperationWhile::get_n_children() { return body.size(); }
+
+std::shared_ptr<Operation> OperationWhile::get_child(size_t index) {
+  return body[index];
+}
+
+std::string OperationWhile::to_string() { return "WHILE"; }
+
+bool OperationFunctionDefinition::is_constant() {
+  // FIXME: Should scan function for return value
+  return false;
+}
+
+std::string OperationFunctionDefinition::get_data_type() {
+  return data_type->get_data_type();
+}
+
+void OperationFunctionDefinition::add_child(std::shared_ptr<Operation> child) {
+  body.push_back(child);
+}
+
+size_t OperationFunctionDefinition::get_n_children() { return body.size(); }
+
+std::shared_ptr<Operation>
+OperationFunctionDefinition::get_child(size_t index) {
+  return body[index];
+}
+
+std::string OperationFunctionDefinition::to_string() {
+  return "FUNCTION_DEFINITION";
+}
+
 bool OperationCall::is_constant() {
   // FIXME: Check if parameters are constant
   return value->is_constant();
 }
 
-std::string OperationMember::get_data_type() {
-  // FIXME
-  return nullptr;
+std::string OperationCall::get_data_type() { return value->get_data_type(); }
+
+std::string OperationCall::to_string() { return "CALL"; }
+
+bool OperationReturn::is_constant() {
+  return value == nullptr || value->is_constant();
+}
+
+std::string OperationReturn::get_data_type() {
+  return function->get_data_type();
+}
+
+std::string OperationReturn::to_string() {
+  return "RETURN(" + value->to_string() + ")";
+}
+
+bool OperationAssert::is_constant() {
+  return expression == nullptr || expression->is_constant();
+}
+
+std::string OperationAssert::to_string() {
+  return "ASSERT(" + expression->to_string() + ")";
+}
+
+bool OperationTrue::is_constant() { return true; }
+
+std::string OperationTrue::get_data_type() { return "bool"; }
+
+std::string OperationTrue::to_string() { return "TRUE"; }
+
+bool OperationFalse::is_constant() { return true; }
+
+std::string OperationFalse::get_data_type() { return "bool"; }
+
+std::string OperationFalse::to_string() { return "FALSE"; }
+
+bool OperationNumberConstant::is_constant() { return true; }
+
+std::string OperationNumberConstant::get_data_type() { return data_type; }
+
+std::string OperationNumberConstant::to_string() {
+  return "NUMBER_CONSTANT(" + (sign_token != nullptr)
+             ? "-"
+             : "" + std::to_string(magnitude) + ")";
+}
+
+bool OperationTextConstant::is_constant() { return true; }
+
+std::string OperationTextConstant::get_data_type() { return "utf8"; }
+
+std::string OperationTextConstant::to_string() {
+  return "TEXT_CONSTANT(" + value + ")";
 }
 
 bool OperationMember::is_constant() {
@@ -53,14 +251,30 @@ bool OperationMember::is_constant() {
   return false;
 }
 
-bool OperationFunctionDefinition::is_constant() {
-  // FIXME: Should scan function for return value
-  return false;
+std::string OperationMember::get_data_type() {
+  // FIXME
+  return nullptr;
 }
+
+std::string OperationMember::to_string() {
+  return "MEMBER(" + member->to_string() + ")";
+}
+
+std::string OperationMember::get_member_name() {
+  return std::string(member->data + member->offset + 1, member->length - 1);
+}
+
+bool OperationUnary::is_constant() { return value->is_constant(); }
 
 std::string OperationUnary::get_data_type() {
   // FIXME: Type depends on operation
   return value->get_data_type();
+}
+
+std::string OperationUnary::to_string() { return "UNARY"; }
+
+bool OperationBinary::is_constant() {
+  return a->is_constant() && b->is_constant();
 }
 
 std::string OperationBinary::get_data_type() {
@@ -68,10 +282,10 @@ std::string OperationBinary::get_data_type() {
   return a->get_data_type();
 }
 
-std::shared_ptr<Operation> Operation::get_last_child() {
-  size_t n_children = get_n_children();
-  if (n_children > 0)
-    return get_child(n_children - 1);
-  else
-    return nullptr;
-}
+std::string OperationBinary::to_string() { return "BINARY"; }
+
+bool OperationConvert::is_constant() { return op->is_constant(); }
+
+std::string OperationConvert::get_data_type() { return data_type; }
+
+std::string OperationConvert::to_string() { return "CONVERT"; }
