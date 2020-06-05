@@ -308,13 +308,13 @@ void ProgramState::run_sequence(std::vector<std::shared_ptr<Operation>> &body) {
 
 std::shared_ptr<DataValue>
 ProgramState::run_module(std::shared_ptr<OperationModule> &module) {
-  run_sequence(module->body);
+  run_sequence(module->children);
   return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue> ProgramState::run_function(
     std::shared_ptr<OperationFunctionDefinition> &function) {
-  run_sequence(function->body);
+  run_sequence(function->children);
 
   auto result = return_value;
   return_value = nullptr;
@@ -338,8 +338,8 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
       operation->data_type->type_definition);
   if (type_definition != nullptr) {
     auto value = std::make_shared<DataValueObject>();
-    for (auto i = type_definition->body.begin();
-         i != type_definition->body.end(); i++) {
+    for (auto i = type_definition->children.begin();
+         i != type_definition->children.end(); i++) {
       auto variable_definition =
           std::dynamic_pointer_cast<OperationVariableDefinition>(*i);
       if (variable_definition == nullptr)
@@ -394,9 +394,9 @@ ProgramState::run_if(std::shared_ptr<OperationIf> &operation) {
   bool condition = bool_value->value;
 
   if (condition) {
-    run_sequence(operation->body);
+    run_sequence(operation->children);
   } else if (operation->else_operation != NULL) {
-    run_sequence(operation->else_operation->body);
+    run_sequence(operation->else_operation->children);
   }
 
   return std::make_shared<DataValueNone>();
@@ -413,7 +413,7 @@ ProgramState::run_while(std::shared_ptr<OperationWhile> &operation) {
     if (!bool_value->value)
       return std::make_shared<DataValueNone>();
 
-    run_sequence(operation->body);
+    run_sequence(operation->children);
   }
 }
 
@@ -545,8 +545,8 @@ ProgramState::run_member(std::shared_ptr<OperationMember> &operation) {
   if (type_definition != nullptr) {
     auto member_name = operation->get_member_name();
     size_t index = 0;
-    for (auto i = type_definition->body.begin();
-         i != type_definition->body.end(); i++) {
+    for (auto i = type_definition->children.begin();
+         i != type_definition->children.end(); i++) {
       auto vd = std::dynamic_pointer_cast<OperationVariableDefinition>(*i);
       if (vd == nullptr)
         continue;

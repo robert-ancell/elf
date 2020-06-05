@@ -9,41 +9,12 @@
 
 #include "elf-operation.h"
 
-std::shared_ptr<Operation> Operation::get_last_child() {
-  size_t n_children = get_n_children();
-  if (n_children > 0)
-    return get_child(n_children - 1);
-  else
-    return nullptr;
-}
-
 bool OperationModule::is_constant() { return true; };
-
-void OperationModule::add_child(std::shared_ptr<Operation> child) {
-  body.push_back(child);
-}
-
-size_t OperationModule::get_n_children() { return body.size(); }
-
-std::shared_ptr<Operation> OperationModule::get_child(size_t index) {
-  return body[index];
-}
 
 std::string OperationModule::to_string() { return "MODULE"; }
 
 std::string OperationPrimitiveDefinition::get_data_type() {
   return name->get_text();
-}
-
-void OperationPrimitiveDefinition::add_child(std::shared_ptr<Operation> child) {
-  body.push_back(child);
-}
-
-size_t OperationPrimitiveDefinition::get_n_children() { return body.size(); }
-
-std::shared_ptr<Operation>
-OperationPrimitiveDefinition::get_child(size_t index) {
-  return body[index];
 }
 
 std::string OperationPrimitiveDefinition::to_string() {
@@ -52,7 +23,7 @@ std::string OperationPrimitiveDefinition::to_string() {
 
 std::shared_ptr<Operation>
 OperationPrimitiveDefinition::find_member(const std::string &name) {
-  for (auto i = body.begin(); i != body.end(); i++) {
+  for (auto i = children.begin(); i != children.end(); i++) {
     auto function_definition =
         std::dynamic_pointer_cast<OperationFunctionDefinition>(*i);
     if (function_definition != nullptr &&
@@ -66,21 +37,11 @@ std::string OperationTypeDefinition::get_data_type() {
   return name->get_text();
 }
 
-void OperationTypeDefinition::add_child(std::shared_ptr<Operation> child) {
-  body.push_back(child);
-}
-
-size_t OperationTypeDefinition::get_n_children() { return body.size(); }
-
-std::shared_ptr<Operation> OperationTypeDefinition::get_child(size_t index) {
-  return body[index];
-}
-
 std::string OperationTypeDefinition::to_string() { return "TYPE_DEFINITION"; }
 
 std::shared_ptr<Operation>
 OperationTypeDefinition::find_member(const std::string &name) {
-  for (auto i = body.begin(); i != body.end(); i++) {
+  for (auto i = children.begin(); i != children.end(); i++) {
     auto function_definition =
         std::dynamic_pointer_cast<OperationFunctionDefinition>(*i);
     if (function_definition != nullptr &&
@@ -127,39 +88,9 @@ std::string OperationAssignment::get_data_type() {
 
 std::string OperationAssignment::to_string() { return "ASSIGNMENT"; }
 
-void OperationIf::add_child(std::shared_ptr<Operation> child) {
-  body.push_back(child);
-}
-
-size_t OperationIf::get_n_children() { return body.size(); }
-
-std::shared_ptr<Operation> OperationIf::get_child(size_t index) {
-  return body[index];
-}
-
 std::string OperationIf::to_string() { return "IF"; }
 
-void OperationElse::add_child(std::shared_ptr<Operation> child) {
-  body.push_back(child);
-}
-
-size_t OperationElse::get_n_children() { return body.size(); }
-
-std::shared_ptr<Operation> OperationElse::get_child(size_t index) {
-  return body[index];
-}
-
 std::string OperationElse::to_string() { return "ELSE"; }
-
-void OperationWhile::add_child(std::shared_ptr<Operation> child) {
-  body.push_back(child);
-}
-
-size_t OperationWhile::get_n_children() { return body.size(); }
-
-std::shared_ptr<Operation> OperationWhile::get_child(size_t index) {
-  return body[index];
-}
 
 std::string OperationWhile::to_string() { return "WHILE"; }
 
@@ -170,17 +101,6 @@ bool OperationFunctionDefinition::is_constant() {
 
 std::string OperationFunctionDefinition::get_data_type() {
   return data_type->get_data_type();
-}
-
-void OperationFunctionDefinition::add_child(std::shared_ptr<Operation> child) {
-  body.push_back(child);
-}
-
-size_t OperationFunctionDefinition::get_n_children() { return body.size(); }
-
-std::shared_ptr<Operation>
-OperationFunctionDefinition::get_child(size_t index) {
-  return body[index];
 }
 
 std::string OperationFunctionDefinition::to_string() {

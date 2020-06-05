@@ -16,51 +16,34 @@
 #include "elf-token.h"
 
 struct Operation {
+  std::vector<std::shared_ptr<Operation>> children;
+
   virtual ~Operation() {}
   virtual bool is_constant() { return false; }
   virtual std::string get_data_type() { return nullptr; }
-  virtual void add_child(std::shared_ptr<Operation> child) {}
-  virtual size_t get_n_children() { return 0; }
-  virtual std::shared_ptr<Operation> get_child(size_t index) { return nullptr; }
-  std::shared_ptr<Operation> get_last_child();
   virtual std::string to_string() = 0;
 };
 
 struct OperationModule : Operation {
-  std::vector<std::shared_ptr<Operation>> body;
-
   bool is_constant();
-  void add_child(std::shared_ptr<Operation> child);
-  size_t get_n_children();
-  std::shared_ptr<Operation> get_child(size_t index);
   std::string to_string();
 };
 
 struct OperationPrimitiveDefinition : Operation {
   std::shared_ptr<Token> name;
-  std::vector<std::shared_ptr<Operation>> body;
 
   OperationPrimitiveDefinition(std::shared_ptr<Token> &name) : name(name) {}
   std::string get_data_type();
-  void add_child(std::shared_ptr<Operation> child);
-  size_t get_n_children();
-  std::shared_ptr<Operation> get_child(size_t index);
   std::string to_string();
-
   std::shared_ptr<Operation> find_member(const std::string &name);
 };
 
 struct OperationTypeDefinition : Operation {
   std::shared_ptr<Token> name;
-  std::vector<std::shared_ptr<Operation>> body;
 
   OperationTypeDefinition(std::shared_ptr<Token> &name) : name(name) {}
   std::string get_data_type();
-  void add_child(std::shared_ptr<Operation> child);
-  size_t get_n_children();
-  std::shared_ptr<Operation> get_child(size_t index);
   std::string to_string();
-
   std::shared_ptr<Operation> find_member(const std::string &name);
 };
 
@@ -113,37 +96,25 @@ struct OperationElse;
 struct OperationIf : Operation {
   std::shared_ptr<Token> keyword;
   std::shared_ptr<Operation> condition;
-  std::vector<std::shared_ptr<Operation>> body;
   std::shared_ptr<OperationElse> else_operation;
 
   OperationIf(std::shared_ptr<Token> keyword,
               std::shared_ptr<Operation> condition)
       : keyword(keyword), condition(condition), else_operation(nullptr) {}
-  void add_child(std::shared_ptr<Operation> child);
-  size_t get_n_children();
-  std::shared_ptr<Operation> get_child(size_t index);
   std::string to_string();
 };
 
 struct OperationElse : Operation {
   std::shared_ptr<Token> keyword;
-  std::vector<std::shared_ptr<Operation>> body;
 
   OperationElse(std::shared_ptr<Token> keyword) : keyword(keyword){};
-  void add_child(std::shared_ptr<Operation> child);
-  size_t get_n_children();
-  std::shared_ptr<Operation> get_child(size_t index);
   std::string to_string();
 };
 
 struct OperationWhile : Operation {
   std::shared_ptr<Operation> condition;
-  std::vector<std::shared_ptr<Operation>> body;
 
   OperationWhile(std::shared_ptr<Operation> condition) : condition(condition) {}
-  void add_child(std::shared_ptr<Operation> child);
-  size_t get_n_children();
-  std::shared_ptr<Operation> get_child(size_t index);
   std::string to_string();
 };
 
@@ -152,7 +123,6 @@ struct OperationFunctionDefinition : Operation {
   std::shared_ptr<OperationDataType> data_type;
   std::shared_ptr<Token> name;
   std::vector<std::shared_ptr<OperationVariableDefinition>> parameters;
-  std::vector<std::shared_ptr<Operation>> body;
 
   OperationFunctionDefinition(
       std::shared_ptr<OperationDataType> data_type, std::shared_ptr<Token> name,
@@ -160,9 +130,6 @@ struct OperationFunctionDefinition : Operation {
       : data_type(data_type), name(name), parameters(parameters) {}
   bool is_constant();
   std::string get_data_type();
-  void add_child(std::shared_ptr<Operation> child);
-  size_t get_n_children();
-  std::shared_ptr<Operation> get_child(size_t index);
   std::string to_string();
 };
 

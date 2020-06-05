@@ -174,9 +174,9 @@ std::shared_ptr<Operation> Parser::find_type(std::string name) {
 
 std::shared_ptr<Operation>
 Parser::find_type(std::shared_ptr<Operation> operation, std::string name) {
-  size_t n_children = operation->get_n_children();
-  for (size_t i = 0; i < n_children; i++) {
-    auto child = operation->get_child(i);
+  for (auto i = operation->children.begin(); i != operation->children.end();
+       i++) {
+    auto child = *i;
 
     auto primitive_definition =
         std::dynamic_pointer_cast<OperationPrimitiveDefinition>(child);
@@ -219,10 +219,9 @@ Parser::find_function(std::shared_ptr<Token> token) {
   for (auto i = stack.rbegin(); i != stack.rend(); i++) {
     auto operation = (*i)->operation;
 
-    size_t n_children = operation->get_n_children();
-    for (size_t j = 0; j < n_children; j++) {
-      auto child = operation->get_child(j);
-
+    for (auto j = operation->children.begin(); j != operation->children.end();
+         j++) {
+      auto child = *j;
       auto op = std::dynamic_pointer_cast<OperationFunctionDefinition>(child);
       if (op != nullptr && token_text_matches(op->name, token))
         return op;
@@ -651,8 +650,10 @@ Parser::parse_else(std::shared_ptr<Operation> &parent) {
     return nullptr;
   next_token();
 
-  std::shared_ptr<Operation> last_operation = parent->get_last_child();
-  auto if_operation = std::dynamic_pointer_cast<OperationIf>(last_operation);
+  std::shared_ptr<OperationIf> if_operation;
+  if (!parent->children.empty())
+    if_operation =
+        std::dynamic_pointer_cast<OperationIf>(parent->children.back());
   if (if_operation == nullptr) {
     set_error(current_token(), "else must follow if");
     return nullptr;
@@ -786,7 +787,7 @@ Parser::parse_primitive_definition() {
       set_error(current_token(), "Expected function definition");
       return nullptr;
     }
-    op->add_child(function_definition);
+    op->children.push_back(function_definition);
   }
 
   return op;
@@ -833,7 +834,7 @@ std::shared_ptr<OperationTypeDefinition> Parser::parse_type_definition() {
       set_error(current_token(), "Expected variable or function definition");
       return nullptr;
     }
-    op->add_child(variable_definition);
+    op->children.push_back(variable_definition);
   }
 
   return op;
@@ -1033,7 +1034,7 @@ bool Parser::parse_sequence() {
       return false;
     }
 
-    parent->add_child(op);
+    parent->children.push_back(op);
   }
 }
 
@@ -1117,7 +1118,7 @@ bool Parser::resolve_sequence(std::vector<std::shared_ptr<Operation>> &body) {
 
 bool Parser::resolve_module(std::shared_ptr<OperationModule> &operation) {
   push_stack(operation);
-  return resolve_sequence(operation->body);
+  return resolve_sequence(operation->children);
 }
 
 bool Parser::resolve_variable_definition(
@@ -1157,19 +1158,19 @@ bool Parser::resolve_if(std::shared_ptr<OperationIf> &operation) {
   if (!resolve_operation(operation->condition))
     return false;
   push_stack(operation);
-  return resolve_sequence(operation->body);
+  return resolve_sequence(operation->children);
 }
 
 bool Parser::resolve_else(std::shared_ptr<OperationElse> &operation) {
   push_stack(operation);
-  return resolve_sequence(operation->body);
+  return resolve_sequence(operation->children);
 }
 
 bool Parser::resolve_while(std::shared_ptr<OperationWhile> &operation) {
   if (!resolve_operation(operation->condition))
     return false;
   push_stack(operation);
-  return resolve_sequence(operation->body);
+  return resolve_sequence(operation->children);
 }
 
 bool Parser::resolve_data_type(std::shared_ptr<OperationDataType> &operation) {
@@ -1219,13 +1220,13 @@ bool Parser::resolve_function_definition(
   for (auto i = operation->parameters.begin(); i != operation->parameters.end();
        i++)
     add_stack_variable(*i);
-  return resolve_sequence(operation->body);
+  return resolve_sequence(operation->children);
 }
 
 bool Parser::resolve_type_definition(
     std::shared_ptr<OperationTypeDefinition> &operation) {
   push_stack(operation);
-  return resolve_sequence(operation->body);
+  return resolve_sequence(operation->children);
 }
 
 bool Parser::resolve_return(std::shared_ptr<OperationReturn> &operation) {
