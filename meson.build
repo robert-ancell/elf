@@ -5,6 +5,7 @@ project ('elf', [ 'cpp' ],
 version = run_command ('make-version')
 elf = executable ('elf',
                   [ 'elf.cc',
+                    'elf-lexer.cc',
                     'elf-operation.cc',
                     'elf-parser.cc',
                     'elf-runner.cc',
