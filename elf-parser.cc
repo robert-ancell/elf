@@ -1211,6 +1211,7 @@ bool Parser::resolve_call(std::shared_ptr<OperationCall> &operation) {
   if (!resolve_operation(operation->value))
     return false;
 
+  push_stack(operation);
   return resolve_sequence(operation->parameters);
 }
 
