@@ -863,18 +863,21 @@ Parser::parse_variable_definition() {
     return nullptr;
   }
 
-  std::shared_ptr<Operation> value;
   if (current_token()->type == TOKEN_TYPE_ASSIGN) {
     next_token();
 
-    value = parse_expression();
+    auto value = parse_expression();
     if (value == nullptr) {
       offset = start_offset;
       return nullptr;
     }
+
+    return std::make_shared<OperationVariableDefinition>(data_type, name,
+                                                         value);
   }
 
-  return std::make_shared<OperationVariableDefinition>(data_type, name, value);
+  return std::make_shared<OperationVariableDefinition>(data_type, name,
+                                                       nullptr);
 }
 
 std::shared_ptr<OperationFunctionDefinition>
