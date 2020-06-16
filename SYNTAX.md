@@ -55,6 +55,10 @@ variable_defintion
 
 type_name
     name
+    array_type_name
+
+array_type_name
+    name ws '[' ws ']'
 
 expression
     constant

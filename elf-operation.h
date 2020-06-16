@@ -49,9 +49,11 @@ struct OperationTypeDefinition : Operation {
 
 struct OperationDataType : Operation {
   std::shared_ptr<Token> name;
+  bool is_array;
   std::shared_ptr<Operation> type_definition;
 
-  OperationDataType(std::shared_ptr<Token> name) : name(name) {}
+  OperationDataType(std::shared_ptr<Token> name, bool is_array)
+      : name(name), is_array(is_array) {}
   std::string get_data_type();
   std::string to_string();
 };

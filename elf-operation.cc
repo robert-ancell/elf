@@ -56,7 +56,12 @@ OperationTypeDefinition::find_member(const std::string &name) {
   return nullptr;
 }
 
-std::string OperationDataType::get_data_type() { return name->get_text(); }
+std::string OperationDataType::get_data_type() {
+  if (is_array)
+    return name->get_text() + "[]";
+  else
+    return name->get_text();
+}
 
 std::string OperationDataType::to_string() { return "DATA_TYPE"; }
 
@@ -177,10 +182,10 @@ bool OperationArrayConstant::is_constant() {
 }
 
 std::string OperationArrayConstant::get_data_type() {
-   if (values.size() == 0)
-     return "[]";
-   else
-     return values[0]->get_data_type() + "[]";
+  if (values.size() == 0)
+    return "[]";
+  else
+    return values[0]->get_data_type() + "[]";
 }
 
 std::string OperationArrayConstant::to_string() { return "ARRAY_CONSTANT"; }

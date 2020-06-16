@@ -497,7 +497,19 @@ std::shared_ptr<OperationDataType> Parser::parse_data_type() {
     return nullptr;
   next_token();
 
-  return std::make_shared<OperationDataType>(token);
+  bool is_array = false;
+  if (current_token()->type == TOKEN_TYPE_OPEN_BRACKET) {
+    is_array = true;
+    next_token();
+
+    if (current_token()->type != TOKEN_TYPE_CLOSE_BRACKET) {
+      set_error(current_token(), "Expected close bracket");
+      return nullptr;
+    }
+    next_token();
+  }
+
+  return std::make_shared<OperationDataType>(token, is_array);
 }
 
 std::shared_ptr<OperationSymbol> Parser::parse_symbol() {

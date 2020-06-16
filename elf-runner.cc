@@ -103,6 +103,7 @@ struct DataValueUtf8 : DataValue {
 struct DataValueArray : DataValue {
   std::vector<std::shared_ptr<DataValue>> values;
 
+  DataValueArray() {}
   DataValueArray(std::vector<std::shared_ptr<DataValue>> &values)
       : values(values) {}
   std::string print() {
@@ -167,16 +168,20 @@ make_signed_integer_value(const std::string &data_type, int64_t value) {
 }
 
 static std::shared_ptr<DataValue>
-make_default_value(const std::string &data_type) {
-  if (data_type == "bool")
+make_default_value(std::shared_ptr<OperationDataType> &data_type) {
+  if (data_type->is_array)
+    return std::make_shared<DataValueArray>();
+
+  auto type_name = data_type->get_data_type();
+  if (type_name == "bool")
     return std::make_shared<DataValueBool>(false);
-  else if (data_type == "uint8" || data_type == "uint16" ||
-           data_type == "uint32" || data_type == "uint64")
-    return make_unsigned_integer_value(data_type, 0);
-  else if (data_type == "int8" || data_type == "int16" ||
-           data_type == "int32" || data_type == "int64")
-    return make_signed_integer_value(data_type, 0);
-  else if (data_type == "utf8")
+  else if (type_name == "uint8" || type_name == "uint16" ||
+           type_name == "uint32" || type_name == "uint64")
+    return make_unsigned_integer_value(type_name, 0);
+  else if (type_name == "int8" || type_name == "int16" ||
+           type_name == "int32" || type_name == "int64")
+    return make_signed_integer_value(type_name, 0);
+  else if (type_name == "utf8")
     return std::make_shared<DataValueUtf8>("");
   else
     return std::make_shared<DataValueNone>();
@@ -393,7 +398,7 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
       if (variable_definition == nullptr)
         continue;
 
-      auto v = make_default_value(variable_definition->get_data_type());
+      auto v = make_default_value(variable_definition->data_type);
       value->values.push_back(v);
     }
 
@@ -402,7 +407,7 @@ std::shared_ptr<DataValue> ProgramState::run_variable_definition(
     auto value = run_operation(operation->value);
     add_variable(variable_name, value);
   } else {
-    auto value = make_default_value(operation->data_type->get_data_type());
+    auto value = make_default_value(operation->data_type);
     add_variable(variable_name, value);
   }
 
