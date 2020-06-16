@@ -16,11 +16,11 @@
 struct DataValue {
   virtual ~DataValue() {}
   virtual std::shared_ptr<DataValue> convert_to(const std::string &data_type);
-  virtual void print() = 0;
+  virtual std::string print() = 0;
 };
 
 struct DataValueNone : DataValue {
-  void print() { printf("none\n"); }
+  std::string print() { return "none"; }
 };
 
 struct DataValueBool : DataValue {
@@ -28,7 +28,7 @@ struct DataValueBool : DataValue {
 
   DataValueBool(bool value) : value(value) {}
   ~DataValueBool() {}
-  void print() { printf(value ? "true\n" : "false\n"); }
+  std::string print() { return value ? "true" : "false"; }
 };
 
 struct DataValueUint8 : DataValue {
@@ -36,7 +36,7 @@ struct DataValueUint8 : DataValue {
 
   DataValueUint8(uint8_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
-  void print() { printf("%u\n", value); }
+  std::string print() { return std::to_string(value); }
 };
 
 struct DataValueInt8 : DataValue {
@@ -44,7 +44,7 @@ struct DataValueInt8 : DataValue {
 
   DataValueInt8(int8_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
-  void print() { printf("%d\n", value); }
+  std::string print() { return std::to_string(value); }
 };
 
 struct DataValueUint16 : DataValue {
@@ -52,7 +52,7 @@ struct DataValueUint16 : DataValue {
 
   DataValueUint16(uint16_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
-  void print() { printf("%u\n", value); }
+  std::string print() { return std::to_string(value); }
 };
 
 struct DataValueInt16 : DataValue {
@@ -60,7 +60,7 @@ struct DataValueInt16 : DataValue {
 
   DataValueInt16(int16_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
-  void print() { printf("%d\n", value); }
+  std::string print() { return std::to_string(value); }
 };
 
 struct DataValueUint32 : DataValue {
@@ -68,7 +68,7 @@ struct DataValueUint32 : DataValue {
 
   DataValueUint32(uint32_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
-  void print() { printf("%u\n", value); }
+  std::string print() { return std::to_string(value); }
 };
 
 struct DataValueInt32 : DataValue {
@@ -76,35 +76,53 @@ struct DataValueInt32 : DataValue {
 
   DataValueInt32(int32_t value) : value(value) {}
   std::shared_ptr<DataValue> convert_to(const std::string &data_type);
-  void print() { printf("%d\n", value); }
+  std::string print() { return std::to_string(value); }
 };
 
 struct DataValueUint64 : DataValue {
   uint64_t value;
 
   DataValueUint64(uint64_t value) : value(value) {}
-  void print() { printf("%lu\n", value); }
+  std::string print() { return std::to_string(value); }
 };
 
 struct DataValueInt64 : DataValue {
   int64_t value;
 
   DataValueInt64(int64_t value) : value(value) {}
-  void print() { printf("%li\n", value); }
+  std::string print() { return std::to_string(value); }
 };
 
 struct DataValueUtf8 : DataValue {
   std::string value;
 
   DataValueUtf8(std::string value) : value(value) {}
-  void print() { printf("%s\n", value.c_str()); }
+  std::string print() { return value; }
+};
+
+struct DataValueArray : DataValue {
+  std::vector<std::shared_ptr<DataValue>> values;
+
+  DataValueArray(std::vector<std::shared_ptr<DataValue>> &values)
+      : values(values) {}
+  std::string print() {
+    std::string text = "[";
+    for (auto i = values.begin(); i != values.end(); i++) {
+      auto value = *i;
+      if (i != values.begin())
+        text += ", ";
+      text += value->print();
+    }
+    text += "]";
+    return text;
+  }
 };
 
 struct DataValueObject : DataValue {
   std::vector<std::shared_ptr<DataValue>> values;
 
   DataValueObject() {}
-  void print() { printf("[FIXME]\n"); }
+  std::string print() { return "{FIXME}"; }
 };
 
 struct DataValueFunction : DataValue {
@@ -112,12 +130,12 @@ struct DataValueFunction : DataValue {
 
   DataValueFunction(std::shared_ptr<OperationFunctionDefinition> &function)
       : function(function) {}
-  void print() { printf("<method>\n"); }
+  std::string print() { return "<method>"; }
 };
 
 struct DataValuePrintFunction : DataValue {
   DataValuePrintFunction() {}
-  void print() { printf("<print>\n"); }
+  std::string print() { return "<print>"; }
 };
 
 static std::shared_ptr<DataValue>
@@ -276,6 +294,8 @@ struct ProgramState {
   run_number_constant(std::shared_ptr<OperationNumberConstant> &operation);
   std::shared_ptr<DataValue>
   run_text_constant(std::shared_ptr<OperationTextConstant> &operation);
+  std::shared_ptr<DataValue>
+  run_array_constant(std::shared_ptr<OperationArrayConstant> &operation);
   std::shared_ptr<DataValue>
   run_member(std::shared_ptr<OperationMember> &operation);
   std::shared_ptr<DataValue>
@@ -477,7 +497,8 @@ ProgramState::run_call(std::shared_ptr<OperationCall> &operation) {
     parameter_values.push_back(run_operation(*i));
 
   if (std::dynamic_pointer_cast<DataValuePrintFunction>(value) != nullptr) {
-    parameter_values[0]->print();
+    auto text = parameter_values[0]->print();
+    printf("%s\n", text.c_str());
     return std::make_shared<DataValueNone>();
   }
 
@@ -551,6 +572,15 @@ std::shared_ptr<DataValue> ProgramState::run_number_constant(
 std::shared_ptr<DataValue> ProgramState::run_text_constant(
     std::shared_ptr<OperationTextConstant> &operation) {
   return std::make_shared<DataValueUtf8>(operation->value);
+}
+
+std::shared_ptr<DataValue> ProgramState::run_array_constant(
+    std::shared_ptr<OperationArrayConstant> &operation) {
+  std::vector<std::shared_ptr<DataValue>> values;
+  for (auto i = operation->values.begin(); i != operation->values.end(); i++)
+    values.push_back(run_operation(*i));
+
+  return std::make_shared<DataValueArray>(values);
 }
 
 std::shared_ptr<DataValue>
@@ -998,6 +1028,11 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
       std::dynamic_pointer_cast<OperationTextConstant>(operation);
   if (op_text_constant != nullptr)
     return run_text_constant(op_text_constant);
+
+  auto op_array_constant =
+      std::dynamic_pointer_cast<OperationArrayConstant>(operation);
+  if (op_array_constant != nullptr)
+    return run_array_constant(op_array_constant);
 
   auto op_member = std::dynamic_pointer_cast<OperationMember>(operation);
   if (op_member != nullptr)

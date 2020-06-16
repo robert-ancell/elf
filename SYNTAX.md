@@ -71,6 +71,7 @@ constant
     hex_constant
     text_constant_single
     text_constant_double
+    array_constant
 
 boolean_constant
     "true"
@@ -148,6 +149,10 @@ escape
     'x' hex_digit hex_digit
     'u' hex_digit hex_digit hex_digit hex_digit
     'U' hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit
+
+array_constant
+    name ws '[' ws ']'
+    name ws '[' expression_list ']'
 
 variable_name
     name

@@ -76,6 +76,8 @@ static bool token_is_complete(const char *data, std::shared_ptr<Token> token,
   case TOKEN_TYPE_DIVIDE:
   case TOKEN_TYPE_OPEN_PAREN:
   case TOKEN_TYPE_CLOSE_PAREN:
+  case TOKEN_TYPE_OPEN_BRACKET:
+  case TOKEN_TYPE_CLOSE_BRACKET:
   case TOKEN_TYPE_COMMA:
   case TOKEN_TYPE_OPEN_BRACE:
   case TOKEN_TYPE_CLOSE_BRACE:
@@ -110,6 +112,10 @@ std::vector<std::shared_ptr<Token>> elf_lex(const char *data,
         type = TOKEN_TYPE_OPEN_PAREN;
       else if (c == ')')
         type = TOKEN_TYPE_CLOSE_PAREN;
+      else if (c == '[')
+        type = TOKEN_TYPE_OPEN_BRACKET;
+      else if (c == ']')
+        type = TOKEN_TYPE_CLOSE_BRACKET;
       else if (c == ',')
         type = TOKEN_TYPE_COMMA;
       else if (c == '{')

@@ -1,0 +1,4 @@
+Line 1:
+uint64 v = [1, 2, 3]
+       ^
+Variable is of type uint64, but value is of type uint8[]

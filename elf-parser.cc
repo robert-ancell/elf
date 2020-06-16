@@ -61,6 +61,7 @@ struct Parser {
   std::shared_ptr<OperationFalse> parse_false();
   std::shared_ptr<OperationNumberConstant> parse_number_constant();
   std::shared_ptr<OperationTextConstant> parse_text_constant();
+  std::shared_ptr<OperationArrayConstant> parse_array_constant();
   std::shared_ptr<OperationDataType> parse_data_type();
   std::shared_ptr<OperationSymbol> parse_symbol();
   std::shared_ptr<Operation> parse_expression();
@@ -79,8 +80,10 @@ struct Parser {
   std::shared_ptr<OperationFunctionDefinition> get_current_function();
   bool parse_sequence();
   bool resolve_operation(std::shared_ptr<Operation> operation);
+  bool
+  resolve_array_constant(std::shared_ptr<OperationArrayConstant> &operation);
   bool resolve_sequence(std::vector<std::shared_ptr<Operation>> &body);
-  bool resolve_module(std::shared_ptr<OperationModule> &oeration);
+  bool resolve_module(std::shared_ptr<OperationModule> &operation);
   bool resolve_variable_definition(
       std::shared_ptr<OperationVariableDefinition> &operation);
   bool resolve_assignment(std::shared_ptr<OperationAssignment> &operation);
@@ -282,6 +285,8 @@ std::shared_ptr<Operation> Parser::parse_value() {
   if (op == nullptr)
     op = parse_text_constant();
   if (op == nullptr)
+    op = parse_array_constant();
+  if (op == nullptr)
     op = parse_symbol();
 
   if (op == nullptr)
@@ -448,6 +453,42 @@ std::shared_ptr<OperationTextConstant> Parser::parse_text_constant() {
   next_token();
 
   return std::make_shared<OperationTextConstant>(token, value);
+}
+
+std::shared_ptr<OperationArrayConstant> Parser::parse_array_constant() {
+  auto token = current_token();
+  if (token->type != TOKEN_TYPE_OPEN_BRACKET)
+    return nullptr;
+  next_token();
+
+  std::vector<std::shared_ptr<Operation>> values;
+  while (current_token()->type != TOKEN_TYPE_EOF) {
+    auto t = current_token();
+    if (t->type == TOKEN_TYPE_CLOSE_BRACKET) {
+      next_token();
+      return std::make_shared<OperationArrayConstant>(values);
+    }
+
+    if (values.size() > 0) {
+      if (t->type != TOKEN_TYPE_COMMA) {
+        set_error(current_token(), "Missing comma");
+        return nullptr;
+      }
+      next_token();
+      t = current_token();
+    }
+
+    auto value = parse_expression();
+    if (value == nullptr) {
+      set_error(current_token(), "Invalid array value");
+      return nullptr;
+    }
+
+    values.push_back(value);
+  }
+
+  set_error(current_token(), "Unclosed array");
+  return nullptr;
 }
 
 std::shared_ptr<OperationDataType> Parser::parse_data_type() {
@@ -1042,6 +1083,11 @@ bool Parser::parse_sequence() {
 }
 
 bool Parser::resolve_operation(std::shared_ptr<Operation> operation) {
+  auto op_array_constant =
+      std::dynamic_pointer_cast<OperationArrayConstant>(operation);
+  if (op_array_constant != nullptr)
+    return resolve_array_constant(op_array_constant);
+
   auto op_module = std::dynamic_pointer_cast<OperationModule>(operation);
   if (op_module != nullptr)
     return resolve_module(op_module);
@@ -1117,6 +1163,11 @@ bool Parser::resolve_sequence(std::vector<std::shared_ptr<Operation>> &body) {
   pop_stack();
 
   return true;
+}
+
+bool Parser::resolve_array_constant(
+    std::shared_ptr<OperationArrayConstant> &operation) {
+  return resolve_sequence(operation->values);
 }
 
 bool Parser::resolve_module(std::shared_ptr<OperationModule> &operation) {

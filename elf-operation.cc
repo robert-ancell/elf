@@ -166,6 +166,25 @@ std::string OperationTextConstant::to_string() {
   return "TEXT_CONSTANT(" + value + ")";
 }
 
+bool OperationArrayConstant::is_constant() {
+  for (auto i = values.begin(); i != values.end(); i++) {
+    auto value = *i;
+    if (!value->is_constant())
+      return false;
+  }
+
+  return true;
+}
+
+std::string OperationArrayConstant::get_data_type() {
+   if (values.size() == 0)
+     return "[]";
+   else
+     return values[0]->get_data_type() + "[]";
+}
+
+std::string OperationArrayConstant::to_string() { return "ARRAY_CONSTANT"; }
+
 bool OperationMember::is_constant() {
   // FIXME:
   return false;

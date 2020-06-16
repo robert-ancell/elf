@@ -219,6 +219,16 @@ struct OperationTextConstant : Operation {
   std::string to_string();
 };
 
+struct OperationArrayConstant : Operation {
+  std::vector<std::shared_ptr<Operation>> values;
+
+  OperationArrayConstant(std::vector<std::shared_ptr<Operation>> &values)
+      : values(values) {}
+  bool is_constant();
+  std::string get_data_type();
+  std::string to_string();
+};
+
 struct OperationMember : Operation {
   std::shared_ptr<Operation> value;
   std::shared_ptr<Token> member;

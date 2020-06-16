@@ -63,6 +63,10 @@ std::string Token::to_string() {
     return "OPEN_PAREN";
   case TOKEN_TYPE_CLOSE_PAREN:
     return "CLOSE_PAREN";
+  case TOKEN_TYPE_OPEN_BRACKET:
+    return "OPEN_BRACKET";
+  case TOKEN_TYPE_CLOSE_BRACKET:
+    return "CLOSE_BRACKET";
   case TOKEN_TYPE_COMMA:
     return "COMMA";
   case TOKEN_TYPE_OPEN_BRACE:
