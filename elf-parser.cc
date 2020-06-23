@@ -110,7 +110,7 @@ void Parser::push_stack(std::shared_ptr<Operation> operation) {
 
 void Parser::add_stack_variable(
     std::shared_ptr<OperationVariableDefinition> definition) {
-  StackFrame *frame = stack.back();
+  auto frame = stack.back();
   frame->variables.push_back(definition);
 }
 
@@ -201,7 +201,7 @@ Parser::find_variable(std::shared_ptr<Token> token) {
     return nullptr;
 
   for (auto i = stack.rbegin(); i != stack.rend(); i++) {
-    StackFrame *frame = *i;
+    auto frame = *i;
 
     for (auto j = frame->variables.begin(); j != frame->variables.end(); j++) {
       auto definition = *j;
