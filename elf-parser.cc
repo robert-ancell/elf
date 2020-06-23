@@ -550,6 +550,27 @@ convert_to_data_type(std::shared_ptr<Operation> &operation,
   if (from_type == to_type)
     return operation;
 
+  auto array_constant =
+      std::dynamic_pointer_cast<OperationArrayConstant>(operation);
+  if (array_constant != nullptr) {
+    if (to_type.compare(to_type.size() - 2, to_type.size(), "[]") != 0)
+      return nullptr;
+
+    auto value_type = to_type.substr(0, to_type.size() - 2);
+    for (auto i = array_constant->values.begin();
+         i != array_constant->values.end(); i++) {
+      auto value = *i;
+
+      auto conversion = convert_to_data_type(value, value_type);
+      if (conversion == nullptr)
+        return nullptr;
+
+      *i = conversion;
+    }
+
+    return operation;
+  }
+
   // Convert unsigned constant numbers to signed ones
   auto number_constant =
       std::dynamic_pointer_cast<OperationNumberConstant>(operation);
