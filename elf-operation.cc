@@ -190,6 +190,20 @@ std::string OperationArrayConstant::get_data_type() {
 
 std::string OperationArrayConstant::to_string() { return "ARRAY_CONSTANT"; }
 
+bool OperationIndex::is_constant() {
+  if (!index->is_constant())
+    return false;
+
+  return value->is_constant();
+}
+
+std::string OperationIndex::get_data_type() {
+  auto array_type = value->get_data_type();
+  return array_type.substr(0, array_type.size() - 2);
+}
+
+std::string OperationIndex::to_string() { return "INDEX"; }
+
 bool OperationMember::is_constant() {
   // FIXME:
   return false;

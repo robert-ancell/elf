@@ -82,6 +82,7 @@ struct Parser {
   bool resolve_operation(std::shared_ptr<Operation> operation);
   bool
   resolve_array_constant(std::shared_ptr<OperationArrayConstant> &operation);
+  bool resolve_index(std::shared_ptr<OperationIndex> &operation);
   bool resolve_sequence(std::vector<std::shared_ptr<Operation>> &body);
   bool resolve_module(std::shared_ptr<OperationModule> &operation);
   bool resolve_variable_definition(
@@ -294,7 +295,21 @@ std::shared_ptr<Operation> Parser::parse_value() {
 
   while (true) {
     auto token = current_token();
-    if (token->type == TOKEN_TYPE_OPEN_PAREN) {
+    if (token->type == TOKEN_TYPE_OPEN_BRACKET) {
+      next_token();
+
+      auto index = parse_value();
+      if (index == nullptr)
+        return nullptr;
+
+      if (current_token()->type != TOKEN_TYPE_CLOSE_BRACKET) {
+        set_error(current_token(), "Expected close bracket");
+        return nullptr;
+      }
+      next_token();
+
+      op = std::make_shared<OperationIndex>(op, index);
+    } else if (token->type == TOKEN_TYPE_OPEN_PAREN) {
       std::vector<std::shared_ptr<Operation>> parameters;
       if (!parse_parameters(parameters))
         return nullptr;
@@ -1122,6 +1137,10 @@ bool Parser::resolve_operation(std::shared_ptr<Operation> operation) {
   if (op_array_constant != nullptr)
     return resolve_array_constant(op_array_constant);
 
+  auto op_index = std::dynamic_pointer_cast<OperationIndex>(operation);
+  if (op_index != nullptr)
+    return resolve_index(op_index);
+
   auto op_module = std::dynamic_pointer_cast<OperationModule>(operation);
   if (op_module != nullptr)
     return resolve_module(op_module);
@@ -1202,6 +1221,11 @@ bool Parser::resolve_sequence(std::vector<std::shared_ptr<Operation>> &body) {
 bool Parser::resolve_array_constant(
     std::shared_ptr<OperationArrayConstant> &operation) {
   return resolve_sequence(operation->values);
+}
+
+bool Parser::resolve_index(std::shared_ptr<OperationIndex> &operation) {
+  // FIXME
+  return true;
 }
 
 bool Parser::resolve_module(std::shared_ptr<OperationModule> &operation) {

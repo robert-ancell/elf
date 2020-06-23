@@ -302,6 +302,8 @@ struct ProgramState {
   std::shared_ptr<DataValue>
   run_array_constant(std::shared_ptr<OperationArrayConstant> &operation);
   std::shared_ptr<DataValue>
+  run_index(std::shared_ptr<OperationIndex> &operation);
+  std::shared_ptr<DataValue>
   run_member(std::shared_ptr<OperationMember> &operation);
   std::shared_ptr<DataValue>
   run_binary_boolean(std::shared_ptr<OperationBinary> &operation,
@@ -586,6 +588,22 @@ std::shared_ptr<DataValue> ProgramState::run_array_constant(
     values.push_back(run_operation(*i));
 
   return std::make_shared<DataValueArray>(values);
+}
+
+std::shared_ptr<DataValue>
+ProgramState::run_index(std::shared_ptr<OperationIndex> &operation) {
+  auto value = run_operation(operation->value);
+  auto index_value = run_operation(operation->index);
+
+  auto array_value = std::dynamic_pointer_cast<DataValueArray>(value);
+  if (array_value == nullptr)
+    return std::make_shared<DataValueNone>();
+
+  auto uint8_index = std::dynamic_pointer_cast<DataValueUint8>(index_value);
+  if (uint8_index != nullptr)
+    return array_value->values[uint8_index->value];
+
+  return std::make_shared<DataValueNone>();
 }
 
 std::shared_ptr<DataValue>
@@ -1038,6 +1056,10 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
       std::dynamic_pointer_cast<OperationArrayConstant>(operation);
   if (op_array_constant != nullptr)
     return run_array_constant(op_array_constant);
+
+  auto op_index = std::dynamic_pointer_cast<OperationIndex>(operation);
+  if (op_index != nullptr)
+    return run_index(op_index);
 
   auto op_member = std::dynamic_pointer_cast<OperationMember>(operation);
   if (op_member != nullptr)
