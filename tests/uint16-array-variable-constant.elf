@@ -1,2 +1,5 @@
 uint16[] value = [1, 2, 3]
 print (value)
+print (value[0])
+print (value[1])
+print (value[2])

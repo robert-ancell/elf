@@ -233,6 +233,18 @@ struct OperationArrayConstant : Operation {
   std::string to_string();
 };
 
+struct OperationIndex : Operation {
+  std::shared_ptr<Operation> value;
+  std::shared_ptr<Operation> index;
+
+  OperationIndex(std::shared_ptr<Operation> &value,
+                 std::shared_ptr<Operation> &index)
+      : value(value), index(index) {}
+  bool is_constant();
+  std::string get_data_type();
+  std::string to_string();
+};
+
 struct OperationMember : Operation {
   std::shared_ptr<Operation> value;
   std::shared_ptr<Token> member;
