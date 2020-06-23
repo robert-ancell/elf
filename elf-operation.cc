@@ -196,8 +196,7 @@ bool OperationMember::is_constant() {
 }
 
 std::string OperationMember::get_data_type() {
-  // FIXME
-  return nullptr;
+  return member_definition->get_data_type();
 }
 
 std::string OperationMember::to_string() {

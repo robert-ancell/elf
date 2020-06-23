@@ -83,11 +83,13 @@ struct OperationSymbol : Operation {
 
 struct OperationAssignment : Operation {
   std::shared_ptr<Operation> target;
+  std::shared_ptr<Token> assign_symbol;
   std::shared_ptr<Operation> value;
 
   OperationAssignment(std::shared_ptr<Operation> target,
+                      std::shared_ptr<Token> &assign_symbol,
                       std::shared_ptr<Operation> &value)
-      : target(target), value(value) {}
+      : target(target), assign_symbol(assign_symbol), value(value) {}
   bool is_constant();
   std::string get_data_type();
   std::string to_string();
@@ -235,6 +237,7 @@ struct OperationMember : Operation {
   std::shared_ptr<Operation> value;
   std::shared_ptr<Token> member;
   std::shared_ptr<Operation> type_definition;
+  std::shared_ptr<Operation> member_definition;
 
   OperationMember(std::shared_ptr<Operation> value,
                   std::shared_ptr<Token> member)

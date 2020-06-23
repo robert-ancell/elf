@@ -1026,7 +1026,8 @@ std::shared_ptr<Operation> Parser::parse_expression_or_assignment() {
   if (target == nullptr)
     return nullptr;
 
-  if (current_token()->type != TOKEN_TYPE_ASSIGN)
+  auto assign_symbol = current_token();
+  if (assign_symbol->type != TOKEN_TYPE_ASSIGN)
     return target;
   next_token();
 
@@ -1036,7 +1037,7 @@ std::shared_ptr<Operation> Parser::parse_expression_or_assignment() {
     return nullptr;
   }
 
-  return std::make_shared<OperationAssignment>(target, value);
+  return std::make_shared<OperationAssignment>(target, assign_symbol, value);
 }
 
 std::shared_ptr<OperationFunctionDefinition> Parser::get_current_function() {
@@ -1216,8 +1217,23 @@ bool Parser::resolve_variable_definition(
 
 bool Parser::resolve_assignment(
     std::shared_ptr<OperationAssignment> &operation) {
-  return resolve_operation(operation->target) &&
-         resolve_operation(operation->value);
+  if (!resolve_operation(operation->target))
+    return false;
+
+  if (!resolve_operation(operation->value))
+    return false;
+
+  auto conversion =
+      convert_to_data_type(operation->value, operation->get_data_type());
+  if (conversion == nullptr) {
+    set_error(operation->assign_symbol,
+              "Can't assign to type " + operation->target->get_data_type() +
+                  " with value of type " + operation->value->get_data_type());
+    return false;
+  }
+  operation->value = conversion;
+
+  return true;
 }
 
 bool Parser::resolve_if(std::shared_ptr<OperationIf> &operation) {
@@ -1323,7 +1339,9 @@ bool Parser::resolve_member(std::shared_ptr<OperationMember> &operation) {
   auto primitive_definition =
       std::dynamic_pointer_cast<OperationPrimitiveDefinition>(definition);
   if (primitive_definition != nullptr) {
-    if (primitive_definition->find_member(member_name) == nullptr) {
+    operation->member_definition =
+        primitive_definition->find_member(member_name);
+    if (operation->member_definition == nullptr) {
       set_error(operation->member, "Primitive type " + data_type +
                                        " doesn't have a member named " +
                                        member_name);
@@ -1334,7 +1352,8 @@ bool Parser::resolve_member(std::shared_ptr<OperationMember> &operation) {
   auto type_definition =
       std::dynamic_pointer_cast<OperationTypeDefinition>(definition);
   if (type_definition != nullptr) {
-    if (type_definition->find_member(member_name) == nullptr) {
+    operation->member_definition = type_definition->find_member(member_name);
+    if (operation->member_definition == nullptr) {
       set_error(operation->member, "Data type " + data_type +
                                        " doesn't have a member named " +
                                        member_name);
