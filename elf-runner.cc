@@ -476,9 +476,6 @@ std::shared_ptr<DataValue>
 ProgramState::run_symbol(std::shared_ptr<OperationSymbol> &operation) {
   auto name = operation->name->get_text();
 
-  if (name == "print")
-    return std::make_shared<DataValuePrintFunction>();
-
   auto function_definition =
       std::dynamic_pointer_cast<OperationFunctionDefinition>(
           operation->definition);
@@ -1017,6 +1014,11 @@ ProgramState::run_operation(std::shared_ptr<Operation> &operation) {
       std::dynamic_pointer_cast<OperationTypeDefinition>(operation);
   if (op_type_definition != nullptr)
     return std::make_shared<DataValueNone>(); // Resolved at compile time
+
+  auto op_print_function =
+      std::dynamic_pointer_cast<OperationPrintFunction>(operation);
+  if (op_print_function != nullptr)
+    return std::make_shared<DataValuePrintFunction>();
 
   auto op_symbol = std::dynamic_pointer_cast<OperationSymbol>(operation);
   if (op_symbol != nullptr)

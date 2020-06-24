@@ -63,6 +63,7 @@ struct Parser {
   std::shared_ptr<OperationTextConstant> parse_text_constant();
   std::shared_ptr<OperationArrayConstant> parse_array_constant();
   std::shared_ptr<OperationDataType> parse_data_type();
+  std::shared_ptr<OperationPrintFunction> parse_print_function();
   std::shared_ptr<OperationSymbol> parse_symbol();
   std::shared_ptr<Operation> parse_expression();
   std::shared_ptr<Operation> parse_variable_value(std::shared_ptr<Token> &token,
@@ -103,6 +104,8 @@ struct Parser {
   bool resolve_member(std::shared_ptr<OperationMember> &operation);
   bool resolve_binary(std::shared_ptr<OperationBinary> &operation);
   bool resolve_convert(std::shared_ptr<OperationConvert> &operation);
+  bool
+  resolve_print_function(std::shared_ptr<OperationPrintFunction> &operation);
 };
 
 void Parser::push_stack(std::shared_ptr<Operation> operation) {
@@ -127,25 +130,28 @@ void Parser::set_error(std::shared_ptr<Token> token,
 }
 
 void Parser::print_error() {
-  size_t line_offset = 0;
-  size_t line_number = 1;
-  for (size_t i = 0; i < error_token->offset; i++) {
-    if (data[i] == '\n') {
-      line_offset = i + 1;
-      line_number++;
+  if (error_token != nullptr) {
+    size_t line_offset = 0;
+    size_t line_number = 1;
+    for (size_t i = 0; i < error_token->offset; i++) {
+      if (data[i] == '\n') {
+        line_offset = i + 1;
+        line_number++;
+      }
     }
-  }
 
-  printf("Line %zi:\n", line_number);
-  for (size_t i = line_offset; data[i] != '\0' && data[i] != '\n'; i++)
-    printf("%c", data[i]);
-  printf("\n");
-  for (size_t i = line_offset; i < error_token->offset; i++)
-    printf(" ");
-  for (size_t i = 0; i < error_token->length; i++)
-    printf("^");
-  printf("\n");
-  printf("%s\n", error_message.c_str());
+    printf("Line %zi:\n", line_number);
+    for (size_t i = line_offset; data[i] != '\0' && data[i] != '\n'; i++)
+      printf("%c", data[i]);
+    printf("\n");
+    for (size_t i = line_offset; i < error_token->offset; i++)
+      printf(" ");
+    for (size_t i = 0; i < error_token->length; i++)
+      printf("^");
+    printf("\n");
+  }
+  printf("%s\n",
+         error_message.empty() ? "<unknown error>" : error_message.c_str());
 }
 
 bool Parser::token_text_matches(std::shared_ptr<Token> a,
@@ -287,6 +293,8 @@ std::shared_ptr<Operation> Parser::parse_value() {
     op = parse_text_constant();
   if (op == nullptr)
     op = parse_array_constant();
+  if (op == nullptr)
+    op = parse_print_function();
   if (op == nullptr)
     op = parse_symbol();
 
@@ -525,6 +533,18 @@ std::shared_ptr<OperationDataType> Parser::parse_data_type() {
   }
 
   return std::make_shared<OperationDataType>(token, is_array);
+}
+
+std::shared_ptr<OperationPrintFunction> Parser::parse_print_function() {
+  auto token = current_token();
+  if (token->type != TOKEN_TYPE_WORD)
+    return nullptr;
+
+  if (!token->has_text("print"))
+    return nullptr;
+  next_token();
+
+  return std::make_shared<OperationPrintFunction>(token);
 }
 
 std::shared_ptr<OperationSymbol> Parser::parse_symbol() {
@@ -1205,6 +1225,11 @@ bool Parser::resolve_operation(std::shared_ptr<Operation> operation) {
   if (op_convert != nullptr)
     return resolve_convert(op_convert);
 
+  auto op_print_function =
+      std::dynamic_pointer_cast<OperationPrintFunction>(operation);
+  if (op_print_function != nullptr)
+    return resolve_print_function(op_print_function);
+
   return true;
 }
 
@@ -1335,6 +1360,20 @@ bool Parser::resolve_call(std::shared_ptr<OperationCall> &operation) {
   if (!resolve_operation(operation->value))
     return false;
 
+  auto symbol = std::dynamic_pointer_cast<OperationSymbol>(operation->value);
+  if (symbol != nullptr)
+    operation->definition = symbol->definition;
+  auto member = std::dynamic_pointer_cast<OperationMember>(operation->value);
+  if (member != nullptr)
+    operation->definition = member->member_definition;
+  auto print_function =
+      std::dynamic_pointer_cast<OperationPrintFunction>(operation->value);
+  if (print_function != nullptr)
+    operation->definition = print_function;
+
+  if (operation->definition == nullptr)
+    return false;
+
   push_stack(operation);
   return resolve_sequence(operation->parameters);
 }
@@ -1434,6 +1473,11 @@ bool Parser::resolve_binary(std::shared_ptr<OperationBinary> &operation) {
 
 bool Parser::resolve_convert(std::shared_ptr<OperationConvert> &operation) {
   return resolve_operation(operation->op);
+}
+
+bool Parser::resolve_print_function(
+    std::shared_ptr<OperationPrintFunction> &operation) {
+  return true;
 }
 
 static std::shared_ptr<OperationModule>

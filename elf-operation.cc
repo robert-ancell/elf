@@ -246,3 +246,9 @@ bool OperationConvert::is_constant() { return op->is_constant(); }
 std::string OperationConvert::get_data_type() { return data_type; }
 
 std::string OperationConvert::to_string() { return "CONVERT"; }
+
+bool OperationPrintFunction::is_constant() { return true; }
+
+std::string OperationPrintFunction::get_data_type() { return ""; }
+
+std::string OperationPrintFunction::to_string() { return "PRINT"; }

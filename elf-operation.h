@@ -140,6 +140,7 @@ struct OperationFunctionDefinition : Operation {
 struct OperationCall : Operation {
   std::shared_ptr<Operation> value;
   std::vector<std::shared_ptr<Operation>> parameters;
+  std::shared_ptr<Operation> definition;
 
   OperationCall(std::shared_ptr<Operation> &value,
                 std::vector<std::shared_ptr<Operation>> &parameters)
@@ -290,6 +291,15 @@ struct OperationConvert : Operation {
 
   OperationConvert(std::shared_ptr<Operation> &op, const std::string &data_type)
       : op(op), data_type(data_type) {}
+  bool is_constant();
+  std::string get_data_type();
+  std::string to_string();
+};
+
+struct OperationPrintFunction : Operation {
+  std::shared_ptr<Token> name;
+
+  OperationPrintFunction(std::shared_ptr<Token> &name) : name(name) {}
   bool is_constant();
   std::string get_data_type();
   std::string to_string();
