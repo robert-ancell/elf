@@ -190,6 +190,7 @@ binary_operation
     expression "xor" expression
 
 function_defintion
+    function_name ws statement_block
     type_name ws function_name ws statement_block
 
 statement_block

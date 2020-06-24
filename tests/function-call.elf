@@ -1,4 +1,4 @@
-uint8 foo () {
+foo () {
    print ('Hello World')
 }
 foo ()

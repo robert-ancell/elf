@@ -1,4 +1,2 @@
-uint8 foo (uint8 value) {
-   return value
-}
+foo (uint8 value) {}
 foo ()

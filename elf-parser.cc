@@ -999,22 +999,34 @@ Parser::parse_function_definition() {
     return nullptr;
   }
 
-  auto name = current_token(); // FIXME: Check valid name
-  if (name->type != TOKEN_TYPE_WORD) {
+  std::shared_ptr<Token> name;
+  if (current_token()->type == TOKEN_TYPE_OPEN_PAREN) {
+    name = data_type->name;
+    data_type = nullptr;
+  } else if (current_token()->type == TOKEN_TYPE_WORD) {
+    name = current_token();
+    next_token();
+  } else {
     offset = start_offset;
     return nullptr;
   }
-  next_token();
 
-  if (current_token()->type != TOKEN_TYPE_OPEN_PAREN) {
-    set_error(current_token(), "Missing open parenthesis");
+  auto open_paren = current_token();
+  if (open_paren->type != TOKEN_TYPE_OPEN_PAREN) {
+    set_error(open_paren, "Missing open parenthesis");
     return nullptr;
   }
   next_token();
 
   std::vector<std::shared_ptr<OperationVariableDefinition>> parameters;
-  while (current_token()->type != TOKEN_TYPE_EOF) {
+  while (true) {
     auto t = current_token();
+
+    if (t->type == TOKEN_TYPE_EOF) {
+      set_error(open_paren, "Unclosed paren");
+      return nullptr;
+    }
+
     if (t->type == TOKEN_TYPE_CLOSE_PAREN) {
       next_token();
       break;
@@ -1022,7 +1034,7 @@ Parser::parse_function_definition() {
 
     if (parameters.size() > 0) {
       if (t->type != TOKEN_TYPE_COMMA) {
-        set_error(current_token(), "Missing comma");
+        offset = start_offset;
         return nullptr;
       }
       next_token();
@@ -1031,13 +1043,13 @@ Parser::parse_function_definition() {
 
     auto param_data_type = parse_data_type();
     if (param_data_type == nullptr) {
-      set_error(current_token(), "Parameter not a data type");
+      offset = start_offset;
       return nullptr;
     }
 
     auto name = current_token();
     if (name->type != TOKEN_TYPE_WORD) {
-      set_error(current_token(), "Not a parameter name");
+      offset = start_offset;
       return nullptr;
     }
     next_token();
@@ -1046,13 +1058,8 @@ Parser::parse_function_definition() {
         param_data_type, name, nullptr));
   }
 
-  if (current_token()->type == TOKEN_TYPE_EOF) {
-    set_error(current_token(), "Unclosed paren");
-    return nullptr;
-  }
-
   if (current_token()->type != TOKEN_TYPE_OPEN_BRACE) {
-    set_error(current_token(), "Missing function open brace");
+    offset = start_offset;
     return nullptr;
   }
   next_token();
@@ -1407,7 +1414,8 @@ bool Parser::resolve_call(std::shared_ptr<OperationCall> &operation) {
 
 bool Parser::resolve_function_definition(
     std::shared_ptr<OperationFunctionDefinition> &operation) {
-  if (!resolve_data_type(operation->data_type))
+  if (operation->data_type != nullptr &&
+      !resolve_data_type(operation->data_type))
     return false;
 
   push_stack(operation);
