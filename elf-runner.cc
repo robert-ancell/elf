@@ -431,6 +431,41 @@ ProgramState::run_assignment(std::shared_ptr<OperationAssignment> &operation) {
   auto value_uint8 = std::dynamic_pointer_cast<DataValueUint8>(value);
   if (target_value_uint8 != nullptr && value_uint8 != nullptr)
     target_value_uint8->value = value_uint8->value;
+  auto target_value_int8 =
+      std::dynamic_pointer_cast<DataValueInt8>(target_value);
+  auto value_int8 = std::dynamic_pointer_cast<DataValueInt8>(value);
+  if (target_value_int8 != nullptr && value_int8 != nullptr)
+    target_value_int8->value = value_int8->value;
+  auto target_value_uint16 =
+      std::dynamic_pointer_cast<DataValueUint16>(target_value);
+  auto value_uint16 = std::dynamic_pointer_cast<DataValueUint16>(value);
+  if (target_value_uint16 != nullptr && value_uint16 != nullptr)
+    target_value_uint16->value = value_uint16->value;
+  auto target_value_int16 =
+      std::dynamic_pointer_cast<DataValueInt16>(target_value);
+  auto value_int16 = std::dynamic_pointer_cast<DataValueInt16>(value);
+  if (target_value_int16 != nullptr && value_int16 != nullptr)
+    target_value_int16->value = value_int16->value;
+  auto target_value_uint32 =
+      std::dynamic_pointer_cast<DataValueUint32>(target_value);
+  auto value_uint32 = std::dynamic_pointer_cast<DataValueUint32>(value);
+  if (target_value_uint32 != nullptr && value_uint32 != nullptr)
+    target_value_uint32->value = value_uint32->value;
+  auto target_value_int32 =
+      std::dynamic_pointer_cast<DataValueInt32>(target_value);
+  auto value_int32 = std::dynamic_pointer_cast<DataValueInt32>(value);
+  if (target_value_int32 != nullptr && value_int32 != nullptr)
+    target_value_int32->value = value_int32->value;
+  auto target_value_uint64 =
+      std::dynamic_pointer_cast<DataValueUint64>(target_value);
+  auto value_uint64 = std::dynamic_pointer_cast<DataValueUint64>(value);
+  if (target_value_uint64 != nullptr && value_uint64 != nullptr)
+    target_value_uint64->value = value_uint64->value;
+  auto target_value_int64 =
+      std::dynamic_pointer_cast<DataValueInt64>(target_value);
+  auto value_int64 = std::dynamic_pointer_cast<DataValueInt64>(value);
+  if (target_value_int64 != nullptr && value_int64 != nullptr)
+    target_value_int64->value = value_int64->value;
   auto target_value_utf8 =
       std::dynamic_pointer_cast<DataValueUtf8>(target_value);
   auto value_utf8 = std::dynamic_pointer_cast<DataValueUtf8>(value);
