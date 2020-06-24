@@ -322,7 +322,7 @@ std::shared_ptr<Operation> Parser::parse_value() {
       if (!parse_parameters(parameters))
         return nullptr;
 
-      op = std::make_shared<OperationCall>(op, parameters);
+      op = std::make_shared<OperationCall>(op, token, parameters);
     } else if (token->type == TOKEN_TYPE_MEMBER) {
       next_token();
       op = std::make_shared<OperationMember>(op, token);
@@ -1373,6 +1373,33 @@ bool Parser::resolve_call(std::shared_ptr<OperationCall> &operation) {
 
   if (operation->definition == nullptr)
     return false;
+
+  auto function_definition =
+      std::dynamic_pointer_cast<OperationFunctionDefinition>(
+          operation->definition);
+  if (function_definition != nullptr) {
+    auto n_required = function_definition->parameters.size();
+    auto n_provided = operation->parameters.size();
+    if (n_provided > n_required) {
+      if (n_required == 0)
+        set_error(operation->open_paren, "Function takes no parameters");
+      else
+        set_error(operation->open_paren,
+                  std::to_string(n_provided - n_required) +
+                      " extra parameters provided");
+      return false;
+    } else if (n_required > n_provided) {
+      if (n_provided == 0)
+        set_error(operation->open_paren, "Function takes " +
+                                             std::to_string(n_required) +
+                                             " parameters");
+      else
+        set_error(operation->open_paren,
+                  "Missing " + std::to_string(n_required - n_provided) +
+                      " parameters");
+      return false;
+    }
+  }
 
   push_stack(operation);
   return resolve_sequence(operation->parameters);

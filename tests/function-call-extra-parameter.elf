@@ -1,0 +1,4 @@
+uint8 foo () {
+   return 42
+}
+foo (123)

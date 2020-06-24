@@ -139,12 +139,14 @@ struct OperationFunctionDefinition : Operation {
 
 struct OperationCall : Operation {
   std::shared_ptr<Operation> value;
+  std::shared_ptr<Token> open_paren;
   std::vector<std::shared_ptr<Operation>> parameters;
   std::shared_ptr<Operation> definition;
 
   OperationCall(std::shared_ptr<Operation> &value,
+                std::shared_ptr<Token> &open_paren,
                 std::vector<std::shared_ptr<Operation>> &parameters)
-      : value(value), parameters(parameters) {}
+      : value(value), open_paren(open_paren), parameters(parameters) {}
   bool is_constant();
   std::string get_data_type();
   std::string to_string();
